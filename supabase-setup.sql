@@ -20,16 +20,16 @@ create table public.people (
   created_at timestamptz not null default now()
 );
 
--- DD (Daily Download): calendario delle presentazioni
+-- DD (Daily Download): calendario delle presentazioni (solo Product)
 create table public.downloads (
   id uuid primary key default gen_random_uuid(),
   date date not null,
-  topic text not null default 'Product',   -- Business/Support/Product/Creative/Fun
-  title text,                               -- opzionale
+  title text not null,                      -- anche provvisorio
   preparer_id uuid references public.people(id) on delete set null,
   uploaded boolean not null default false,
-  presenter_id uuid references public.people(id) on delete set null,
+  presenter_id uuid references public.people(id) on delete set null,  -- chi lo delivera
   presented boolean not null default false,
+  manager text,                             -- manager presente (testo libero)
   notes text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -127,9 +127,3 @@ insert into public.fwe (name) values
   ('Ferrara'), ('Galli'), ('Martini'), ('Leone'), ('Longo'),
   ('Gentile'), ('Vitale'), ('Lombardo'), ('Serra'), ('Coppola'),
   ('De Santis'), ('D''Angelo'), ('Marchetti'), ('Parisi'), ('Villa');
-
--- DD dei prossimi 14 giorni con argomento assegnato a caso
-insert into public.downloads (date, topic)
-select d::date,
-       (array['Business','Support','Product','Creative','Fun'])[1 + floor(random()*5)::int]
-from generate_series(current_date, current_date + 13, interval '1 day') as g(d);
