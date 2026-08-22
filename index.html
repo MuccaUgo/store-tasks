@@ -545,9 +545,8 @@ function renderValidation(main) {
 function renderTeam(main) {
   const rowsPeople = people.map(p => `
     <div class="row spread" style="padding:8px 0; border-bottom:1px solid var(--line)">
-      <div>${esc(p.name)} ${p.active ? "" : `<span class="sub">(disattivato)</span>`}</div>
-      <button class="ghost small" data-act="toggle-person" data-id="${p.id}">
-        ${p.active ? "Disattiva" : "Riattiva"}</button>
+      <div>${esc(p.name)}</div>
+      <button class="danger small" data-act="del-person" data-id="${p.id}">Elimina</button>
     </div>`).join("");
   main.innerHTML = `
     <div class="section-head"><h2>Persone</h2>
@@ -562,11 +561,17 @@ function renderTeam(main) {
       await log(`ha aggiunto ${fd.get("name").trim()} al team`);
       await refresh();
     });
-  main.querySelectorAll("[data-act=toggle-person]").forEach(b => {
+  main.querySelectorAll("[data-act=del-person]").forEach(b => {
     b.onclick = async () => {
       const p = people.find(x => x.id === b.dataset.id);
-      await db.from("people").update({ active: !p.active }).eq("id", p.id);
-      await log(`${p.active ? "ha disattivato" : "ha riattivato"} ${p.name}`);
+      if (!confirm(`Eliminare ${p.name} dal team?\nLe attività già registrate nello Storico restano.`)) return;
+      const { error } = await db.from("people").delete().eq("id", p.id);
+      if (error) { toast("Errore nell'eliminazione"); return; }
+      await log(`ha eliminato ${p.name} dal team`);
+      if (me?.id === p.id) {
+        localStorage.removeItem("whoami"); me = null;
+        await loadAll(); showWhoami(); return;
+      }
       await refresh();
     };
   });
