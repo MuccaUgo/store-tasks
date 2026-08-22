@@ -23,11 +23,10 @@ Nel progetto Supabase → **SQL Editor** → incolla il contenuto di
 `supabase-setup.sql` → **Run**.
 
 ### 2. Utente condiviso
-Supabase → **Authentication → Users → Add user → Create new user**:
-
-- Email: `team@store-tasks.app`
-- Password: la password del team (quella che i colleghi useranno per entrare)
-- Spunta **Auto Confirm User**
+L'utente condiviso è `marcocasati+storetasks@gmail.com` (alias Gmail del
+proprietario: le email di sistema arrivano a lui). La sua password è la
+password del team. Nota: Supabase rifiuta email con domini inesistenti,
+quindi serve un dominio reale.
 
 ### 3. Pubblicazione su GitHub Pages
 1. Crea un repository su GitHub (es. `store-tasks`) e carica questi file.
