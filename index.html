@@ -398,6 +398,7 @@ function ddCard(d) {
     <div class="field"><label>Chi lo prepara</label>${personSelect(d.preparer_id, "sel-preparer", d.id)}</div>
     <div class="field"><label>Chi lo delivera</label>${personSelect(d.presenter_id, "sel-presenter", d.id)}</div>
     ${d.manager ? `<div class="manager-line">👤 Manager presente: <strong>${esc(d.manager)}</strong></div>` : ""}
+    ${d.notes ? `<div class="manager-line">📝 ${esc(d.notes)}</div>` : ""}
     <div class="row" style="margin-top:12px">
       <button class="toggle ${d.uploaded ? "on" : ""}" data-act="uploaded" data-id="${d.id}">
         ${d.uploaded ? "✓ Caricato" : "Da caricare"}</button>
@@ -426,7 +427,9 @@ function ddFormFields(d) {
           `<option value="${p.id}" ${p.id === d?.presenter_id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}
       </select></div>
     <div class="field"><label>Manager presente</label>
-      <input type="text" name="manager" value="${esc(d?.manager || "")}" placeholder="es. Verdi"></div>`;
+      <input type="text" name="manager" value="${esc(d?.manager || "")}" placeholder="es. Verdi"></div>
+    <div class="field"><label>Note / altri partecipanti</label>
+      <input type="text" name="notes" value="${esc(d?.notes || "")}" placeholder="es. presente anche il team Genius"></div>`;
 }
 
 function renderDD(main) {
@@ -469,6 +472,7 @@ function renderDD(main) {
         preparer_id: fd.get("preparer_id") || null,
         presenter_id: fd.get("presenter_id") || null,
         manager: fd.get("manager").trim() || null,
+        notes: fd.get("notes").trim() || null,
       };
       const { error } = await db.from("downloads").insert(row);
       if (error) { toast("Errore nel salvataggio"); return; }
@@ -490,6 +494,7 @@ function renderDD(main) {
             preparer_id: fd.get("preparer_id") || null,
             presenter_id: fd.get("presenter_id") || null,
             manager: fd.get("manager").trim() || null,
+            notes: fd.get("notes").trim() || null,
             updated_at: new Date().toISOString(),
           };
           const { error } = await db.from("downloads").update(row).eq("id", d.id);
