@@ -99,6 +99,36 @@
     background: var(--warn-soft); color: var(--warn);
   }
   .badge.done { background: var(--ok-soft); color: var(--ok); }
+  .topic {
+    font-size: .72rem; font-weight: 700; padding: 3px 10px; border-radius: 999px;
+    display: inline-block;
+  }
+  .topic.Business { background: rgba(59,130,246,.16); color: #3b82f6; }
+  .topic.Support  { background: rgba(245,158,11,.16); color: #d97706; }
+  .topic.Product  { background: rgba(16,185,129,.16); color: #0d9668; }
+  .topic.Creative { background: rgba(168,85,247,.16); color: #a855f7; }
+  .topic.Fun      { background: rgba(236,72,153,.16); color: #ec4899; }
+  @media (prefers-color-scheme: dark) {
+    .topic.Business { color: #7ab1ff; }
+    .topic.Support  { color: #fbbf24; }
+    .topic.Product  { color: #34d399; }
+  }
+  .date-head {
+    margin: 16px 2px 8px; font-size: .82rem; font-weight: 700;
+    color: var(--muted); text-transform: uppercase; letter-spacing: .04em;
+  }
+  .date-head.today { color: var(--accent); }
+  .mini {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 11px 14px; margin-bottom: 8px;
+  }
+  .mini .sub { flex: 1; }
+  details.past { margin-top: 18px; }
+  details.past summary {
+    cursor: pointer; color: var(--muted); font-size: .85rem; font-weight: 600;
+    padding: 8px 2px; list-style: none;
+  }
   .progress { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin: 8px 0 4px; }
   .progress > div { height: 100%; background: var(--ok); border-radius: 3px; transition: width .3s; }
   .checklist { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 6px; }
@@ -114,6 +144,7 @@
     color: #fff; font-size: .8rem;
   }
   .check-item.done .box { background: var(--ok); border-color: var(--ok); }
+  .fwe-summary { cursor: pointer; }
   nav {
     position: fixed; bottom: 0; left: 0; right: 0; z-index: 10;
     display: flex; background: var(--card); border-top: 1px solid var(--line);
@@ -152,7 +183,7 @@
   .login-box h1 { margin-bottom: 4px; }
   .login-box p { color: var(--muted); font-size: .9rem; margin-bottom: 20px; }
   .login-box form { display: flex; flex-direction: column; gap: 12px; text-align: left; }
-  .who-list { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+  .who-list { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; max-height: 45dvh; overflow-y: auto; }
   .who-list button { background: var(--card); color: var(--text); border: 1px solid var(--line); text-align: left; }
   .log-item { padding: 9px 2px; border-bottom: 1px solid var(--line); font-size: .85rem; }
   .log-item:last-child { border-bottom: none; }
@@ -180,24 +211,18 @@
     <h1>Chi sei?</h1>
     <p>Scegli il tuo nome: le attività che gestisci verranno registrate a tuo nome.</p>
     <div class="who-list" id="who-list"></div>
-    <div class="field" style="margin-top:18px">
-      <form id="who-add-form" class="row" style="gap:8px; flex-wrap:nowrap">
-        <input type="text" id="who-add-name" placeholder="Il tuo nome non c'è? Aggiungilo" style="flex:1">
-        <button type="submit" class="small">+</button>
-      </form>
-    </div>
   </div>
 </div>
 
 <div id="view-app" class="hidden">
   <header>
-    <h1 id="tab-title">Download</h1>
+    <h1 id="tab-title">DD</h1>
     <button id="whoami-chip" title="Cambia utente"></button>
   </header>
   <main id="main"></main>
   <nav>
-    <button data-tab="downloads" class="active"><span class="ico">📥</span>Download</button>
-    <button data-tab="fwe"><span class="ico">🎓</span>FWE</button>
+    <button data-tab="dd" class="active"><span class="ico">📅</span>DD</button>
+    <button data-tab="validation"><span class="ico">✅</span>Validation</button>
     <button data-tab="team"><span class="ico">👥</span>Team</button>
     <button data-tab="log"><span class="ico">🕓</span>Storico</button>
   </nav>
@@ -217,12 +242,16 @@ const SUPABASE_URL = "https://nrxnmucuwucfecnphrtf.supabase.co";
 const SUPABASE_KEY = "sb_publishable_OJnekj88Hcc4zCXVo8k9Uw_oSlwAmXm";
 const SHARED_EMAIL = "team@store-tasks.app"; // utente condiviso creato in Supabase Auth
 
+const TOPICS = ["Business", "Support", "Product", "Creative", "Fun"];
+const MANAGED_TOPIC = "Product"; // solo questi DD vengono gestiti dal team
+
 const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ── Stato ───────────────────────────────────────────────────
 let people = [], downloads = [], competencies = [], fwes = [], validations = [], logRows = [];
-let tab = "downloads";
+let tab = "dd";
 let me = JSON.parse(localStorage.getItem("whoami") || "null");
+let openFwe = new Set(); // schede FWE espanse
 
 const $ = (s) => document.querySelector(s);
 const views = { login: $("#view-login"), whoami: $("#view-whoami"), app: $("#view-app") };
@@ -235,9 +264,15 @@ function toast(msg) {
   clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2600);
 }
 const esc = (s) => (s ?? "").toString().replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
-const fmtDate = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" }) : "—";
+const todayStr = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+};
+const fmtDate = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" }) : "—";
+const fmtDateShort = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString("it-IT", { day: "numeric", month: "short" }) : "—";
 const fmtTs = (ts) => new Date(ts).toLocaleString("it-IT", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 const personName = (id) => people.find(p => p.id === id)?.name || "—";
+const ddLabel = (d) => d.title || `DD ${d.topic} · ${fmtDateShort(d.date)}`;
 
 // ── Login ───────────────────────────────────────────────────
 $("#login-form").addEventListener("submit", async (e) => {
@@ -253,7 +288,7 @@ $("#login-form").addEventListener("submit", async (e) => {
 });
 
 $("#whoami-chip").addEventListener("click", () => {
-  if (confirm("Vuoi cambiare utente o uscire?\nOK = cambia nome · Annulla = resta")) {
+  if (confirm("Vuoi cambiare nome utente?")) {
     localStorage.removeItem("whoami"); me = null;
     showWhoami();
   }
@@ -277,19 +312,6 @@ function showWhoami() {
   });
 }
 
-$("#who-add-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const name = $("#who-add-name").value.trim();
-  if (!name) return;
-  const { data, error } = await db.from("people").insert({ name }).select().single();
-  if (error) { toast("Errore: nome già esistente?"); return; }
-  people.push(data);
-  me = { id: data.id, name: data.name };
-  localStorage.setItem("whoami", JSON.stringify(me));
-  await log(`si è unito al team`);
-  enterApp();
-});
-
 function enterApp() {
   $("#whoami-chip").textContent = me.name;
   show("app");
@@ -301,9 +323,9 @@ function enterApp() {
 async function loadAll() {
   const [p, d, c, f, v, l] = await Promise.all([
     db.from("people").select("*").order("name"),
-    db.from("downloads").select("*").order("date", { ascending: false }),
+    db.from("downloads").select("*").order("date"),
     db.from("competencies").select("*").order("position"),
-    db.from("fwe").select("*").order("created_at", { ascending: false }),
+    db.from("fwe").select("*").order("name"),
     db.from("fwe_validations").select("*"),
     db.from("activity_log").select("*").order("id", { ascending: false }).limit(80),
   ]);
@@ -340,18 +362,18 @@ document.querySelectorAll("nav button").forEach(b => {
   });
 });
 
-const TITLES = { downloads: "Download", fwe: "FWE", team: "Team", log: "Storico" };
+const TITLES = { dd: "Daily Download", validation: "Validation", team: "Team", log: "Storico" };
 
 function render() {
   $("#tab-title").textContent = TITLES[tab];
   const main = $("#main");
-  if (tab === "downloads") renderDownloads(main);
-  else if (tab === "fwe") renderFwe(main);
+  if (tab === "dd") renderDD(main);
+  else if (tab === "validation") renderValidation(main);
   else if (tab === "team") renderTeam(main);
   else renderLog(main);
 }
 
-// ── Download ────────────────────────────────────────────────
+// ── DD (Daily Download) ─────────────────────────────────────
 function personSelect(selected, cls, id) {
   const opts = people.filter(p => p.active || p.id === selected)
     .map(p => `<option value="${p.id}" ${p.id === selected ? "selected" : ""}>${esc(p.name)}</option>`).join("");
@@ -359,38 +381,81 @@ function personSelect(selected, cls, id) {
     <option value="">— nessuno —</option>${opts}</select>`;
 }
 
-function renderDownloads(main) {
-  const cards = downloads.map(d => {
-    const done = d.uploaded && d.presented;
-    return `<div class="card" data-id="${d.id}">
-      <div class="row spread">
-        <div><h3>${esc(d.title)}</h3><div class="sub">${fmtDate(d.date)}</div></div>
-        <span class="badge ${done ? "done" : ""}">${done ? "Completato" : "In corso"}</span>
-      </div>
-      <div class="field"><label>Chi lo prepara</label>${personSelect(d.preparer_id, "sel-preparer", d.id)}</div>
-      <div class="field"><label>Chi lo presenta</label>${personSelect(d.presenter_id, "sel-presenter", d.id)}</div>
-      <div class="row" style="margin-top:12px">
-        <button class="toggle ${d.uploaded ? "on" : ""}" data-act="uploaded" data-id="${d.id}">
-          ${d.uploaded ? "✓ Caricato" : "Da caricare"}</button>
-        <button class="toggle ${d.presented ? "on" : ""}" data-act="presented" data-id="${d.id}">
-          ${d.presented ? "✓ Presentato" : "Da presentare"}</button>
-        <span style="flex:1"></span>
-        <button class="danger small" data-act="del-download" data-id="${d.id}">Elimina</button>
-      </div>
+function ddCard(d) {
+  const managed = d.topic === MANAGED_TOPIC;
+  if (!managed) {
+    return `<div class="mini">
+      <span class="topic ${esc(d.topic)}">${esc(d.topic)}</span>
+      <span class="sub">${d.title ? esc(d.title) : "gestito da altri"}</span>
+      <button class="danger small" data-act="del-dd" data-id="${d.id}">✕</button>
     </div>`;
-  }).join("");
-  main.innerHTML = `
-    <div class="section-head"><h2>Presentazioni</h2>
-      <button class="small" id="add-download">+ Nuovo</button></div>
-    ${cards || `<div class="empty">Nessun download ancora.<br>Aggiungi il primo con “+ Nuovo”.</div>`}`;
+  }
+  const done = d.uploaded && d.presented;
+  return `<div class="card" data-id="${d.id}">
+    <div class="row spread">
+      <div class="row" style="gap:8px">
+        <span class="topic ${esc(d.topic)}">${esc(d.topic)}</span>
+        ${d.title ? `<h3>${esc(d.title)}</h3>` : ""}
+      </div>
+      <span class="badge ${done ? "done" : ""}">${done ? "Completato" : "In corso"}</span>
+    </div>
+    <div class="field"><label>Chi lo prepara</label>${personSelect(d.preparer_id, "sel-preparer", d.id)}</div>
+    <div class="field"><label>Chi lo presenta</label>${personSelect(d.presenter_id, "sel-presenter", d.id)}</div>
+    <div class="row" style="margin-top:12px">
+      <button class="toggle ${d.uploaded ? "on" : ""}" data-act="uploaded" data-id="${d.id}">
+        ${d.uploaded ? "✓ Caricato" : "Da caricare"}</button>
+      <button class="toggle ${d.presented ? "on" : ""}" data-act="presented" data-id="${d.id}">
+        ${d.presented ? "✓ Presentato" : "Da presentare"}</button>
+      <span style="flex:1"></span>
+      <button class="danger small" data-act="del-dd" data-id="${d.id}">Elimina</button>
+    </div>
+  </div>`;
+}
 
-  $("#add-download").onclick = () => openDialog("Nuovo download", `
-      <div class="field"><label>Titolo</label><input type="text" name="title" required></div>
-      <div class="field"><label>Data</label><input type="date" name="date" value="${new Date().toISOString().slice(0,10)}" required></div>`,
+function renderDD(main) {
+  const today = todayStr();
+  const upcoming = downloads.filter(d => d.date >= today);
+  const past = downloads.filter(d => d.date < today).reverse();
+
+  // raggruppa per data
+  const groups = [];
+  for (const d of upcoming) {
+    const g = groups[groups.length - 1];
+    if (g && g.date === d.date) g.items.push(d);
+    else groups.push({ date: d.date, items: [d] });
+  }
+  const calendar = groups.map(g => `
+    <div class="date-head ${g.date === today ? "today" : ""}">
+      ${g.date === today ? "Oggi · " : ""}${fmtDate(g.date)}</div>
+    ${g.items.map(ddCard).join("")}`).join("");
+
+  const pastHtml = past.length ? `
+    <details class="past"><summary>Giorni passati (${past.length}) ▾</summary>
+      ${past.map(d => `
+        <div class="mini">
+          <span class="topic ${esc(d.topic)}">${esc(d.topic)}</span>
+          <span class="sub">${fmtDateShort(d.date)}${d.title ? " · " + esc(d.title) : ""}</span>
+          ${d.topic === MANAGED_TOPIC ? `<span class="badge ${d.uploaded && d.presented ? "done" : ""}">
+            ${d.uploaded && d.presented ? "✓" : "✗"}</span>` : ""}
+        </div>`).join("")}
+    </details>` : "";
+
+  main.innerHTML = `
+    <div class="section-head"><h2>Calendario</h2>
+      <button class="small" id="add-dd">+ Nuovo DD</button></div>
+    ${calendar || `<div class="empty">Nessun DD in calendario.<br>Aggiungine uno con “+ Nuovo DD”.</div>`}
+    ${pastHtml}`;
+
+  $("#add-dd").onclick = () => openDialog("Nuovo DD", `
+      <div class="field"><label>Data</label><input type="date" name="date" value="${today}" required></div>
+      <div class="field"><label>Argomento</label>
+        <select name="topic">${TOPICS.map(t => `<option ${t === MANAGED_TOPIC ? "selected" : ""}>${t}</option>`).join("")}</select></div>
+      <div class="field"><label>Titolo (facoltativo)</label><input type="text" name="title" placeholder="es. Novità iPhone"></div>`,
     async (fd) => {
-      const { error } = await db.from("downloads").insert({ title: fd.get("title").trim(), date: fd.get("date") });
+      const title = fd.get("title").trim() || null;
+      const { error } = await db.from("downloads").insert({ date: fd.get("date"), topic: fd.get("topic"), title });
       if (error) { toast("Errore nel salvataggio"); return; }
-      await log(`ha creato il download “${fd.get("title").trim()}”`);
+      await log(`ha creato il DD ${fd.get("topic")} del ${fmtDateShort(fd.get("date"))}${title ? ` “${title}”` : ""}`);
       await refresh();
     });
 
@@ -400,7 +465,7 @@ function renderDownloads(main) {
       const d = downloads.find(x => x.id === sel.dataset.id);
       const val = sel.value || null;
       await db.from("downloads").update({ [field]: val, updated_at: new Date().toISOString() }).eq("id", d.id);
-      await log(`ha assegnato ${field === "preparer_id" ? "la preparazione" : "la presentazione"} di “${d.title}” a ${val ? personName(val) : "nessuno"}`);
+      await log(`ha assegnato ${field === "preparer_id" ? "la preparazione" : "la presentazione"} di “${ddLabel(d)}” a ${val ? personName(val) : "nessuno"}`);
       await refresh();
     };
   });
@@ -410,23 +475,23 @@ function renderDownloads(main) {
       const field = b.dataset.act;
       const val = !d[field];
       await db.from("downloads").update({ [field]: val, updated_at: new Date().toISOString() }).eq("id", d.id);
-      await log(`ha segnato “${d.title}” come ${field === "uploaded" ? (val ? "caricato" : "da caricare") : (val ? "presentato" : "da presentare")}`);
+      await log(`ha segnato “${ddLabel(d)}” come ${field === "uploaded" ? (val ? "caricato" : "da caricare") : (val ? "presentato" : "da presentare")}`);
       await refresh();
     };
   });
-  main.querySelectorAll("[data-act=del-download]").forEach(b => {
+  main.querySelectorAll("[data-act=del-dd]").forEach(b => {
     b.onclick = async () => {
       const d = downloads.find(x => x.id === b.dataset.id);
-      if (!confirm(`Eliminare “${d.title}”?`)) return;
+      if (!confirm(`Eliminare “${ddLabel(d)}”?`)) return;
       await db.from("downloads").delete().eq("id", d.id);
-      await log(`ha eliminato il download “${d.title}”`);
+      await log(`ha eliminato il DD “${ddLabel(d)}”`);
       await refresh();
     };
   });
 }
 
-// ── FWE ─────────────────────────────────────────────────────
-function renderFwe(main) {
+// ── Validation (FWE) ────────────────────────────────────────
+function renderValidation(main) {
   const activeComps = competencies.filter(c => c.active);
   const cards = fwes.map(f => {
     const mine = validations.filter(v => v.fwe_id === f.id);
@@ -434,7 +499,8 @@ function renderFwe(main) {
     const total = activeComps.length;
     const done = activeComps.filter(c => doneIds.has(c.id)).length;
     const complete = total > 0 && done === total;
-    const items = activeComps.map(c => {
+    const expanded = openFwe.has(f.id);
+    const items = !expanded ? "" : activeComps.map(c => {
       const v = mine.find(x => x.competency_id === c.id);
       return `<div class="check-item ${v ? "done" : ""}" data-fwe="${f.id}" data-comp="${c.id}">
         <div class="box">${v ? "✓" : ""}</div>
@@ -443,26 +509,34 @@ function renderFwe(main) {
         </div></div>`;
     }).join("");
     return `<div class="card">
-      <div class="row spread">
+      <div class="row spread fwe-summary" data-fwe-toggle="${f.id}">
         <div><h3>${esc(f.name)}</h3>
-          <div class="sub">${f.start_date ? "dal " + fmtDate(f.start_date) : ""}</div></div>
+          <div class="sub">${f.start_date ? "dal " + fmtDateShort(f.start_date) : "tocca per la checklist"}</div></div>
         <span class="badge ${complete ? "done" : ""}">${done}/${total}</span>
       </div>
       <div class="progress"><div style="width:${total ? (done/total*100) : 0}%"></div></div>
-      <div class="checklist">${items || `<div class="sub">Nessuna competenza definita — aggiungile dalla scheda Team.</div>`}</div>
+      ${expanded ? `<div class="checklist">${items}</div>
       <div class="row" style="justify-content:flex-end; margin-top:8px">
         <button class="danger small" data-act="del-fwe" data-id="${f.id}">Rimuovi</button>
-      </div>
+      </div>` : ""}
     </div>`;
   }).join("");
+
+  const doneCount = fwes.filter(f => {
+    const ids = new Set(validations.filter(v => v.fwe_id === f.id).map(v => v.competency_id));
+    const comps = competencies.filter(c => c.active);
+    return comps.length > 0 && comps.every(c => ids.has(c.id));
+  }).length;
+
   main.innerHTML = `
-    <div class="section-head"><h2>Nuovi arrivati</h2>
+    <div class="section-head">
+      <h2>FWE <span class="sub">${doneCount}/${fwes.length} completi</span></h2>
       <button class="small" id="add-fwe">+ Nuovo</button></div>
     ${cards || `<div class="empty">Nessun FWE in corso.</div>`}`;
 
   $("#add-fwe").onclick = () => openDialog("Nuovo FWE", `
-      <div class="field"><label>Nome</label><input type="text" name="name" required></div>
-      <div class="field"><label>Data di inizio</label><input type="date" name="start_date" value="${new Date().toISOString().slice(0,10)}"></div>`,
+      <div class="field"><label>Cognome</label><input type="text" name="name" required></div>
+      <div class="field"><label>Data di inizio (facoltativa)</label><input type="date" name="start_date"></div>`,
     async (fd) => {
       const { error } = await db.from("fwe").insert({ name: fd.get("name").trim(), start_date: fd.get("start_date") || null });
       if (error) { toast("Errore nel salvataggio"); return; }
@@ -470,6 +544,13 @@ function renderFwe(main) {
       await refresh();
     });
 
+  main.querySelectorAll("[data-fwe-toggle]").forEach(el => {
+    el.onclick = () => {
+      const id = el.dataset.fweToggle;
+      openFwe.has(id) ? openFwe.delete(id) : openFwe.add(id);
+      render();
+    };
+  });
   main.querySelectorAll(".check-item").forEach(it => {
     it.onclick = async () => {
       const fweId = it.dataset.fwe, compId = it.dataset.comp;
@@ -488,7 +569,8 @@ function renderFwe(main) {
     };
   });
   main.querySelectorAll("[data-act=del-fwe]").forEach(b => {
-    b.onclick = async () => {
+    b.onclick = async (e) => {
+      e.stopPropagation();
       const f = fwes.find(x => x.id === b.dataset.id);
       if (!confirm(`Rimuovere ${f.name} e le sue validazioni?`)) return;
       await db.from("fwe").delete().eq("id", f.id);
@@ -516,12 +598,12 @@ function renderTeam(main) {
     <div class="section-head"><h2>Persone</h2>
       <button class="small" id="add-person">+ Aggiungi</button></div>
     <div class="card">${rowsPeople || `<div class="empty">Nessuno ancora.</div>`}</div>
-    <div class="section-head"><h2>Competenze FWE</h2>
+    <div class="section-head"><h2>Competenze da validare</h2>
       <button class="small" id="add-comp">+ Aggiungi</button></div>
     <div class="card">${rowsComps || `<div class="empty">Nessuna competenza.</div>`}</div>`;
 
   $("#add-person").onclick = () => openDialog("Nuova persona", `
-      <div class="field"><label>Nome</label><input type="text" name="name" required></div>`,
+      <div class="field"><label>Cognome</label><input type="text" name="name" required></div>`,
     async (fd) => {
       const { error } = await db.from("people").insert({ name: fd.get("name").trim() });
       if (error) { toast("Nome già esistente?"); return; }

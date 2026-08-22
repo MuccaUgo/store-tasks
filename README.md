@@ -2,10 +2,17 @@
 
 Web app mobile-first per gestire le attività dello store in team (~12 persone):
 
-- **Download** — presentazioni: chi le prepara, se sono caricate, chi le presenta
-- **FWE** — nuovi arrivati: checklist di competenze da validare, con firma e data
+- **DD (Daily Download)** — calendario dei prossimi giorni con argomento
+  (Business/Support/Product/Creative/Fun); il team gestisce i **Product**:
+  chi prepara, caricato sì/no, chi presenta, presentato sì/no
+- **Validation** — FWE (nuovi arrivati, senza accesso all'app): checklist di
+  competenze da validare (Competenze operative, Approccio, Demo, Business),
+  con firma di chi valida e data
 - **Team** — gestione persone e competenze
 - **Storico** — registro di chi ha fatto cosa
+
+Dati iniziali: 10 utenti del team e 30 FWE (cognomi di prova), DD dei
+prossimi 14 giorni con argomenti casuali.
 
 Frontend statico (GitHub Pages) + database e login su Supabase (piano gratuito).
 

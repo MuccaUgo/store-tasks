@@ -1,9 +1,18 @@
 -- ============================================================
--- Store Tasks — setup database Supabase
--- Incolla tutto questo nello SQL Editor di Supabase ed esegui.
+-- Store Tasks — setup database Supabase (v2)
+-- Incolla tutto nello SQL Editor di Supabase ed esegui.
+-- NOTA: ricrea le tabelle da zero (cancella eventuali dati
+-- inseriti con la versione precedente dello script).
 -- ============================================================
 
--- Team: le persone dello store
+drop table if exists public.fwe_validations cascade;
+drop table if exists public.fwe             cascade;
+drop table if exists public.competencies    cascade;
+drop table if exists public.downloads       cascade;
+drop table if exists public.people          cascade;
+drop table if exists public.activity_log    cascade;
+
+-- Team: chi usa l'app (login + assegnazioni DD)
 create table public.people (
   id uuid primary key default gen_random_uuid(),
   name text not null unique,
@@ -11,11 +20,12 @@ create table public.people (
   created_at timestamptz not null default now()
 );
 
--- Download: le presentazioni da preparare/caricare/presentare
+-- DD (Daily Download): calendario delle presentazioni
 create table public.downloads (
   id uuid primary key default gen_random_uuid(),
-  title text not null,
   date date not null,
+  topic text not null default 'Product',   -- Business/Support/Product/Creative/Fun
+  title text,                               -- opzionale
   preparer_id uuid references public.people(id) on delete set null,
   uploaded boolean not null default false,
   presenter_id uuid references public.people(id) on delete set null,
@@ -25,7 +35,7 @@ create table public.downloads (
   updated_at timestamptz not null default now()
 );
 
--- Competenze da validare per i nuovi arrivati (lista gestibile dall'app)
+-- Competenze da validare per gli FWE
 create table public.competencies (
   id uuid primary key default gen_random_uuid(),
   label text not null,
@@ -33,7 +43,7 @@ create table public.competencies (
   active boolean not null default true
 );
 
--- FWE: i nuovi arrivati
+-- FWE: i nuovi arrivati (non hanno accesso all'app)
 create table public.fwe (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -42,7 +52,7 @@ create table public.fwe (
   created_at timestamptz not null default now()
 );
 
--- Validazioni: quale competenza è stata validata, per chi, da chi
+-- Validazioni: competenza validata per un FWE, da chi e quando
 create table public.fwe_validations (
   id uuid primary key default gen_random_uuid(),
   fwe_id uuid not null references public.fwe(id) on delete cascade,
@@ -52,7 +62,7 @@ create table public.fwe_validations (
   unique (fwe_id, competency_id)
 );
 
--- Storico attività: chi ha fatto cosa (non modificabile dagli utenti)
+-- Storico attività: solo-aggiunta
 create table public.activity_log (
   id bigint generated always as identity primary key,
   actor text,
@@ -61,8 +71,7 @@ create table public.activity_log (
 );
 
 -- ------------------------------------------------------------
--- Row Level Security: tutto chiuso, aperto solo a chi ha
--- fatto il login (ruolo "authenticated").
+-- Row Level Security: accesso solo dopo il login
 -- ------------------------------------------------------------
 alter table public.people          enable row level security;
 alter table public.downloads       enable row level security;
@@ -82,24 +91,45 @@ create policy "team full access" on public.fwe
 create policy "team full access" on public.fwe_validations
   for all to authenticated using (true) with check (true);
 
--- Lo storico si può leggere e aggiungere, mai modificare o cancellare
 create policy "log read"   on public.activity_log
   for select to authenticated using (true);
 create policy "log insert" on public.activity_log
   for insert to authenticated with check (true);
 
 -- ------------------------------------------------------------
--- Aggiornamenti in tempo reale sui dispositivi collegati
+-- Aggiornamenti in tempo reale
 -- ------------------------------------------------------------
 alter publication supabase_realtime add table
   public.people, public.downloads, public.competencies,
   public.fwe, public.fwe_validations;
 
 -- ------------------------------------------------------------
--- Qualche competenza di esempio (modificabili dall'app)
+-- Dati iniziali
 -- ------------------------------------------------------------
+
+-- 10 utenti del team (cognomi di prova)
+insert into public.people (name) values
+  ('Rossi'), ('Bianchi'), ('Ferrari'), ('Russo'), ('Esposito'),
+  ('Colombo'), ('Ricci'), ('Marino'), ('Greco'), ('Gallo');
+
+-- Le 4 competenze da validare
 insert into public.competencies (label, position) values
-  ('Accoglienza cliente', 1),
-  ('Gestione coda', 2),
-  ('Procedure di cassa', 3),
-  ('Conoscenza prodotto', 4);
+  ('Competenze operative', 1),
+  ('Approccio', 2),
+  ('Demo', 3),
+  ('Business', 4);
+
+-- 30 FWE da validare (cognomi di prova, senza accesso all'app)
+insert into public.fwe (name) values
+  ('Conti'), ('Bruno'), ('Rizzo'), ('Moretti'), ('De Luca'),
+  ('Costa'), ('Giordano'), ('Mancini'), ('Lombardi'), ('Barbieri'),
+  ('Fontana'), ('Santoro'), ('Mariani'), ('Rinaldi'), ('Caruso'),
+  ('Ferrara'), ('Galli'), ('Martini'), ('Leone'), ('Longo'),
+  ('Gentile'), ('Vitale'), ('Lombardo'), ('Serra'), ('Coppola'),
+  ('De Santis'), ('D''Angelo'), ('Marchetti'), ('Parisi'), ('Villa');
+
+-- DD dei prossimi 14 giorni con argomento assegnato a caso
+insert into public.downloads (date, topic)
+select d::date,
+       (array['Business','Support','Product','Creative','Fun'])[1 + floor(random()*5)::int]
+from generate_series(current_date, current_date + 13, interval '1 day') as g(d);
