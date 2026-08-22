@@ -108,6 +108,7 @@
     background: var(--warn-soft); color: var(--warn);
   }
   .badge.done { background: var(--ok-soft); color: var(--ok); }
+  .dd-summary { cursor: pointer; }
   .manager-line {
     margin-top: 10px; font-size: .85rem; color: var(--muted);
     display: flex; align-items: center; gap: 6px;
@@ -263,6 +264,7 @@ const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 let people = [], downloads = [], logRows = [];
 let tab = "dd";
 let me = JSON.parse(localStorage.getItem("whoami") || "null");
+let openDD = new Set(); // schede DD espanse
 
 const $ = (s) => document.querySelector(s);
 const views = { login: $("#view-login"), whoami: $("#view-whoami"), app: $("#view-app") };
@@ -389,12 +391,18 @@ function personSelect(selected, cls, id) {
 }
 
 function ddCard(d) {
-  const done = d.uploaded && d.presented;
+  const done = d.uploaded;
+  const expanded = openDD.has(d.id);
+  const summary = [
+    d.preparer_id ? `Prepara: ${personName(d.preparer_id)}` : null,
+    d.presenter_id ? `Delivera: ${personName(d.presenter_id)}` : null,
+  ].filter(Boolean).join(" · ") || "tocca per i dettagli";
   return `<div class="card" data-id="${d.id}">
-    <div class="row spread">
-      <h3>${esc(ddLabel(d))}</h3>
-      <span class="badge ${done ? "done" : ""}">${done ? "Completato" : "In corso"}</span>
+    <div class="row spread dd-summary" data-dd-toggle="${d.id}">
+      <div><h3>${esc(ddLabel(d))}</h3><div class="sub">${esc(summary)}</div></div>
+      <span class="badge ${done ? "done" : ""}">${done ? "Caricato" : "Da caricare"}</span>
     </div>
+    ${!expanded ? "" : `
     <div class="field"><label>Chi lo prepara</label>${personSelect(d.preparer_id, "sel-preparer", d.id)}</div>
     <div class="field"><label>Chi lo delivera</label>${personSelect(d.presenter_id, "sel-presenter", d.id)}</div>
     ${d.manager ? `<div class="manager-line">👤 Manager presente: <strong>${esc(d.manager)}</strong></div>` : ""}
@@ -402,11 +410,9 @@ function ddCard(d) {
     <div class="row" style="margin-top:12px">
       <button class="toggle ${d.uploaded ? "on" : ""}" data-act="uploaded" data-id="${d.id}">
         ${d.uploaded ? "✓ Caricato" : "Da caricare"}</button>
-      <button class="toggle ${d.presented ? "on" : ""}" data-act="presented" data-id="${d.id}">
-        ${d.presented ? "✓ Deliverato" : "Da deliverare"}</button>
       <span style="flex:1"></span>
       <button class="ghost small" data-act="edit-dd" data-id="${d.id}">Modifica</button>
-    </div>
+    </div>`}
   </div>`;
 }
 
@@ -452,7 +458,7 @@ function renderDD(main) {
     <details class="past"><summary>Giorni passati (${past.length}) ▾</summary>
       ${past.map(d => `
         <div class="mini">
-          <span class="badge ${d.uploaded && d.presented ? "done" : ""}">${d.uploaded && d.presented ? "✓" : "✗"}</span>
+          <span class="badge ${d.uploaded ? "done" : ""}">${d.uploaded ? "✓" : "✗"}</span>
           <span class="sub">${fmtDateShort(d.date)} · ${esc(ddLabel(d))}</span>
           <button class="ghost small" data-act="edit-dd" data-id="${d.id}">Modifica</button>
         </div>`).join("")}
@@ -524,13 +530,19 @@ function renderDD(main) {
       await refresh();
     };
   });
-  main.querySelectorAll("[data-act=uploaded],[data-act=presented]").forEach(b => {
+  main.querySelectorAll("[data-dd-toggle]").forEach(el => {
+    el.onclick = () => {
+      const id = el.dataset.ddToggle;
+      openDD.has(id) ? openDD.delete(id) : openDD.add(id);
+      render();
+    };
+  });
+  main.querySelectorAll("[data-act=uploaded]").forEach(b => {
     b.onclick = async () => {
       const d = downloads.find(x => x.id === b.dataset.id);
-      const field = b.dataset.act;
-      const val = !d[field];
-      await db.from("downloads").update({ [field]: val, updated_at: new Date().toISOString() }).eq("id", d.id);
-      await log(`ha segnato “${ddLabel(d)}” come ${field === "uploaded" ? (val ? "caricato" : "da caricare") : (val ? "deliverato" : "da deliverare")}`);
+      const val = !d.uploaded;
+      await db.from("downloads").update({ uploaded: val, updated_at: new Date().toISOString() }).eq("id", d.id);
+      await log(`ha segnato “${ddLabel(d)}” come ${val ? "caricato" : "da caricare"}`);
       await refresh();
     };
   });
