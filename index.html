@@ -109,6 +109,23 @@
   }
   .badge.done { background: var(--ok-soft); color: var(--ok); }
   .dd-summary { cursor: pointer; }
+  .role-tag {
+    font-size: .7rem; font-weight: 700; padding: 3px 9px; border-radius: 999px;
+    text-transform: uppercase; letter-spacing: .04em; cursor: pointer; border: none;
+    background: var(--accent-soft); color: var(--accent);
+  }
+  .role-tag.pro { background: rgba(168, 85, 247, .16); color: #8b3fd4; }
+  .aud-tag {
+    font-size: .68rem; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+    text-transform: uppercase; letter-spacing: .04em; white-space: nowrap;
+    background: rgba(16, 185, 129, .16); color: #0d9668;
+  }
+  .aud-tag.pz { background: rgba(245, 158, 11, .18); color: #b8730a; }
+  @media (prefers-color-scheme: dark) {
+    .role-tag.pro { color: #c78dff; }
+    .aud-tag { color: #34d399; }
+    .aud-tag.pz { color: #fbbf24; }
+  }
   .manager-line {
     margin-top: 10px; font-size: .85rem; color: var(--muted);
     display: flex; align-items: center; gap: 6px;
@@ -265,6 +282,7 @@ let people = [], downloads = [], logRows = [];
 let tab = "dd";
 let me = JSON.parse(localStorage.getItem("whoami") || "null");
 let openDD = new Set(); // schede DD espanse
+let hasAudience = false; // il tag destinatari appare solo se la colonna esiste
 
 const $ = (s) => document.querySelector(s);
 const views = { login: $("#view-login"), whoami: $("#view-whoami"), app: $("#view-app") };
@@ -286,6 +304,7 @@ const fmtDateShort = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString("it
 const fmtTs = (ts) => new Date(ts).toLocaleString("it-IT", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 const personName = (id) => people.find(p => p.id === id)?.name || "—";
 const ddLabel = (d) => d.title || `DD del ${fmtDateShort(d.date)}`;
+const audienceLabel = (a) => a === "pz" ? "PZ solo" : "All team";
 
 // Evento .ics per aggiungere il DD al proprio calendario (promemoria ore 9:00)
 function ddToICS(d) {
@@ -297,8 +316,9 @@ function ddToICS(d) {
   const dayEnd = `${next.getFullYear()}${String(next.getMonth()+1).padStart(2,"0")}${String(next.getDate()).padStart(2,"0")}`;
   const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
   const details = [
+    hasAudience ? `Destinatari: ${audienceLabel(d.audience)}` : null,
     d.preparer_id ? `Prepara: ${personName(d.preparer_id)}` : null,
-    d.presenter_id ? `Delivera: ${personName(d.presenter_id)}` : null,
+    d.presenter_id ? `Facilita: ${personName(d.presenter_id)}` : null,
     d.manager ? `Manager presente: ${d.manager}` : null,
     d.notes ? `Note: ${d.notes}` : null,
   ].filter(Boolean).join("\n");
@@ -357,6 +377,7 @@ $("#whoami-chip").addEventListener("click", () => {
 });
 
 async function start() {
+  await detectSchema();
   await loadAll();
   if (!me || !people.find(p => p.id === me.id)) { showWhoami(); return; }
   enterApp();
@@ -382,6 +403,11 @@ function enterApp() {
 }
 
 // ── Dati ────────────────────────────────────────────────────
+async function detectSchema() {
+  const { error } = await db.from("downloads").select("audience").limit(1);
+  hasAudience = !error;
+}
+
 async function loadAll() {
   const [p, d, l] = await Promise.all([
     db.from("people").select("*").order("name"),
@@ -444,16 +470,22 @@ function ddCard(d) {
   const expanded = openDD.has(d.id);
   const summary = [
     d.preparer_id ? `Prepara: ${personName(d.preparer_id)}` : null,
-    d.presenter_id ? `Delivera: ${personName(d.presenter_id)}` : null,
+    d.presenter_id ? `Facilita: ${personName(d.presenter_id)}` : null,
   ].filter(Boolean).join(" · ") || "tocca per i dettagli";
   return `<div class="card" data-id="${d.id}">
     <div class="row spread dd-summary" data-dd-toggle="${d.id}">
-      <div><h3>${esc(ddLabel(d))}</h3><div class="sub">${esc(summary)}</div></div>
+      <div>
+        <div class="row" style="gap:8px">
+          <h3>${esc(ddLabel(d))}</h3>
+          ${hasAudience ? `<span class="aud-tag ${d.audience === "pz" ? "pz" : ""}">${audienceLabel(d.audience)}</span>` : ""}
+        </div>
+        <div class="sub">${esc(summary)}</div>
+      </div>
       <span class="badge ${done ? "done" : ""}">${done ? "Caricato" : "Da caricare"}</span>
     </div>
     ${!expanded ? "" : `
     <div class="field"><label>Chi lo prepara</label>${personSelect(d.preparer_id, "sel-preparer", d.id)}</div>
-    <div class="field"><label>Chi lo delivera</label>${personSelect(d.presenter_id, "sel-presenter", d.id)}</div>
+    <div class="field"><label>Chi lo facilita</label>${personSelect(d.presenter_id, "sel-presenter", d.id)}</div>
     ${d.manager ? `<div class="manager-line">👤 Manager presente: <strong>${esc(d.manager)}</strong></div>` : ""}
     ${d.notes ? `<div class="manager-line">📝 ${esc(d.notes)}</div>` : ""}
     <div class="row" style="margin-top:12px">
@@ -470,14 +502,20 @@ function ddFormFields(d) {
   return `
     <div class="field"><label>Data *</label>
       <input type="date" name="date" value="${d?.date || todayStr()}" required></div>
-    <div class="field"><label>Titolo (anche provvisorio) *</label>
+    <div class="field"><label>Argomento (anche provvisorio) *</label>
       <input type="text" name="title" value="${esc(d?.title || "")}" placeholder="es. Novità del mese" required></div>
+    ${!hasAudience ? "" : `
+    <div class="field"><label>Destinatari</label>
+      <select name="audience">
+        <option value="all" ${d?.audience !== "pz" ? "selected" : ""}>All team</option>
+        <option value="pz" ${d?.audience === "pz" ? "selected" : ""}>PZ solo</option>
+      </select></div>`}
     <div class="field"><label>Chi lo prepara</label>
       <select name="preparer_id"><option value="">— da assegnare —</option>
         ${people.filter(p => p.active || p.id === d?.preparer_id).map(p =>
           `<option value="${p.id}" ${p.id === d?.preparer_id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}
       </select></div>
-    <div class="field"><label>Chi lo delivera</label>
+    <div class="field"><label>Chi lo facilita</label>
       <select name="presenter_id"><option value="">— da assegnare —</option>
         ${people.filter(p => p.active || p.id === d?.presenter_id).map(p =>
           `<option value="${p.id}" ${p.id === d?.presenter_id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}
@@ -525,6 +563,7 @@ function renderDD(main) {
       const row = {
         date: fd.get("date"),
         title: fd.get("title").trim(),
+        ...(hasAudience ? { audience: fd.get("audience") } : {}),
         preparer_id: fd.get("preparer_id") || null,
         presenter_id: fd.get("presenter_id") || null,
         manager: fd.get("manager").trim() || null,
@@ -532,7 +571,7 @@ function renderDD(main) {
       };
       const { error } = await db.from("downloads").insert(row);
       if (error) { toast("Errore nel salvataggio"); return; }
-      await log(`ha creato il DD “${row.title}” del ${fmtDateShort(row.date)}`);
+      await log(`ha creato il DD “${row.title}” del ${fmtDateShort(row.date)}${hasAudience ? ` (${audienceLabel(row.audience)})` : ""}`);
       await refresh();
     });
 
@@ -547,6 +586,7 @@ function renderDD(main) {
           const row = {
             date: fd.get("date"),
             title: fd.get("title").trim(),
+            ...(hasAudience ? { audience: fd.get("audience") } : {}),
             preparer_id: fd.get("preparer_id") || null,
             presenter_id: fd.get("presenter_id") || null,
             manager: fd.get("manager").trim() || null,
@@ -576,7 +616,7 @@ function renderDD(main) {
       const d = downloads.find(x => x.id === sel.dataset.id);
       const val = sel.value || null;
       await db.from("downloads").update({ [field]: val, updated_at: new Date().toISOString() }).eq("id", d.id);
-      await log(`ha assegnato ${field === "preparer_id" ? "la preparazione" : "la delivery"} di “${ddLabel(d)}” a ${val ? personName(val) : "nessuno"}`);
+      await log(`ha assegnato ${field === "preparer_id" ? "la preparazione" : "la facilitazione"} di “${ddLabel(d)}” a ${val ? personName(val) : "nessuno"}`);
       await refresh();
     };
   });
@@ -615,22 +655,42 @@ function renderValidation(main) {
 function renderTeam(main) {
   const rowsPeople = people.map(p => `
     <div class="row spread" style="padding:8px 0; border-bottom:1px solid var(--line)">
-      <div>${esc(p.name)}</div>
+      <div class="row" style="gap:8px">
+        <span>${esc(p.name)}</span>
+        <button class="role-tag ${p.role === "pro" ? "pro" : ""}" data-act="toggle-role" data-id="${p.id}"
+          title="Tocca per cambiare ruolo">${p.role === "pro" ? "Pro" : "Expert"}</button>
+      </div>
       <button class="danger small" data-act="del-person" data-id="${p.id}">Elimina</button>
     </div>`).join("");
   main.innerHTML = `
     <div class="section-head"><h2>Persone</h2>
       <button class="small" id="add-person">+ Aggiungi</button></div>
-    <div class="card">${rowsPeople || `<div class="empty">Nessuno ancora.</div>`}</div>`;
+    <div class="card">${rowsPeople || `<div class="empty">Nessuno ancora.</div>`}</div>
+    <div class="sub" style="margin:8px 4px">Tocca Expert/Pro per cambiare il ruolo.</div>`;
 
   $("#add-person").onclick = () => openDialog("Nuova persona", `
-      <div class="field"><label>Cognome</label><input type="text" name="name" required></div>`,
+      <div class="field"><label>Cognome</label><input type="text" name="name" required></div>
+      <div class="field"><label>Ruolo</label>
+        <select name="role"><option value="expert" selected>Expert</option><option value="pro">Pro</option></select></div>`,
     async (fd) => {
-      const { error } = await db.from("people").insert({ name: fd.get("name").trim() });
+      const name = fd.get("name").trim();
+      const role = fd.get("role");
+      const { error } = await db.from("people").insert({ name, role });
       if (error) { toast("Nome già esistente?"); return; }
-      await log(`ha aggiunto ${fd.get("name").trim()} al team`);
+      await log(`ha aggiunto ${name} (${role === "pro" ? "Pro" : "Expert"}) al team`);
       await refresh();
     });
+
+  main.querySelectorAll("[data-act=toggle-role]").forEach(b => {
+    b.onclick = async () => {
+      const p = people.find(x => x.id === b.dataset.id);
+      const role = p.role === "pro" ? "expert" : "pro";
+      const { error } = await db.from("people").update({ role }).eq("id", p.id);
+      if (error) { toast("Errore nel salvataggio"); return; }
+      await log(`ha impostato ${p.name} come ${role === "pro" ? "Pro" : "Expert"}`);
+      await refresh();
+    };
+  });
   main.querySelectorAll("[data-act=del-person]").forEach(b => {
     b.onclick = async () => {
       const p = people.find(x => x.id === b.dataset.id);
