@@ -897,7 +897,7 @@ function renderFweDetail(main) {
       </div>
       <div class="progress" style="margin-top:10px"><div style="width:${tot ? done / tot * 100 : 0}%"></div></div>
     </div>
-    <div class="sub" style="margin:10px 4px 4px">Tocca una voce per farla avanzare. Su una già validata ti chiede cosa non ha funzionato.</div>`;
+    <div class="sub" style="margin:10px 4px 4px">Tocca una voce per aggiornarla: confermi sempre prima del salvataggio, e puoi aggiungere una nota.</div>`;
 
   areaList().forEach(a => {
     const leaves = leavesOf(a), isParent = kidsOf(a).length > 0;
@@ -926,7 +926,7 @@ function renderFweDetail(main) {
     html += `<div class="hist"><div class="area-head"><span>Storico</span></div>` + hist.map(e => {
       const node = comps.find(c => c.id === e.competency_id);
       const verb = e.level === 2 ? "ha validato" : e.isRevert ? "ha riportato a osservato"
-        : e.level === 1 ? "ha osservato" : "ha aggiornato";
+        : e.level === 1 ? "ha osservato" : e.level === 0 ? "ha riportato a da osservare" : "ha aggiornato";
       return `<div class="hist-i">
         <span class="hist-dot" style="background:${e.level === 2 ? "var(--ok)" : e.isRevert ? "var(--danger)" : "var(--warn)"}"></span>
         <span><b>${esc(e.actor_name)}</b> ${verb} ${esc(node ? node.label : "—")} · ${fmtTs(e.created_at)}
@@ -939,32 +939,64 @@ function renderFweDetail(main) {
   main.querySelectorAll("[data-leaf]").forEach(b => b.onclick = () => tapLeaf(f, b.dataset.leaf));
 }
 
-async function tapLeaf(f, leafId) {
+// Ogni tocco apre un foglio con la transizione, nota facoltativa e Annulla:
+// niente avanza più per sbaglio. La nota è obbligatoria solo tornando
+// indietro da Validato.
+function tapLeaf(f, leafId) {
   const lvl = stOf(f.id, leafId);
   const node = comps.find(c => c.id === leafId);
-  if (lvl === 2) return openRevert(f, node);
-  if (lvl === 1 && !canValidate(f.id, leafId)) {
-    toast("L'hai osservata tu: la validazione spetta a un altro key role");
-    return;
-  }
-  const target = lvl === -1 ? 0 : lvl + 1;
-  if (!await addEvent(f.id, leafId, target)) return;
-  toast(target === 2 ? `${node.label} validato` : target === 1 ? `${node.label} osservato` : `${node.label} ora è richiesta`);
-  await refresh();
-}
+  const trans = (a, b) => `<p class="sub" style="margin:4px 0 2px"><strong style="color:var(--text)">${ST_LABEL[a].split(" ·")[0]}</strong> → <strong style="color:var(--accent)">${ST_LABEL[b].split(" ·")[0]}</strong></p>`;
 
-function openRevert(f, node) {
-  openDialog(`Torna a osservato`, `
-    <p class="sub">${esc(node.label)} · ${esc(f.name)}</p>
-    <div class="field"><label>Cosa non ha funzionato (obbligatorio)</label>
-      <input type="text" name="note" placeholder="es. sbaglia ancora il passaggio sul trade-in" required></div>`,
+  let target, title, noteLabel = "Nota (facoltativa)", notePh = "es. demo iPhone con cliente indeciso";
+  let noteRequired = false, extra = "", blocked = false;
+
+  if (lvl === -1) { target = 0; title = "Richiedi questa competenza"; noteLabel = "Perché la aggiungi ora (facoltativa)"; notePh = "es. entrata nel percorso dopo il reparto"; }
+  else if (lvl === 0) { target = 1; title = "Segna come osservato"; noteLabel = "Cosa hai osservato (facoltativa)"; }
+  else if (lvl === 1) {
+    target = 2; title = "Valida";
+    noteLabel = "Cosa conferma che è autonomo (facoltativa)";
+    notePh = "es. turno intero senza supporto";
+    blocked = !canValidate(f.id, leafId);
+    if (blocked) extra = `<p class="sub" style="color:var(--warn);margin-top:6px">L'hai osservata tu: la validazione spetta a un altro key role. Puoi però riportarla a “da osservare”.</p>`;
+  } else {
+    target = 1; title = "Torna a osservato"; noteRequired = true;
+    noteLabel = "Cosa non ha funzionato (obbligatorio)";
+    notePh = "es. sbaglia ancora il passaggio sul trade-in";
+    const ev = evOf(f.id, leafId);
+    if (ev) extra = `<p class="sub" style="margin-top:6px">Validato da ${esc(ev.actor_name)} il ${fmtTs(ev.created_at)}. Resta nello storico.</p>`;
+  }
+
+  // da "osservato" si può anche tornare a "da osservare" (il tap sbagliato si corregge qui)
+  const backBtn = lvl === 1
+    ? `<div class="row" style="margin-top:12px"><button type="button" class="ghost small" id="dlg-back0">↩︎ Riporta a “da osservare”</button></div>`
+    : "";
+
+  openDialog(title, `
+      <p class="sub">${esc(node.label)} · ${esc(f.name)}</p>
+      ${blocked ? "" : trans(lvl, target)}
+      ${extra}
+      ${blocked ? "" : `<div class="field"><label>${noteLabel}</label>
+        <input type="text" name="note" placeholder="${notePh}" ${noteRequired ? "required" : ""}></div>`}
+      ${backBtn}`,
     async (fd) => {
-      const note = fd.get("note").trim();
-      if (note.length < 3) { toast("Serve una nota"); return; }
-      if (!await addEvent(f.id, node.id, 1, note)) return;
-      await log(`ha riportato a osservato “${node.label}” di ${f.name}: ${note}`);
-      toast(`${node.label} torna da verificare`);
+      if (blocked) return;
+      const note = (fd.get("note") || "").trim();
+      if (noteRequired && note.length < 3) { toast("Serve scrivere cosa non ha funzionato"); return; }
+      if (!await addEvent(f.id, leafId, target, note || null)) return;
+      if (lvl === 2) await log(`ha riportato a osservato “${node.label}” di ${f.name}: ${note}`);
+      toast(target === 2 ? `${node.label} validato` : target === 1 ? (lvl === 2 ? `${node.label} torna da verificare` : `${node.label} osservato`) : `${node.label} ora è richiesta`);
       await refresh();
+    },
+    (form) => {
+      if (blocked) form.querySelector("button[type=submit]").style.display = "none";
+      const b0 = form.querySelector("#dlg-back0");
+      if (b0) b0.onclick = async () => {
+        const note = (form.querySelector("[name=note]")?.value || "").trim();
+        if (!await addEvent(f.id, leafId, 0, note || null)) return;
+        toast(`${node.label} torna a “da osservare”`);
+        $("#dlg").close();
+        await refresh();
+      };
     });
 }
 
