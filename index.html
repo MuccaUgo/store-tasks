@@ -214,6 +214,87 @@
   .log-item { padding: 9px 2px; border-bottom: 1px solid var(--line); font-size: .85rem; }
   .log-item:last-child { border-bottom: none; }
   .log-item .sub { margin-top: 2px; }
+  /* ── Validation ── */
+  .seg {
+    display: flex; gap: 4px; padding: 4px; background: var(--bg);
+    border: 1px solid var(--line); border-radius: 13px; margin-bottom: 14px;
+  }
+  .fchip {
+    border: 1px solid var(--line); background: var(--card); color: var(--muted);
+    border-radius: 999px; padding: 7px 14px; font-size: .82rem; font-weight: 600;
+    cursor: pointer; font-family: inherit;
+  }
+  .fchip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .progress { height: 7px; background: var(--line); border-radius: 999px; overflow: hidden; }
+  .progress > div { height: 100%; background: var(--ok); border-radius: 999px; transition: width .3s; }
+  .seg button {
+    flex: 1; border: none; background: none; padding: 9px 6px; border-radius: 10px;
+    font-size: .9rem; font-weight: 600; color: var(--muted); cursor: pointer;
+  }
+  .seg button[aria-pressed="true"] { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.13); }
+  .wave-head {
+    display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin: 18px 4px 8px;
+  }
+  .wave-head:first-child { margin-top: 2px; }
+  .wave-head .wn { font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--accent); }
+  .wave-head .wm { font-size: .78rem; color: var(--muted); }
+  .dots { display: flex; gap: 5px; }
+  .dot { width: 22px; height: 7px; border-radius: 999px; background: var(--line); }
+  .dot.s1 { background: var(--warn); }
+  .dot.s2 { background: var(--ok); }
+  .dot.na { background: transparent; border: 1px dashed var(--muted); }
+  .area-head {
+    display: flex; align-items: center; gap: 10px; margin: 16px 4px 7px;
+    font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+  }
+  .area-head .ac { margin-left: auto; font-variant-numeric: tabular-nums; letter-spacing: 0; }
+  .comp-row {
+    width: 100%; text-align: left; background: var(--card); border: 1px solid var(--line);
+    border-radius: 14px; padding: 12px 14px; margin-bottom: 8px; cursor: pointer;
+    display: flex; gap: 12px; align-items: flex-start; font-family: inherit; color: var(--text);
+  }
+  .comp-row.sub { margin-left: 14px; }
+  .mark {
+    width: 25px; height: 25px; min-width: 25px; border-radius: 8px; display: grid; place-items: center;
+    font-size: .8rem; font-weight: 700; background: var(--line); color: var(--muted);
+  }
+  .mark.s1 { background: var(--warn-soft); color: var(--warn); }
+  .mark.s2 { background: var(--ok); color: #fff; }
+  .mark.na { background: transparent; border: 1px dashed var(--muted); }
+  .comp-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .comp-name { font-size: .97rem; font-weight: 600; }
+  .comp-row.sub .comp-name { font-weight: 500; }
+  .comp-state { font-size: .78rem; color: var(--muted); }
+  .comp-note { font-size: .78rem; color: var(--muted); font-style: italic; }
+  .backlink {
+    background: none; border: none; color: var(--accent); font-size: .95rem; font-weight: 600;
+    padding: 2px 0 12px; cursor: pointer; font-family: inherit;
+  }
+  .hist { margin-top: 18px; }
+  .hist-i { display: flex; gap: 9px; padding: 8px 2px; font-size: .84rem; color: var(--muted); }
+  .hist-i b { color: var(--text); font-weight: 600; }
+  .hist-dot { width: 8px; height: 8px; border-radius: 99px; margin-top: 7px; flex: none; }
+  .att-row {
+    display: flex; align-items: center; gap: 12px; padding: 11px 14px;
+    border-bottom: 1px solid var(--line);
+  }
+  .att-row:last-child { border-bottom: none; }
+  .att-name { flex: 0 0 40%; font-size: .9rem; font-weight: 600; }
+  .att-name em { display: block; font-style: normal; font-size: .72rem; color: var(--muted); font-weight: 400; }
+  .att-bar { flex: 1; height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; display: flex; }
+  .att-bar i { display: block; height: 100%; }
+  .att-bar i.v { background: var(--ok); }
+  .att-bar i.o { background: var(--warn); }
+  .att-num { font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums; flex: none; min-width: 46px; text-align: right; }
+  .att-flag { font-size: .7rem; font-weight: 700; color: var(--danger); flex: none; }
+  .t-row {
+    display: flex; align-items: center; gap: 10px; padding: 11px 13px; background: var(--card);
+    border: 1px solid var(--line); border-radius: 14px; margin-bottom: 8px;
+  }
+  .t-row.tap { cursor: pointer; }
+  .t-txt { flex: 1; min-width: 0; }
+  .t-name { font-size: .96rem; font-weight: 600; display: block; }
+  .t-meta { font-size: .75rem; color: var(--muted); display: block; }
   .hidden { display: none !important; }
 </style>
 </head>
@@ -280,10 +361,15 @@ const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ── Stato ───────────────────────────────────────────────────
 let people = [], downloads = [], logRows = [];
+let comps = [], fweList = [], events = [];
 let tab = "dd";
 let me = JSON.parse(localStorage.getItem("whoami") || "null");
 let openDD = new Set(); // schede DD espanse
 let hasAudience = false; // il tag destinatari appare solo se la colonna esiste
+let hasValidation = false; // il tab Validation si attiva quando il database è pronto
+let vSeg = "persone", vFilter = "tutti", openFweId = null, vEditor = false;
+let teamSeg = "key";
+let stateMap = {}, pairHist = {};
 
 const $ = (s) => document.querySelector(s);
 const views = { login: $("#view-login"), whoami: $("#view-whoami"), app: $("#view-app") };
@@ -405,18 +491,81 @@ function enterApp() {
 
 // ── Dati ────────────────────────────────────────────────────
 async function detectSchema() {
-  const { error } = await db.from("downloads").select("audience").limit(1);
-  hasAudience = !error;
+  const [a, v] = await Promise.all([
+    db.from("downloads").select("audience").limit(1),
+    db.from("fwe_events").select("id").limit(1),
+  ]);
+  hasAudience = !a.error;
+  hasValidation = !v.error;
 }
 
 async function loadAll() {
-  const [p, d, l] = await Promise.all([
+  const base = [
     db.from("people").select("*").order("name"),
     db.from("downloads").select("*").order("date"),
     db.from("activity_log").select("*").order("id", { ascending: false }).limit(80),
-  ]);
-  people = p.data || []; downloads = d.data || []; logRows = l.data || [];
+  ];
+  if (hasValidation) base.push(
+    db.from("competencies").select("*").order("position"),
+    db.from("fwe").select("*").order("name"),
+    db.from("fwe_events").select("*").order("id"),
+  );
+  const r = await Promise.all(base);
+  people = r[0].data || []; downloads = r[1].data || []; logRows = r[2].data || [];
+  if (hasValidation) {
+    comps = r[3].data || []; fweList = r[4].data || []; events = r[5].data || [];
+    buildState();
+  }
 }
+
+// Lo stato di una competenza è il suo ultimo evento; un livello 1 che segue
+// un livello 2 è un passo indietro, non un'osservazione.
+function buildState() {
+  stateMap = {}; pairHist = {};
+  events.forEach(e => {
+    const k = e.fwe_id + "|" + e.competency_id;
+    const arr = pairHist[k] || (pairHist[k] = []);
+    const prev = arr[arr.length - 1];
+    e.isRevert = e.level === 1 && prev && prev.level === 2;
+    arr.push(e);
+    stateMap[k] = e;
+  });
+}
+
+const areaList = () => comps.filter(c => !c.parent_id && c.active).sort((a, b) => a.position - b.position);
+const kidsOf = (a) => comps.filter(c => c.parent_id === a.id && c.active).sort((x, y) => x.position - y.position);
+const leavesOf = (a) => { const k = kidsOf(a); return k.length ? k : [a]; };
+const allLeaves = () => areaList().flatMap(leavesOf);
+const evOf = (fweId, leafId) => stateMap[fweId + "|" + leafId] || null;
+const stOf = (fweId, leafId) => { const e = evOf(fweId, leafId); return e ? e.level : 0; };
+
+function areaState(fweId, a) {
+  const v = leavesOf(a).map(l => stOf(fweId, l.id)).filter(x => x !== -1);
+  if (!v.length) return -1;
+  if (v.every(x => x === 2)) return 2;
+  if (v.every(x => x === 0)) return 0;
+  return 1;
+}
+const reqAreas = (f) => areaList().filter(a => areaState(f.id, a) !== -1);
+const doneAreas = (f) => reqAreas(f).filter(a => areaState(f.id, a) === 2).length;
+const totAreas = (f) => reqAreas(f).length;
+const isComplete = (f) => totAreas(f) > 0 && doneAreas(f) === totAreas(f);
+
+function lastTouch(f) {
+  const mine = events.filter(e => e.fwe_id === f.id);
+  return mine.length ? mine[mine.length - 1].created_at : f.created_at;
+}
+function idleDays(f) {
+  return Math.floor((Date.now() - new Date(lastTouch(f)).getTime()) / 86400000);
+}
+const isStuck = (f) => idleDays(f) > 14 && !isComplete(f);
+
+// I quattro occhi: chi ha osservato non valida mai quella competenza.
+function myObservation(fweId, leafId) {
+  const h = pairHist[fweId + "|" + leafId] || [];
+  return h.find(e => e.level === 1 && !e.isRevert && e.actor_name === me?.name) || null;
+}
+const canValidate = (fweId, leafId) => !myObservation(fweId, leafId);
 
 async function log(action) {
   await db.from("activity_log").insert({ actor: me?.name || "?", action });
@@ -442,6 +591,7 @@ async function refresh() { await loadAll(); render(); }
 document.querySelectorAll("nav button").forEach(b => {
   b.addEventListener("click", () => {
     tab = b.dataset.tab;
+    openFweId = null; vEditor = false;
     document.querySelectorAll("nav button").forEach(x => x.classList.toggle("active", x === b));
     render();
   });
@@ -456,6 +606,11 @@ function render() {
   else if (tab === "validation") renderValidation(main);
   else if (tab === "team") renderTeam(main);
   else renderLog(main);
+
+  main.querySelectorAll("[data-vseg]").forEach(b => b.onclick = () => {
+    vSeg = b.dataset.vseg; openFweId = null; vEditor = false; render();
+  });
+  main.querySelectorAll("[data-tseg]").forEach(b => b.onclick = () => { teamSeg = b.dataset.tseg; render(); });
 }
 
 // ── DD (Daily Download) ─────────────────────────────────────
@@ -654,18 +809,292 @@ function renderDD(main) {
   });
 }
 
-// ── Validation (in arrivo) ──────────────────────────────────
+// ── Validation ──────────────────────────────────────────────
+const ST_LABEL = { "-1": "Non richiesta", 0: "Da osservare", 1: "Osservato · da validare", 2: "Validato" };
+
+async function addEvent(fweId, leafId, level, note) {
+  const { error } = await db.from("fwe_events").insert({
+    fwe_id: fweId, competency_id: leafId, level,
+    actor_id: me.id, actor_name: me.name, note: note || null,
+  });
+  if (error) { toast("Errore nel salvataggio"); return false; }
+  return true;
+}
+
 function renderValidation(main) {
-  main.innerHTML = `
-    <div class="empty-big">
-      <div class="glyph">🚧</div>
-      <h2>In arrivo</h2>
-      <p>Questa sezione ospiterà la validazione degli FWE.<br>La attiveremo più avanti.</p>
+  if (!hasValidation) {
+    main.innerHTML = `
+      <div class="empty-big">
+        <div class="glyph">🚧</div>
+        <h2>Quasi pronto</h2>
+        <p>Manca l'ultimo passaggio sul database.<br>Esegui <strong>migration-5.sql</strong> e questa sezione si accende da sola.</p>
+      </div>`;
+    return;
+  }
+  if (openFweId) return renderFweDetail(main);
+  if (vEditor) return renderCompEditor(main);
+
+  const seg = `
+    <div class="seg" role="group" aria-label="Vista">
+      <button type="button" data-vseg="persone" aria-pressed="${vSeg === "persone"}">Persone</button>
+      <button type="button" data-vseg="competenze" aria-pressed="${vSeg === "competenze"}">Competenze</button>
     </div>`;
+
+  if (vSeg === "competenze") { renderCompetenze(main, seg); return; }
+
+  const nStuck = fweList.filter(isStuck).length;
+  const nDone = fweList.filter(isComplete).length;
+  const list = fweList.filter(f =>
+    vFilter === "fermi" ? isStuck(f) : vFilter === "completi" ? isComplete(f) : true);
+
+  const waves = [...new Set(fweList.map(f => f.wave || 1))].sort((a, b) => a - b);
+  const groups = waves.map(w => {
+    const g = list.filter(f => (f.wave || 1) === w)
+      .sort((a, b) => (isStuck(b) - isStuck(a)) || (doneAreas(b) - doneAreas(a)) || a.name.localeCompare(b.name));
+    if (!g.length) return "";
+    return `<div class="wave-head"><span class="wn">Wave ${w}</span>
+      <span class="wm">${g.length} ${g.length === 1 ? "persona" : "persone"} · ${g.filter(isComplete).length} complete</span></div>` +
+      g.map(fweCard).join("");
+  }).join("");
+
+  main.innerHTML = seg + `
+    <div class="filters" style="display:flex;gap:7px;margin-bottom:12px;flex-wrap:wrap">
+      <button type="button" class="fchip" data-vf="tutti" aria-pressed="${vFilter === "tutti"}">Tutti · ${fweList.length}</button>
+      <button type="button" class="fchip" data-vf="fermi" aria-pressed="${vFilter === "fermi"}">Fermi · ${nStuck}</button>
+      <button type="button" class="fchip" data-vf="completi" aria-pressed="${vFilter === "completi"}">Completi · ${nDone}</button>
+    </div>
+    ${groups || `<div class="empty">Nessun FWE in questa vista.<br>Aggiungili dal tab Team.</div>`}`;
+
+  main.querySelectorAll("[data-vf]").forEach(b => b.onclick = () => { vFilter = b.dataset.vf; render(); });
+  main.querySelectorAll("[data-fwe]").forEach(b => b.onclick = () => { openFweId = b.dataset.fwe; render(); });
+}
+
+function fweCard(f) {
+  const done = doneAreas(f), tot = totAreas(f);
+  const pill = isComplete(f) ? `<span class="badge done">Completo</span>`
+    : isStuck(f) ? `<span class="badge">Fermo da ${idleDays(f)}g</span>`
+    : `<span class="badge">${done}/${tot}</span>`;
+  return `<button type="button" class="card" data-fwe="${f.id}"
+      style="width:100%;text-align:left;display:flex;flex-direction:column;gap:8px;cursor:pointer;color:var(--text)">
+    <div class="row spread" style="width:100%"><h3>${esc(f.name)}</h3>${pill}</div>
+    <div class="dots">${areaList().map(a => {
+      const s = areaState(f.id, a);
+      return `<span class="dot ${s === -1 ? "na" : s ? "s" + s : ""}"></span>`;
+    }).join("")}</div>
+  </button>`;
+}
+
+function renderFweDetail(main) {
+  const f = fweList.find(x => x.id === openFweId);
+  if (!f) { openFweId = null; return render(); }
+  const done = doneAreas(f), tot = totAreas(f);
+
+  let html = `<button type="button" class="backlink" id="v-back">‹ Tutti gli FWE</button>
+    <div class="card">
+      <div class="row spread"><div><h3>${esc(f.name)}</h3>
+        <div class="sub">Wave ${f.wave || 1}</div></div>
+        ${isComplete(f) ? `<span class="badge done">Completo</span>` : `<span class="badge">${done}/${tot}</span>`}
+      </div>
+      <div class="progress" style="margin-top:10px"><div style="width:${tot ? done / tot * 100 : 0}%"></div></div>
+    </div>
+    <div class="sub" style="margin:10px 4px 4px">Tocca una voce per farla avanzare. Su una già validata ti chiede cosa non ha funzionato.</div>`;
+
+  areaList().forEach(a => {
+    const leaves = leavesOf(a), isParent = kidsOf(a).length > 0;
+    if (isParent) {
+      const nOk = leaves.filter(l => stOf(f.id, l.id) === 2).length;
+      html += `<div class="area-head"><span>${esc(a.label)}</span>
+        <span class="ac">${areaState(f.id, a) === -1 ? "non richiesta" : nOk + "/" + leaves.length}</span></div>`;
+    }
+    leaves.forEach(l => {
+      const lvl = stOf(f.id, l.id), ev = evOf(f.id, l.id);
+      const meta = ev && lvl > 0 ? ` · ${esc(ev.actor_name)} · ${fmtTs(ev.created_at)}` : "";
+      html += `<button type="button" class="comp-row${isParent ? " sub" : ""}" data-leaf="${l.id}">
+        <span class="mark ${lvl === -1 ? "na" : lvl ? "s" + lvl : ""}">${lvl === 2 ? "✓" : lvl === 1 ? "◐" : lvl === -1 ? "–" : ""}</span>
+        <span class="comp-main">
+          <span class="comp-name">${esc(l.label)}</span>
+          <span class="comp-state">${ST_LABEL[lvl]}${meta}</span>
+          ${ev && ev.note && lvl === 1 ? `<span class="comp-note">“${esc(ev.note)}”</span>` : ""}
+        </span>
+        <span class="sub" style="font-size:1.1rem">›</span>
+      </button>`;
+    });
+  });
+
+  const hist = events.filter(e => e.fwe_id === f.id).slice().reverse().slice(0, 30);
+  if (hist.length) {
+    html += `<div class="hist"><div class="area-head"><span>Storico</span></div>` + hist.map(e => {
+      const node = comps.find(c => c.id === e.competency_id);
+      const verb = e.level === 2 ? "ha validato" : e.isRevert ? "ha riportato a osservato"
+        : e.level === 1 ? "ha osservato" : "ha aggiornato";
+      return `<div class="hist-i">
+        <span class="hist-dot" style="background:${e.level === 2 ? "var(--ok)" : e.isRevert ? "var(--danger)" : "var(--warn)"}"></span>
+        <span><b>${esc(e.actor_name)}</b> ${verb} ${esc(node ? node.label : "—")} · ${fmtTs(e.created_at)}
+        ${e.note ? `<br>“${esc(e.note)}”` : ""}</span></div>`;
+    }).join("") + `</div>`;
+  }
+
+  main.innerHTML = html;
+  $("#v-back").onclick = () => { openFweId = null; render(); };
+  main.querySelectorAll("[data-leaf]").forEach(b => b.onclick = () => tapLeaf(f, b.dataset.leaf));
+}
+
+async function tapLeaf(f, leafId) {
+  const lvl = stOf(f.id, leafId);
+  const node = comps.find(c => c.id === leafId);
+  if (lvl === 2) return openRevert(f, node);
+  if (lvl === 1 && !canValidate(f.id, leafId)) {
+    toast("L'hai osservata tu: la validazione spetta a un altro key role");
+    return;
+  }
+  const target = lvl === -1 ? 0 : lvl + 1;
+  if (!await addEvent(f.id, leafId, target)) return;
+  toast(target === 2 ? `${node.label} validato` : target === 1 ? `${node.label} osservato` : `${node.label} ora è richiesta`);
+  await refresh();
+}
+
+function openRevert(f, node) {
+  openDialog(`Torna a osservato`, `
+    <p class="sub">${esc(node.label)} · ${esc(f.name)}</p>
+    <div class="field"><label>Cosa non ha funzionato (obbligatorio)</label>
+      <input type="text" name="note" placeholder="es. sbaglia ancora il passaggio sul trade-in" required></div>`,
+    async (fd) => {
+      const note = fd.get("note").trim();
+      if (note.length < 3) { toast("Serve una nota"); return; }
+      if (!await addEvent(f.id, node.id, 1, note)) return;
+      await log(`ha riportato a osservato “${node.label}” di ${f.name}: ${note}`);
+      toast(`${node.label} torna da verificare`);
+      await refresh();
+    });
+}
+
+// Vista per competenza: dove il floor è scoperto
+function renderCompetenze(main, seg) {
+  const rows = [];
+  areaList().forEach(a => {
+    const isParent = kidsOf(a).length > 0;
+    leavesOf(a).forEach(l => {
+      let v = 0, o = 0, tot = 0, rev = 0;
+      fweList.forEach(f => {
+        const s = stOf(f.id, l.id);
+        if (s === -1) return;
+        tot++; if (s === 2) v++; else if (s === 1) o++;
+        rev += (pairHist[f.id + "|" + l.id] || []).filter(e => e.isRevert).length;
+      });
+      rows.push({ label: l.label, area: isParent ? a.label : null, v, o, tot, rev });
+    });
+  });
+  rows.sort((x, y) => (x.tot ? x.v / x.tot : 1) - (y.tot ? y.v / y.tot : 1) || y.o - x.o);
+
+  main.innerHTML = seg + `
+    <div class="section-head"><h2>Dove serve attenzione</h2>
+      <button class="small ghost" id="edit-comps">Modifica</button></div>
+    <div class="sub" style="margin:0 4px 12px">Le competenze dalla più scoperta alla più solida, su tutti gli FWE.</div>
+    <div class="card" style="padding:0">
+      ${rows.length ? rows.map(r => `
+        <div class="att-row">
+          <span class="att-name">${esc(r.label)}${r.area ? `<em>${esc(r.area)}</em>` : ""}</span>
+          <span class="att-bar"><i class="v" style="width:${r.tot ? r.v / r.tot * 100 : 0}%"></i><i class="o" style="width:${r.tot ? r.o / r.tot * 100 : 0}%"></i></span>
+          ${r.rev ? `<span class="att-flag">${r.rev} indietro</span>` : ""}
+          <span class="att-num">${r.v}/${r.tot}</span>
+        </div>`).join("") : `<div class="empty">Nessuna competenza.</div>`}
+    </div>`;
+  $("#edit-comps").onclick = () => { vEditor = true; render(); };
+}
+
+// Editor dell'elenco competenze
+function renderCompEditor(main) {
+  const areas = comps.filter(c => !c.parent_id).sort((a, b) => a.position - b.position);
+  let html = `<button type="button" class="backlink" id="v-back">‹ Competenze</button>
+    <div class="sub" style="margin:0 4px 12px">Rinominare è sempre sicuro: le validazioni restano legate alla competenza, non al suo nome.</div>`;
+
+  areas.forEach(a => {
+    const kids = comps.filter(c => c.parent_id === a.id).sort((x, y) => x.position - y.position);
+    html += `<div class="card" style="${a.active ? "" : "opacity:.55"}">
+      <div class="row spread">
+        <strong>${esc(a.label)}</strong>
+        <span class="row" style="gap:6px">
+          <button class="ghost small" data-ce="rename" data-id="${a.id}">Rinomina</button>
+          <button class="${a.active ? "danger" : "ghost"} small" data-ce="toggle" data-id="${a.id}">${a.active ? "Disattiva" : "Riattiva"}</button>
+        </span>
+      </div>
+      ${kids.map(k => `
+        <div class="row spread" style="padding:7px 0 7px 14px;border-top:1px solid var(--line);${k.active ? "" : "opacity:.55"}">
+          <span class="sub" style="color:var(--text)">${esc(k.label)}</span>
+          <span class="row" style="gap:6px">
+            <button class="ghost small" data-ce="rename" data-id="${k.id}">Rinomina</button>
+            <button class="${k.active ? "danger" : "ghost"} small" data-ce="toggle" data-id="${k.id}">${k.active ? "Disattiva" : "Riattiva"}</button>
+          </span>
+        </div>`).join("")}
+      <button class="ghost small" data-ce="add-sub" data-id="${a.id}" style="margin-top:10px;width:100%">+ Sotto-competenza</button>
+    </div>`;
+  });
+  html += `<button class="small" id="add-area" style="width:100%">+ Nuova area</button>`;
+
+  main.innerHTML = html;
+  $("#v-back").onclick = () => { vEditor = false; render(); };
+  $("#add-area").onclick = () => openAddComp(null);
+  main.querySelectorAll("[data-ce]").forEach(b => {
+    const c = comps.find(x => x.id === b.dataset.id);
+    if (b.dataset.ce === "rename") b.onclick = () => openDialog("Rinomina", `
+        <div class="field"><label>Nome</label><input type="text" name="label" value="${esc(c.label)}" required></div>`,
+      async (fd) => {
+        await db.from("competencies").update({ label: fd.get("label").trim() }).eq("id", c.id);
+        await log(`ha rinominato la competenza in “${fd.get("label").trim()}”`);
+        await refresh();
+      });
+    if (b.dataset.ce === "toggle") b.onclick = async () => {
+      await db.from("competencies").update({ active: !c.active }).eq("id", c.id);
+      await log(`${c.active ? "ha disattivato" : "ha riattivato"} la competenza “${c.label}”`);
+      await refresh();
+    };
+    if (b.dataset.ce === "add-sub") b.onclick = () => openAddComp(c.id);
+  });
+}
+
+function openAddComp(parentId) {
+  const parent = parentId ? comps.find(c => c.id === parentId) : null;
+  const firstSub = parent && comps.filter(c => c.parent_id === parentId).length === 0;
+  openDialog(parent ? `Sotto-competenza di ${parent.label}` : "Nuova area", `
+    <div class="field"><label>Nome</label><input type="text" name="label" required></div>
+    ${firstSub ? `<p class="sub">“${esc(parent.label)}” diventa un contenitore: lo stato attuale di ciascun FWE passa a questa prima voce, così nessuno perde quanto già validato.</p>` : ""}
+    <div class="field"><label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer">
+      <input type="checkbox" name="retro" style="width:auto;margin-top:3px">
+      <span>Richiedila anche agli FWE già in percorso<br>
+      <span class="sub">Se la lasci spenta resta “non richiesta” per chi c'è già.</span></span></label></div>`,
+    async (fd) => {
+      const label = fd.get("label").trim();
+      const retro = fd.get("retro") === "on";
+      const siblings = comps.filter(c => (c.parent_id || null) === (parentId || null));
+      const pos = Math.max(0, ...siblings.map(c => c.position)) + 1;
+      const { data, error } = await db.from("competencies")
+        .insert({ label, position: pos, parent_id: parentId }).select().single();
+      if (error) { toast("Errore nel salvataggio"); return; }
+
+      const rows = [];
+      fweList.forEach(f => {
+        // la prima sotto-competenza eredita lo stato che l'area aveva
+        const lvl = firstSub ? stOf(f.id, parentId) : (retro ? 0 : -1);
+        if (lvl !== 0) rows.push({
+          fwe_id: f.id, competency_id: data.id, level: lvl,
+          actor_id: me.id, actor_name: me.name,
+        });
+      });
+      if (rows.length) await db.from("fwe_events").insert(rows);
+      await log(`ha aggiunto la competenza “${label}”`);
+      await refresh();
+    });
 }
 
 // ── Team ────────────────────────────────────────────────────
 function renderTeam(main) {
+  const seg = `
+    <div class="seg" role="group" aria-label="Sezione del team">
+      <button type="button" data-tseg="key" aria-pressed="${teamSeg === "key"}">Keyrole · ${people.length}</button>
+      <button type="button" data-tseg="fwe" aria-pressed="${teamSeg === "fwe"}">FWE${hasValidation ? " · " + fweList.length : ""}</button>
+    </div>`;
+  if (teamSeg === "fwe") { renderTeamFwe(main, seg); return; }
+
   const rowsPeople = people.map(p => `
     <div class="row spread" style="padding:8px 0; border-bottom:1px solid var(--line)">
       <div class="row" style="gap:8px">
@@ -675,11 +1104,11 @@ function renderTeam(main) {
       </div>
       <button class="danger small" data-act="del-person" data-id="${p.id}">Elimina</button>
     </div>`).join("");
-  main.innerHTML = `
-    <div class="section-head"><h2>Persone</h2>
+  main.innerHTML = seg + `
+    <div class="section-head"><h2>Chi usa l'app</h2>
       <button class="small" id="add-person">+ Aggiungi</button></div>
     <div class="card">${rowsPeople || `<div class="empty">Nessuno ancora.</div>`}</div>
-    <div class="sub" style="margin:8px 4px">Tocca Expert/Pro per cambiare il ruolo.</div>`;
+    <div class="sub" style="margin:8px 4px">Tocca Expert/Pro per cambiare il ruolo. Nella validazione i due ruoli hanno gli stessi poteri.</div>`;
 
   $("#add-person").onclick = () => openDialog("Nuova persona", `
       <div class="field"><label>Cognome</label><input type="text" name="name" required></div>
@@ -718,6 +1147,74 @@ function renderTeam(main) {
       await refresh();
     };
   });
+}
+
+function renderTeamFwe(main, seg) {
+  if (!hasValidation) {
+    main.innerHTML = seg + `<div class="empty">Esegui <strong>migration-5.sql</strong> per gestire gli FWE da qui.</div>`;
+    main.querySelectorAll("[data-tseg]").forEach(b => b.onclick = () => { teamSeg = b.dataset.tseg; render(); });
+    return;
+  }
+  const waves = [...new Set(fweList.map(f => f.wave || 1))].sort((a, b) => a - b);
+  const groups = waves.map(w => {
+    const g = fweList.filter(f => (f.wave || 1) === w).sort((a, b) => a.name.localeCompare(b.name));
+    return `<div class="wave-head"><span class="wn">Wave ${w}</span>
+      <span class="wm">${g.length} ${g.length === 1 ? "persona" : "persone"}</span></div>` +
+      g.map(f => `
+        <div class="t-row tap" data-fweedit="${f.id}">
+          <span class="t-txt"><span class="t-name">${esc(f.name)}</span>
+            <span class="t-meta">${doneAreas(f)} di ${totAreas(f)} aree</span></span>
+          <span class="dots">${areaList().map(a => {
+            const s = areaState(f.id, a);
+            return `<span class="dot ${s === -1 ? "na" : s ? "s" + s : ""}"></span>`;
+          }).join("")}</span>
+        </div>`).join("");
+  }).join("");
+
+  main.innerHTML = seg + `
+    <div class="section-head"><h2>Chi va validato</h2>
+      <button class="small" id="add-fwe">+ Aggiungi</button></div>
+    <div class="sub" style="margin:0 4px 6px">Non hanno accesso all'app. Tocca un nome per modificarlo.</div>
+    ${groups || `<div class="empty">Nessun FWE ancora.</div>`}`;
+
+  $("#add-fwe").onclick = () => openDialog("Nuovo FWE", `
+      <div class="field"><label>Cognome</label><input type="text" name="name" required></div>
+      <div class="field"><label>Wave</label><select name="wave">
+        ${[1,2,3,4,5,6].map(w => `<option value="${w}">Wave ${w}</option>`).join("")}</select></div>`,
+    async (fd) => {
+      const name = fd.get("name").trim();
+      const { error } = await db.from("fwe").insert({ name, wave: parseInt(fd.get("wave"), 10) });
+      if (error) { toast("Nome già esistente?"); return; }
+      await log(`ha aggiunto l'FWE ${name}`);
+      await refresh();
+    });
+
+  main.querySelectorAll("[data-fweedit]").forEach(el => {
+    el.onclick = () => {
+      const f = fweList.find(x => x.id === el.dataset.fweedit);
+      openDialog("Modifica FWE", `
+        <div class="field"><label>Cognome</label><input type="text" name="name" value="${esc(f.name)}" required></div>
+        <div class="field"><label>Wave</label><select name="wave">
+          ${[1,2,3,4,5,6].map(w => `<option value="${w}" ${(f.wave || 1) === w ? "selected" : ""}>Wave ${w}</option>`).join("")}</select></div>
+        <div class="row" style="margin-top:14px"><button type="button" class="danger small" id="dlg-del">Rimuovi dal percorso</button></div>`,
+        async (fd) => {
+          await db.from("fwe").update({ name: fd.get("name").trim(), wave: parseInt(fd.get("wave"), 10) }).eq("id", f.id);
+          await refresh();
+        },
+        (form) => {
+          form.querySelector("#dlg-del").onclick = async () => {
+            const n = events.filter(e => e.fwe_id === f.id && e.level === 2).length;
+            if (!confirm(`Rimuovere ${f.name}?${n ? `\n${n} validazioni firmate verranno eliminate con lui.` : ""}`)) return;
+            await db.from("fwe").delete().eq("id", f.id);
+            await log(`ha rimosso l'FWE ${f.name}`);
+            $("#dlg").close();
+            await refresh();
+          };
+        });
+    };
+  });
+
+  main.querySelectorAll("[data-tseg]").forEach(b => b.onclick = () => { teamSeg = b.dataset.tseg; render(); });
 }
 
 // ── Storico ─────────────────────────────────────────────────
