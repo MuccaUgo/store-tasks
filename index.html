@@ -82,12 +82,16 @@
   .spread { justify-content: space-between; }
   .field { margin-top: 10px; }
   .field label { display: block; font-size: .78rem; color: var(--muted); margin-bottom: 4px; }
-  select, input[type=text], input[type=date], input[type=password] {
+  select, textarea,
+  input[type=text], input[type=date], input[type=password],
+  input[type=number], input[type=time] {
     width: 100%; padding: 11px 12px; font-size: 1rem;
     border: 1px solid var(--line); border-radius: 12px;
     background: var(--bg); color: var(--text);
     -webkit-appearance: none; appearance: none;
+    font-family: inherit;
   }
+  textarea { resize: vertical; line-height: 1.4; }
   button {
     font-family: inherit; font-size: .95rem; font-weight: 600;
     border: none; border-radius: 12px; padding: 11px 16px;
@@ -173,6 +177,9 @@
     transition: background .2s;
   }
   nav button .ico svg { width: 21px; height: 21px; }
+  nav.many button { font-size: .63rem; }
+  nav.many button .ico { width: 40px; }
+  nav .emo { font-size: 1.15rem; line-height: 1; }
   nav button.active { color: var(--accent); }
   nav button.active .ico { background: var(--accent-soft); }
   .empty { text-align: center; color: var(--muted); padding: 30px 10px; font-size: .9rem; }
@@ -184,6 +191,7 @@
   dialog {
     border: none; border-radius: 20px; background: var(--card); color: var(--text);
     width: min(92vw, 420px); padding: 18px;
+    max-height: 86dvh; overflow-y: auto;
     box-shadow: var(--shadow);
   }
   dialog::backdrop {
@@ -295,6 +303,44 @@
   .t-txt { flex: 1; min-width: 0; }
   .t-name { font-size: .96rem; font-weight: 600; display: block; }
   .t-meta { font-size: .75rem; color: var(--muted); display: block; }
+  /* ── Progetti ── */
+  .stats { display: flex; gap: 8px; margin-bottom: 6px; }
+  .stat {
+    flex: 1; background: var(--card); border: 1px solid var(--line);
+    border-radius: 14px; padding: 10px 6px; text-align: center;
+  }
+  .stat b { display: block; font-size: 1.3rem; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: .66rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .slot-head { flex-wrap: nowrap; align-items: flex-start; }
+  .slot-head .badge { flex: none; margin-top: 2px; }
+  .role-line { display: flex; gap: 10px; font-size: .88rem; margin-top: 8px; align-items: baseline; }
+  .role-line b {
+    flex: 0 0 74px; font-size: .68rem; color: var(--muted); font-weight: 700;
+    text-transform: uppercase; letter-spacing: .04em;
+  }
+  .db-item { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 10px; font-size: .88rem; }
+  .db-nums { display: flex; flex-wrap: wrap; gap: 6px; margin: 7px 0; }
+  .db-nums span { background: var(--bg); border-radius: 999px; padding: 3px 10px; font-size: .78rem; }
+  .db-line { color: var(--muted); margin-top: 3px; }
+  .db-line b { color: var(--text); font-weight: 600; }
+  .kind {
+    font-size: .66rem; font-weight: 700; padding: 3px 9px; border-radius: 999px;
+    text-transform: uppercase; letter-spacing: .04em;
+    background: var(--accent-soft); color: var(--accent);
+  }
+  .kind.problema { background: rgba(211, 63, 73, .14); color: var(--danger); }
+  .kind.domanda { background: var(--warn-soft); color: var(--warn); }
+  .kind.idea { background: rgba(168, 85, 247, .16); color: #8b3fd4; }
+  @media (prefers-color-scheme: dark) { .kind.idea { color: #c78dff; } }
+  .reply {
+    border-left: 2px solid var(--line); margin: 8px 0 0 2px;
+    padding: 3px 0 3px 10px; font-size: .86rem;
+  }
+  .num-grid { display: flex; gap: 8px; margin-top: 10px; }
+  .num-grid label { flex: 1; font-size: .72rem; color: var(--muted); }
+  .num-grid input { margin-top: 4px; text-align: center; }
+  .badge.soft { background: var(--accent-soft); color: var(--accent); }
   .hidden { display: none !important; }
 </style>
 </head>
@@ -327,20 +373,7 @@
     <button id="whoami-chip" title="Cambia utente"></button>
   </header>
   <main id="main"></main>
-  <nav>
-    <button data-tab="dd" class="active">
-      <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="4.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span>
-      DD</button>
-    <button data-tab="validation">
-      <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.4l2.4 2.4 4.6-5"/></svg></span>
-      Validation</button>
-    <button data-tab="team">
-      <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.5" r="3.4"/><path d="M3.2 19.3c.8-3.1 3.1-4.7 5.8-4.7s5 1.6 5.8 4.7"/><circle cx="16.8" cy="9.8" r="2.6"/><path d="M15.6 14.7c2.3.2 4.2 1.6 4.9 4"/></svg></span>
-      Team</button>
-    <button data-tab="log">
-      <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3.2 2"/></svg></span>
-      Storico</button>
-  </nav>
+  <nav id="nav"></nav>
 </div>
 
 <div id="toast"></div>
@@ -362,13 +395,16 @@ const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 // ── Stato ───────────────────────────────────────────────────
 let people = [], downloads = [], logRows = [];
 let comps = [], fweList = [], events = [];
+let projects = [], slots = [], slotPeople = [], projItems = [], debriefs = [], insights = [], replies = [];
 let tab = "dd";
 let me = JSON.parse(localStorage.getItem("whoami") || "null");
 let openDD = new Set(); // schede DD espanse
 let hasAudience = false; // il tag destinatari appare solo se la colonna esiste
 let hasValidation = false; // il tab Validation si attiva quando il database è pronto
+let hasProjects = false;   // i tab dei progetti compaiono dopo migration-6.sql
 let vSeg = "persone", vFilter = "tutti", openFweId = null, vEditor = false;
 let teamSeg = "key";
+let pSeg = "turni", openSlot = new Set(); // schede turno espanse
 let stateMap = {}, pairHist = {};
 
 const $ = (s) => document.querySelector(s);
@@ -393,15 +429,16 @@ const personName = (id) => people.find(p => p.id === id)?.name || "—";
 const ddLabel = (d) => d.title || `DD del ${fmtDateShort(d.date)}`;
 const audienceLabel = (a) => a === "pz" ? "PZ solo" : "All team";
 
+const icsEsc = (s) => (s ?? "").toString()
+  .replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
+const icsStamp = () => new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+
 // Evento .ics per aggiungere il DD al proprio calendario (promemoria ore 9:00)
 function ddToICS(d) {
-  const icsEsc = (s) => (s ?? "").toString()
-    .replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
   const day = d.date.replace(/-/g, "");
   const next = new Date(d.date + "T00:00:00");
   next.setDate(next.getDate() + 1);
   const dayEnd = `${next.getFullYear()}${String(next.getMonth()+1).padStart(2,"0")}${String(next.getDate()).padStart(2,"0")}`;
-  const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
   const details = [
     hasAudience ? `Destinatari: ${audienceLabel(d.audience)}` : null,
     d.preparer_id ? `Prepara: ${personName(d.preparer_id)}` : null,
@@ -415,7 +452,7 @@ function ddToICS(d) {
     "PRODID:-//Store Tasks//IT",
     "BEGIN:VEVENT",
     `UID:dd-${d.id}@store-tasks`,
-    `DTSTAMP:${stamp}`,
+    `DTSTAMP:${icsStamp()}`,
     `DTSTART;VALUE=DATE:${day}`,
     `DTEND;VALUE=DATE:${dayEnd}`,
     `SUMMARY:${icsEsc("DD: " + ddLabel(d))}`,
@@ -430,12 +467,12 @@ function ddToICS(d) {
   ].filter(Boolean).join("\r\n");
 }
 
-function downloadICS(d) {
-  const blob = new Blob([ddToICS(d)], { type: "text/calendar;charset=utf-8" });
+function saveICS(text, filename) {
+  const blob = new Blob([text], { type: "text/calendar;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `dd-${d.date}.ics`;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -491,30 +528,48 @@ function enterApp() {
 
 // ── Dati ────────────────────────────────────────────────────
 async function detectSchema() {
-  const [a, v] = await Promise.all([
+  const [a, v, p] = await Promise.all([
     db.from("downloads").select("audience").limit(1),
     db.from("fwe_events").select("id").limit(1),
+    db.from("projects").select("id").limit(1),
   ]);
   hasAudience = !a.error;
   hasValidation = !v.error;
+  hasProjects = !p.error;
 }
 
 async function loadAll() {
-  const base = [
-    db.from("people").select("*").order("name"),
-    db.from("downloads").select("*").order("date"),
-    db.from("activity_log").select("*").order("id", { ascending: false }).limit(80),
+  const q = [
+    ["people", db.from("people").select("*").order("name")],
+    ["downloads", db.from("downloads").select("*").order("date")],
+    ["log", db.from("activity_log").select("*").order("id", { ascending: false }).limit(80)],
   ];
-  if (hasValidation) base.push(
-    db.from("competencies").select("*").order("position"),
-    db.from("fwe").select("*").order("name"),
-    db.from("fwe_events").select("*").order("id"),
+  if (hasValidation) q.push(
+    ["comps", db.from("competencies").select("*").order("position")],
+    ["fwe", db.from("fwe").select("*").order("name")],
+    ["events", db.from("fwe_events").select("*").order("id")],
   );
-  const r = await Promise.all(base);
-  people = r[0].data || []; downloads = r[1].data || []; logRows = r[2].data || [];
+  if (hasProjects) q.push(
+    ["projects", db.from("projects").select("*").eq("status", "active").order("position")],
+    ["slots", db.from("project_slots").select("*").order("date").order("start_time")],
+    ["crew", db.from("slot_people").select("*").order("position")],
+    ["items", db.from("project_items").select("*").order("position")],
+    ["debriefs", db.from("debriefs").select("*").order("id")],
+    ["insights", db.from("insights").select("*").order("id")],
+    ["replies", db.from("insight_replies").select("*").order("id")],
+  );
+  const res = await Promise.all(q.map(x => x[1]));
+  const d = {};
+  q.forEach((x, i) => d[x[0]] = res[i].data || []);
+
+  people = d.people; downloads = d.downloads; logRows = d.log;
   if (hasValidation) {
-    comps = r[3].data || []; fweList = r[4].data || []; events = r[5].data || [];
+    comps = d.comps; fweList = d.fwe; events = d.events;
     buildState();
+  }
+  if (hasProjects) {
+    projects = d.projects; slots = d.slots; slotPeople = d.crew; projItems = d.items;
+    debriefs = d.debriefs; insights = d.insights; replies = d.replies;
   }
 }
 
@@ -588,21 +643,48 @@ document.addEventListener("visibilitychange", async () => {
 async function refresh() { await loadAll(); render(); }
 
 // ── Navigazione ─────────────────────────────────────────────
-document.querySelectorAll("nav button").forEach(b => {
-  b.addEventListener("click", () => {
-    tab = b.dataset.tab;
-    openFweId = null; vEditor = false;
-    document.querySelectorAll("nav button").forEach(x => x.classList.toggle("active", x === b));
-    render();
-  });
-});
-
 const TITLES = { dd: "Daily Download", validation: "Validation", team: "Team", log: "Storico" };
 
+const ICONS = {
+  dd: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="4.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>`,
+  validation: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.4l2.4 2.4 4.6-5"/></svg>`,
+  team: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.5" r="3.4"/><path d="M3.2 19.3c.8-3.1 3.1-4.7 5.8-4.7s5 1.6 5.8 4.7"/><circle cx="16.8" cy="9.8" r="2.6"/><path d="M15.6 14.7c2.3.2 4.2 1.6 4.9 4"/></svg>`,
+  log: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3.2 2"/></svg>`,
+};
+
+// Un tab per progetto attivo, tra Validation e Team.
+function renderNav() {
+  const items = [
+    { id: "dd", label: "DD", ico: ICONS.dd },
+    { id: "validation", label: "Validation", ico: ICONS.validation },
+    ...projects.map(p => ({ id: "proj:" + p.id, label: p.name, emo: p.icon || "🎯" })),
+    { id: "team", label: "Team", ico: ICONS.team },
+    { id: "log", label: "Storico", ico: ICONS.log },
+  ];
+  const nav = $("#nav");
+  nav.classList.toggle("many", items.length > 4);
+  nav.innerHTML = items.map(it => `<button data-tab="${it.id}" class="${tab === it.id ? "active" : ""}">
+      <span class="ico">${it.emo ? `<span class="emo">${esc(it.emo)}</span>` : it.ico}</span>${esc(it.label)}</button>`).join("");
+  nav.querySelectorAll("button").forEach(b => {
+    b.onclick = () => {
+      tab = b.dataset.tab;
+      openFweId = null; vEditor = false;
+      render();
+    };
+  });
+}
+
 function render() {
-  $("#tab-title").textContent = TITLES[tab];
+  let pr = null;
+  if (tab.startsWith("proj:")) {
+    pr = projectOf(tab.slice(5));
+    if (!pr) tab = "dd"; // progetto archiviato o eliminato altrove
+  }
+  renderNav();
+  $("#tab-title").textContent = pr ? (pr.full_name || pr.name) : TITLES[tab];
   const main = $("#main");
-  if (tab === "dd") renderDD(main);
+  if (pr) renderProject(main, pr);
+  else if (tab === "dd") renderDD(main);
   else if (tab === "validation") renderValidation(main);
   else if (tab === "team") renderTeam(main);
   else renderLog(main);
@@ -611,6 +693,7 @@ function render() {
     vSeg = b.dataset.vseg; openFweId = null; vEditor = false; render();
   });
   main.querySelectorAll("[data-tseg]").forEach(b => b.onclick = () => { teamSeg = b.dataset.tseg; render(); });
+  main.querySelectorAll("[data-pseg]").forEach(b => b.onclick = () => { pSeg = b.dataset.pseg; render(); });
 }
 
 // ── DD (Daily Download) ─────────────────────────────────────
@@ -796,7 +879,10 @@ function renderDD(main) {
     };
   });
   main.querySelectorAll("[data-act=ics]").forEach(b => {
-    b.onclick = () => downloadICS(downloads.find(x => x.id === b.dataset.id));
+    b.onclick = () => {
+      const d = downloads.find(x => x.id === b.dataset.id);
+      saveICS(ddToICS(d), `dd-${d.date}.ics`);
+    };
   });
   main.querySelectorAll("[data-act=uploaded]").forEach(b => {
     b.onclick = async () => {
@@ -981,7 +1067,7 @@ function tapLeaf(f, leafId) {
     async (fd) => {
       if (blocked) return;
       const note = (fd.get("note") || "").trim();
-      if (noteRequired && note.length < 3) { toast("Serve scrivere cosa non ha funzionato"); return; }
+      if (noteRequired && note.length < 3) { toast("Serve scrivere cosa non ha funzionato"); return false; }
       if (!await addEvent(f.id, leafId, target, note || null)) return;
       if (lvl === 2) await log(`ha riportato a osservato “${node.label}” di ${f.name}: ${note}`);
       toast(target === 2 ? `${node.label} validato` : target === 1 ? (lvl === 2 ? `${node.label} torna da verificare` : `${node.label} osservato`) : `${node.label} ora è richiesta`);
@@ -1257,6 +1343,525 @@ function renderLog(main) {
   main.innerHTML = `<div class="card">${rows || `<div class="empty">Ancora nessuna attività.</div>`}</div>`;
 }
 
+// ── Progetti ────────────────────────────────────────────────
+// Ogni progetto attivo è un tab a sé: il pilot vive accanto a
+// Validation, non dentro un menu.
+const ROLES = ["Specialist", "OnPoint", "Keyrole", "Coach"];
+const TRAFFIC = ["poco", "medio", "tanto"];
+const KINDS = ["osservazione", "idea", "problema", "domanda"];
+
+const projectOf = (id) => projects.find(p => p.id === id) || null;
+const itemsOf = (pr, kind) => projItems
+  .filter(i => i.project_id === pr.id && i.kind === kind && i.active)
+  .sort((a, b) => a.position - b.position);
+const slotsOf = (pr) => slots.filter(s => s.project_id === pr.id)
+  .sort((a, b) => (a.date + (a.start_time || "")).localeCompare(b.date + (b.start_time || "")));
+const crewOf = (slotId) => slotPeople.filter(x => x.slot_id === slotId).sort((a, b) => a.position - b.position);
+const roleNames = (slotId, role) => crewOf(slotId).filter(x => x.role === role).map(x => x.person_name);
+const debriefsOf = (slotId) => debriefs.filter(d => d.slot_id === slotId);
+const projDebriefs = (pr) => debriefs.filter(d => d.project_id === pr.id);
+const repliesOf = (insightId) => replies.filter(r => r.insight_id === insightId);
+const slotLabel = (s) => s.start_time ? `${s.start_time}–${s.end_time || ""}`.replace(/–$/, "") : "Turno";
+const projPeriod = (pr) => pr.starts_on
+  ? `${fmtDateShort(pr.starts_on)} – ${fmtDateShort(pr.ends_on)}` : "";
+
+function slotState(s) {
+  const n = debriefsOf(s.id).length;
+  if (n) return { cls: "done", label: n === 1 ? "Debriefato" : `${n} debrief` };
+  const t = todayStr();
+  if (s.date < t) return { cls: "", label: "Da debriefare" };
+  return { cls: "soft", label: s.date === t ? "Oggi" : "In programma" };
+}
+
+function renderProject(main, pr) {
+  const seg = `
+    <div class="seg" role="group" aria-label="Vista">
+      <button type="button" data-pseg="turni" aria-pressed="${pSeg === "turni"}">Turni</button>
+      <button type="button" data-pseg="spunti" aria-pressed="${pSeg === "spunti"}">Spunti</button>
+    </div>`;
+  if (pSeg === "spunti") renderProjectSpunti(main, pr, seg);
+  else renderProjectTurni(main, pr, seg);
+}
+
+// ── Turni ───────────────────────────────────────────────────
+function renderProjectTurni(main, pr, seg) {
+  const list = slotsOf(pr), today = todayStr();
+  const nDeb = projDebriefs(pr).length;
+  const nTodo = list.filter(s => s.date < today && !debriefsOf(s.id).length).length;
+
+  const groups = [];
+  list.forEach(s => {
+    const g = groups[groups.length - 1];
+    if (g && g.date === s.date) g.items.push(s);
+    else groups.push({ date: s.date, items: [s] });
+  });
+  const cal = groups.map(g => `
+    <div class="date-head ${g.date === today ? "today" : ""}">
+      ${g.date === today ? "Oggi · " : ""}${fmtDate(g.date)}</div>
+    ${g.items.map(s => slotCard(pr, s)).join("")}`).join("");
+
+  const recap = [projPeriod(pr), `${list.length} turni`, `${nDeb} debrief`].filter(Boolean).join(" · ");
+  main.innerHTML = seg + `
+    <div class="section-head"><h2>Turni</h2>
+      <button class="small" id="add-slot">+ Nuovo turno</button></div>
+    <div class="sub" style="margin:-6px 4px 12px">${esc(recap)}${
+      nTodo ? ` · <strong style="color:var(--warn)">${nTodo} da debriefare</strong>` : ""}</div>
+    ${cal || `<div class="empty">Nessun turno ancora.<br>Aggiungine uno con “+ Nuovo turno”.</div>`}`;
+
+  $("#add-slot").onclick = () => openDialog("Nuovo turno", slotFields(pr, null),
+    async (fd) => {
+      const { data, error } = await db.from("project_slots").insert({
+        project_id: pr.id,
+        date: fd.get("date"),
+        start_time: fd.get("start_time") || null,
+        end_time: fd.get("end_time") || null,
+        note: (fd.get("note") || "").trim() || null,
+      }).select().single();
+      if (error) { toast("Errore nel salvataggio"); return false; }
+      await saveCrew(data.id, fd);
+      await log(`ha aggiunto un turno ${pr.name} del ${fmtDateShort(data.date)}`);
+      await refresh();
+    }, wireSlotForm);
+
+  main.querySelectorAll("[data-slot-toggle]").forEach(el => {
+    el.onclick = () => {
+      const id = el.dataset.slotToggle;
+      openSlot.has(id) ? openSlot.delete(id) : openSlot.add(id);
+      render();
+    };
+  });
+  main.querySelectorAll("[data-act=debrief]").forEach(b => {
+    b.onclick = () => openDebriefDialog(pr, list.find(s => s.id === b.dataset.id));
+  });
+  main.querySelectorAll("[data-act=slot-ics]").forEach(b => {
+    const s = list.find(x => x.id === b.dataset.id);
+    b.onclick = () => saveICS(slotToICS(pr, s), `${pr.name.toLowerCase()}-${s.date}.ics`);
+  });
+  main.querySelectorAll("[data-act=edit-slot]").forEach(b => {
+    b.onclick = () => {
+      const s = list.find(x => x.id === b.dataset.id);
+      openDialog("Modifica turno", slotFields(pr, s) + `
+        <div class="row" style="margin-top:14px">
+          <button type="button" class="danger small" id="dlg-del-slot">Elimina questo turno</button>
+        </div>`,
+        async (fd) => {
+          const { error } = await db.from("project_slots").update({
+            date: fd.get("date"),
+            start_time: fd.get("start_time") || null,
+            end_time: fd.get("end_time") || null,
+            note: (fd.get("note") || "").trim() || null,
+            updated_at: new Date().toISOString(),
+          }).eq("id", s.id);
+          if (error) { toast("Errore nel salvataggio"); return false; }
+          await saveCrew(s.id, fd);
+          await log(`ha modificato il turno ${pr.name} del ${fmtDateShort(fd.get("date"))}`);
+          await refresh();
+        },
+        (form) => {
+          wireSlotForm(form);
+          form.querySelector("#dlg-del-slot").onclick = async () => {
+            const n = debriefsOf(s.id).length;
+            if (!confirm(`Eliminare il turno del ${fmtDateShort(s.date)}?${
+              n ? `\nI ${n} debrief restano, senza turno collegato.` : ""}`)) return;
+            await db.from("project_slots").delete().eq("id", s.id);
+            await log(`ha eliminato il turno ${pr.name} del ${fmtDateShort(s.date)}`);
+            $("#dlg").close();
+            await refresh();
+          };
+        });
+    };
+  });
+}
+
+function slotCard(pr, s) {
+  const st = slotState(s);
+  const lines = ROLES.map(r => ({ r, n: roleNames(s.id, r) })).filter(x => x.n.length);
+  const summary = lines.map(x => `${x.r}: ${x.n.join(", ")}`).join(" · ") || "nessuno assegnato";
+  return `<div class="card">
+    <div class="row spread dd-summary slot-head" data-slot-toggle="${s.id}">
+      <div style="min-width:0">
+        <h3>${esc(slotLabel(s))}</h3>
+        ${openSlot.has(s.id) ? "" : `<div class="sub">${esc(summary)}</div>`}
+      </div>
+      <span class="badge ${st.cls}">${esc(st.label)}</span>
+    </div>
+    ${!openSlot.has(s.id) ? "" : `
+      ${lines.map(x => `<div class="role-line"><b>${esc(x.r)}</b><span>${esc(x.n.join(", "))}</span></div>`).join("")}
+      ${s.note ? `<div class="manager-line">📝 ${esc(s.note)}</div>` : ""}
+      ${debriefsOf(s.id).map(debriefBlock).join("")}
+      <div class="row" style="margin-top:12px">
+        <button class="small" data-act="debrief" data-id="${s.id}">+ Debrief</button>
+        <span style="flex:1"></span>
+        <button class="ghost small" data-act="slot-ics" data-id="${s.id}">📅 Calendario</button>
+        <button class="ghost small" data-act="edit-slot" data-id="${s.id}">Modifica</button>
+      </div>`}
+  </div>`;
+}
+
+function debriefBlock(d) {
+  const nums = [
+    d.in_list != null ? `👥 ${d.in_list} in lista` : null,
+    d.bags != null ? `🛍 ${d.bags} bag` : null,
+    d.conversions != null ? `✅ ${d.conversions} conversion` : null,
+    d.traffic ? `traffico ${d.traffic}` : null,
+  ].filter(Boolean);
+  const demos = Array.isArray(d.demos) ? d.demos : [];
+  return `<div class="db-item">
+    <div class="row spread"><strong>${esc(d.author_name)}</strong>
+      <span class="sub">${fmtTs(d.created_at)}</span></div>
+    ${nums.length ? `<div class="db-nums">${nums.map(n => `<span>${esc(n)}</span>`).join("")}</div>` : ""}
+    ${demos.length ? `<div class="db-line">Demo: ${esc(demos.join(", "))}</div>` : ""}
+    ${d.best_demo ? `<div class="db-line">★ La più efficace: <b>${esc(d.best_demo)}</b></div>` : ""}
+    ${d.icebreaker ? `<div class="db-line">🗣 “${esc(d.icebreaker)}”</div>` : ""}
+    ${d.worked ? `<div class="db-line">✔ <b>${esc(d.worked)}</b></div>` : ""}
+    ${d.improve ? `<div class="db-line">↻ ${esc(d.improve)}</div>` : ""}
+  </div>`;
+}
+
+// I nomi dei ruoli si scrivono separati da virgola: i suggerimenti
+// sotto al campo evitano di riscriverli ogni volta.
+function suggestNames(pr, role) {
+  const ids = new Set(slotsOf(pr).map(s => s.id));
+  const freq = {};
+  slotPeople.filter(x => ids.has(x.slot_id) && x.role === role)
+    .forEach(x => freq[x.person_name] = (freq[x.person_name] || 0) + 1);
+  const used = Object.keys(freq).sort((a, b) => freq[b] - freq[a]);
+  const extra = role === "Specialist"
+    ? itemsOf(pr, "specialist").sort((a, b) => (b.checked - a.checked) || (a.position - b.position)).map(i => i.label)
+    : people.filter(p => p.active).map(p => p.name);
+  return [...new Set([...used, ...extra])];
+}
+
+function slotFields(pr, s) {
+  return `
+    <div class="field"><label>Data *</label>
+      <input type="date" name="date" value="${s?.date || todayStr()}" required></div>
+    <div class="row" style="gap:10px">
+      <div class="field" style="flex:1"><label>Dalle</label>
+        <input type="time" name="start_time" value="${s?.start_time || "16:00"}"></div>
+      <div class="field" style="flex:1"><label>Alle</label>
+        <input type="time" name="end_time" value="${s?.end_time || "18:00"}"></div>
+    </div>
+    ${ROLES.map(r => {
+      const have = roleNames(s?.id, r);
+      const sug = suggestNames(pr, r).filter(n => !have.includes(n)).slice(0, 8);
+      return `<div class="field"><label>${r}</label>
+        <input type="text" name="role_${r}" value="${esc(have.join(", "))}" placeholder="Nomi separati da virgola">
+        ${sug.length ? `<div class="chips" style="margin-top:6px">${sug.map(n =>
+          `<button type="button" class="fchip" data-append="role_${r}" data-v="${esc(n)}">${esc(n)}</button>`).join("")}</div>` : ""}
+      </div>`;
+    }).join("")}
+    <div class="field"><label>Note</label>
+      <input type="text" name="note" value="${esc(s?.note || "")}" placeholder="es. store pieno per il lancio"></div>`;
+}
+
+function wireSlotForm(form) {
+  form.querySelectorAll("[data-append]").forEach(b => {
+    b.onclick = () => {
+      const inp = form.querySelector(`[name="${b.dataset.append}"]`);
+      const names = inp.value.split(",").map(x => x.trim()).filter(Boolean);
+      if (names.includes(b.dataset.v)) return;
+      names.push(b.dataset.v);
+      inp.value = names.join(", ");
+      b.setAttribute("aria-pressed", "true");
+    };
+  });
+}
+
+// Sostituisce in blocco chi copre il turno: più semplice di
+// inseguire le singole differenze, e il turno resta coerente.
+async function saveCrew(slotId, fd) {
+  await db.from("slot_people").delete().eq("slot_id", slotId);
+  const rows = [];
+  ROLES.forEach(r => (fd.get("role_" + r) || "").split(",").map(x => x.trim()).filter(Boolean)
+    .forEach((nm, i) => rows.push({
+      slot_id: slotId, role: r, person_name: nm,
+      person_id: people.find(p => p.name === nm)?.id || null, position: i,
+    })));
+  if (rows.length) await db.from("slot_people").insert(rows);
+}
+
+function slotToICS(pr, s) {
+  const day = s.date.replace(/-/g, "");
+  const hhmm = (v, fb) => (v || fb).replace(":", "") + "00";
+  const crew = ROLES.map(r => {
+    const n = roleNames(s.id, r);
+    return n.length ? `${r}: ${n.join(", ")}` : null;
+  }).filter(Boolean).join("\n");
+  const title = `${pr.full_name || pr.name}: turno ${slotLabel(s)}`;
+  return [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Store Tasks//IT",
+    "BEGIN:VEVENT",
+    `UID:slot-${s.id}@store-tasks`,
+    `DTSTAMP:${icsStamp()}`,
+    `DTSTART:${day}T${hhmm(s.start_time, "16:00")}`,
+    `DTEND:${day}T${hhmm(s.end_time, "18:00")}`,
+    `SUMMARY:${icsEsc(title)}`,
+    crew || s.note ? `DESCRIPTION:${icsEsc([crew, s.note].filter(Boolean).join("\n"))}` : null,
+    "BEGIN:VALARM",
+    "ACTION:DISPLAY",
+    `DESCRIPTION:${icsEsc("Tra un'ora: " + title)}`,
+    "TRIGGER;RELATED=START:-PT1H",
+    "END:VALARM",
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].filter(Boolean).join("\r\n");
+}
+
+// ── Debrief ─────────────────────────────────────────────────
+function chipRow(name, values, current, multi) {
+  const sel = multi ? (current || []) : (current ? [current] : []);
+  return `<div class="chips" data-chips="${name}" data-multi="${multi ? 1 : 0}">
+    ${values.map(v => `<button type="button" class="fchip" data-v="${esc(v)}"
+        aria-pressed="${sel.includes(v)}">${esc(v)}</button>`).join("")}
+    <input type="hidden" name="${name}" value="${esc(multi ? JSON.stringify(sel) : (current || ""))}">
+  </div>`;
+}
+
+function wireChips(form) {
+  form.querySelectorAll("[data-chips]").forEach(box => {
+    const hidden = box.querySelector("input[type=hidden]");
+    const multi = box.dataset.multi === "1";
+    box.querySelectorAll("button[data-v]").forEach(b => {
+      b.onclick = () => {
+        if (multi) {
+          const cur = JSON.parse(hidden.value || "[]");
+          const i = cur.indexOf(b.dataset.v);
+          if (i < 0) cur.push(b.dataset.v); else cur.splice(i, 1);
+          hidden.value = JSON.stringify(cur);
+          b.setAttribute("aria-pressed", i < 0);
+        } else {
+          const on = b.getAttribute("aria-pressed") === "true";
+          box.querySelectorAll("button[data-v]").forEach(x => x.setAttribute("aria-pressed", "false"));
+          b.setAttribute("aria-pressed", !on);
+          hidden.value = on ? "" : b.dataset.v;
+        }
+      };
+    });
+  });
+}
+
+function openDebriefDialog(pr, s) {
+  if (!s) return;
+  const demos = itemsOf(pr, "demo").map(i => i.label);
+  const phrases = [...new Set(projDebriefs(pr).filter(d => d.icebreaker)
+    .map(d => d.icebreaker.trim()))].reverse().slice(0, 5);
+
+  openDialog(`Debrief · ${fmtDateShort(s.date)}`, `
+      <p class="sub">${esc(slotLabel(s))} · quello che scrivi qui finisce negli Spunti.</p>
+      <div class="num-grid">
+        <label>In lista<input type="number" name="in_list" min="0" inputmode="numeric" placeholder="—"></label>
+        <label>Shopping bag<input type="number" name="bags" min="0" inputmode="numeric" placeholder="—"></label>
+        <label>Conversion<input type="number" name="conversions" min="0" inputmode="numeric" placeholder="—"></label>
+      </div>
+      <div class="field"><label>Traffico in store</label>${chipRow("traffic", TRAFFIC, "", false)}</div>
+      ${demos.length ? `
+        <div class="field"><label>Demo fatte</label>${chipRow("demos", demos, [], true)}</div>
+        <div class="field"><label>La demo più efficace</label>
+          <select name="best_demo"><option value="">— nessuna —</option>
+            ${demos.map(d => `<option value="${esc(d)}">${esc(d)}</option>`).join("")}</select></div>` : ""}
+      <div class="field"><label>Frase rompighiaccio che ha funzionato</label>
+        <input type="text" name="icebreaker" placeholder="es. Hai già l'iPhone?">
+        ${phrases.length ? `<div class="chips" style="margin-top:6px">${phrases.map(p =>
+          `<button type="button" class="fchip" data-fill="${esc(p)}">${esc(p)}</button>`).join("")}</div>` : ""}</div>
+      <div class="field"><label>Cosa ha funzionato</label>
+        <textarea name="worked" rows="2" placeholder="es. partire da una funzione sola"></textarea></div>
+      <div class="field"><label>Cosa cambieresti</label>
+        <textarea name="improve" rows="2"></textarea></div>`,
+    async (fd) => {
+      const num = (k) => { const v = (fd.get(k) || "").trim(); return v === "" ? null : parseInt(v, 10); };
+      const txt = (k) => ((fd.get(k) || "").toString().trim() || null);
+      const row = {
+        project_id: pr.id, slot_id: s.id,
+        author_id: me.id, author_name: me.name,
+        in_list: num("in_list"), bags: num("bags"), conversions: num("conversions"),
+        traffic: txt("traffic"),
+        demos: JSON.parse(fd.get("demos") || "[]"),
+        best_demo: txt("best_demo"), icebreaker: txt("icebreaker"),
+        worked: txt("worked"), improve: txt("improve"),
+      };
+      const vuoto = row.in_list == null && row.bags == null && row.conversions == null &&
+        !row.demos.length && !row.traffic && !row.best_demo && !row.icebreaker && !row.worked && !row.improve;
+      if (vuoto) { toast("Scrivi almeno un numero o un'osservazione"); return false; }
+      const { error } = await db.from("debriefs").insert(row);
+      if (error) { toast("Errore nel salvataggio"); return false; }
+      await log(`ha fatto il debrief del turno ${pr.name} del ${fmtDateShort(s.date)}`);
+      toast("Debrief salvato");
+      openSlot.add(s.id);
+      await refresh();
+    },
+    (form) => {
+      wireChips(form);
+      form.querySelectorAll("[data-fill]").forEach(b => {
+        b.onclick = () => { form.querySelector("[name=icebreaker]").value = b.dataset.fill; };
+      });
+    });
+}
+
+// ── Spunti ──────────────────────────────────────────────────
+function renderProjectSpunti(main, pr, seg) {
+  const dbs = projDebriefs(pr);
+  const somma = (k) => dbs.reduce((a, d) => a + (d[k] || 0), 0);
+
+  const demoRows = itemsOf(pr, "demo").map(i => ({
+    label: i.label,
+    fatte: dbs.filter(d => (d.demos || []).includes(i.label)).length,
+    best: dbs.filter(d => d.best_demo === i.label).length,
+  })).sort((a, b) => (b.best - a.best) || (b.fatte - a.fatte) || a.label.localeCompare(b.label));
+  const maxDemo = Math.max(1, ...demoRows.map(r => Math.max(r.fatte, r.best)));
+  const demoHtml = demoRows.some(r => r.fatte || r.best)
+    ? `<div class="card" style="padding:4px 0">${demoRows.map(r => `
+        <div class="att-row">
+          <span class="att-name">${esc(r.label)}</span>
+          <span class="att-bar">
+            <i class="v" style="width:${r.best / maxDemo * 100}%"></i>
+            <i class="o" style="width:${Math.max(0, r.fatte - r.best) / maxDemo * 100}%"></i></span>
+          <span class="att-num">${r.fatte}× · ${r.best}★</span>
+        </div>`).join("")}</div>`
+    : `<div class="empty">Nessuna demo ancora registrata in un debrief.</div>`;
+
+  const frasi = {};
+  dbs.filter(d => d.icebreaker).forEach(d => {
+    const k = d.icebreaker.trim().toLowerCase();
+    const f = frasi[k] || (frasi[k] = { text: d.icebreaker.trim(), n: 0, chi: [] });
+    f.n++;
+    if (!f.chi.includes(d.author_name)) f.chi.push(d.author_name);
+  });
+  const frasiRows = Object.values(frasi).sort((a, b) => b.n - a.n);
+
+  const media = (g, k) => {
+    const v = g.filter(d => d[k] != null);
+    return v.length ? (v.reduce((a, d) => a + d[k], 0) / v.length).toFixed(1).replace(".0", "") : "—";
+  };
+  const trRows = TRAFFIC.map(t => {
+    const g = dbs.filter(d => d.traffic === t);
+    return { t, n: g.length, lista: media(g, "in_list"), bag: media(g, "bags"), conv: media(g, "conversions") };
+  }).filter(r => r.n);
+
+  const note = dbs.filter(d => d.worked || d.improve).slice().reverse().slice(0, 8);
+
+  const spunti = insights.filter(i => i.project_id === pr.id)
+    .sort((a, b) => (a.resolved - b.resolved) || (b.id - a.id));
+
+  main.innerHTML = seg + `
+    <div class="stats">
+      <div class="stat"><b>${dbs.length}</b><span>Debrief</span></div>
+      <div class="stat"><b>${somma("in_list")}</b><span>In lista</span></div>
+      <div class="stat"><b>${somma("bags")}</b><span>Bag</span></div>
+      <div class="stat"><b>${somma("conversions")}</b><span>Conversion</span></div>
+    </div>
+
+    <div class="area-head"><span>Le demo che convertono</span>
+      <span class="ac">volte · ★ migliore</span></div>
+    ${demoHtml}
+
+    ${frasiRows.length ? `<div class="area-head"><span>Frasi che funzionano</span></div>
+      ${frasiRows.map(f => `<div class="t-row">
+        <span class="t-txt"><span class="t-name">“${esc(f.text)}”</span>
+          <span class="t-meta">${esc(f.chi.join(", "))}</span></span>
+        <span class="badge ${f.n > 1 ? "done" : "soft"}">${f.n}×</span>
+      </div>`).join("")}` : ""}
+
+    ${trRows.length ? `<div class="area-head"><span>Traffico e risultati</span>
+        <span class="ac">media per turno</span></div>
+      ${trRows.map(r => `<div class="t-row">
+        <span class="t-txt"><span class="t-name">Traffico ${esc(r.t)}</span>
+          <span class="t-meta">${r.n} ${r.n === 1 ? "debrief" : "debrief"}</span></span>
+        <span class="sub">👥 ${r.lista} · 🛍 ${r.bag} · ✅ ${r.conv}</span>
+      </div>`).join("")}` : ""}
+
+    ${note.length ? `<div class="area-head"><span>Dai debrief</span></div>
+      <div class="card">${note.map(d => `
+        <div class="db-line" style="margin-bottom:8px">
+          ${d.worked ? `✔ <b>${esc(d.worked)}</b><br>` : ""}
+          ${d.improve ? `↻ ${esc(d.improve)}<br>` : ""}
+          <span class="sub">${esc(d.author_name)} · ${fmtTs(d.created_at)}</span>
+        </div>`).join("")}</div>` : ""}
+
+    <div class="section-head" style="margin-top:22px"><h2>Spunti</h2>
+      <button class="small" id="add-insight">+ Spunto</button></div>
+    ${spunti.length ? spunti.map(insightCard).join("")
+      : `<div class="empty">Ancora nessuno spunto.<br>Butta giù un'osservazione con “+ Spunto”.</div>`}`;
+
+  $("#add-insight").onclick = () => openDialog("Nuovo spunto", `
+      <div class="field"><label>Che tipo è</label>${chipRow("kind", KINDS, "osservazione", false)}</div>
+      <div class="field"><label>Lo spunto</label>
+        <textarea name="text" rows="3" required placeholder="es. con il cliente indeciso funziona partire dalla fotocamera"></textarea></div>`,
+    async (fd) => {
+      const text = (fd.get("text") || "").trim();
+      if (text.length < 3) { toast("Scrivi lo spunto"); return false; }
+      const { error } = await db.from("insights").insert({
+        project_id: pr.id, kind: fd.get("kind") || "osservazione", text,
+        author_id: me.id, author_name: me.name,
+      });
+      if (error) { toast("Errore nel salvataggio"); return false; }
+      await log(`ha aggiunto uno spunto a ${pr.name}: ${text.slice(0, 60)}`);
+      toast("Spunto salvato");
+      await refresh();
+    }, wireChips);
+
+  main.querySelectorAll("[data-act=reply]").forEach(b => {
+    b.onclick = () => {
+      const i = insights.find(x => x.id === Number(b.dataset.id));
+      openDialog("Rispondi", `
+        <p class="sub">${esc(i.text)}</p>
+        <div class="field"><label>La tua risposta</label>
+          <textarea name="text" rows="3" required></textarea></div>`,
+        async (fd) => {
+          const text = (fd.get("text") || "").trim();
+          if (text.length < 2) { toast("Scrivi la risposta"); return false; }
+          const { error } = await db.from("insight_replies").insert({
+            insight_id: i.id, text, author_id: me.id, author_name: me.name,
+          });
+          if (error) { toast("Errore nel salvataggio"); return false; }
+          await refresh();
+        });
+    };
+  });
+  main.querySelectorAll("[data-act=resolve]").forEach(b => {
+    b.onclick = async () => {
+      const i = insights.find(x => x.id === Number(b.dataset.id));
+      const { error } = await db.from("insights").update({ resolved: !i.resolved }).eq("id", i.id);
+      if (error) { toast("Errore nel salvataggio"); return; }
+      await refresh();
+    };
+  });
+  main.querySelectorAll("[data-act=del-insight]").forEach(b => {
+    b.onclick = async () => {
+      const i = insights.find(x => x.id === Number(b.dataset.id));
+      if (!confirm("Eliminare questo spunto?")) return;
+      await db.from("insights").delete().eq("id", i.id);
+      await refresh();
+    };
+  });
+}
+
+function insightCard(i) {
+  const rs = repliesOf(i.id);
+  return `<div class="card">
+    <div class="row spread">
+      <span class="row" style="gap:6px">
+        <span class="kind ${esc(i.kind)}">${esc(i.kind)}</span>
+        ${i.resolved ? `<span class="badge done">Chiusa</span>` : ""}
+      </span>
+      <span class="sub">${esc(i.author_name)} · ${fmtTs(i.created_at)}</span>
+    </div>
+    <div style="margin-top:8px">${esc(i.text)}</div>
+    ${rs.map(r => `<div class="reply"><b>${esc(r.author_name)}</b>
+      <span class="sub">· ${fmtTs(r.created_at)}</span><br>${esc(r.text)}</div>`).join("")}
+    <div class="row" style="margin-top:10px">
+      <button class="ghost small" data-act="reply" data-id="${i.id}">Rispondi</button>
+      ${i.kind === "domanda" ? `<button class="ghost small" data-act="resolve" data-id="${i.id}">${
+        i.resolved ? "↩︎ Riapri" : "✓ Chiudi"}</button>` : ""}
+      <span style="flex:1"></span>
+      ${i.author_name === me?.name
+        ? `<button class="danger small" data-act="del-insight" data-id="${i.id}">Elimina</button>` : ""}
+    </div>
+  </div>`;
+}
+
 // ── Dialog generico ─────────────────────────────────────────
 function openDialog(title, fieldsHtml, onSubmit, onOpen) {
   const dlg = $("#dlg"), form = $("#dlg-form");
@@ -1267,7 +1872,9 @@ function openDialog(title, fieldsHtml, onSubmit, onOpen) {
     </div>`;
   form.onsubmit = async (e) => {
     e.preventDefault();
-    await onSubmit(new FormData(form));
+    // chi gestisce il salvataggio può restituire false per tenere
+    // aperto il foglio senza far perdere quello che è stato scritto
+    if (await onSubmit(new FormData(form)) === false) return;
     dlg.close();
   };
   form.querySelector("#dlg-cancel").onclick = () => dlg.close();
