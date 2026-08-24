@@ -8,6 +8,12 @@ Web app mobile-first per gestire le attività dello store in team (~12 persone):
 - **Validation** — FWE (nuovi arrivati, senza accesso all'app): checklist di
   competenze da validare (Competenze operative, Approccio, Demo, Business),
   con firma di chi valida e data
+- **Progetti** — ogni progetto attivo è un tab a sé, accanto a Validation.
+  Il primo è **Pilot** (Live Group Demo Pilot): i turni con Specialist,
+  OnPoint, Keyrole e Coach; il **debrief** di fine turno (numeri, demo fatte,
+  frase rompighiaccio, cosa ha funzionato); la bacheca **Spunti** che ne
+  ricava le demo che convertono, le frasi che funzionano, traffico e
+  risultati, più le osservazioni e le domande aperte con le risposte
 - **Team** — gestione persone e competenze
 - **Storico** — registro di chi ha fatto cosa
 
@@ -20,7 +26,12 @@ Frontend statico (GitHub Pages) + database e login su Supabase (piano gratuito).
 
 ### 1. Database
 Nel progetto Supabase → **SQL Editor** → incolla il contenuto di
-`supabase-setup.sql` → **Run**.
+`supabase-setup.sql` → **Run**, poi le migrazioni in ordine
+(`migration-2.sql` … `migration-6.sql`) allo stesso modo.
+
+Ogni migrazione si può rieseguire senza danni. Finché `migration-6.sql`
+non gira, i tab dei progetti semplicemente non compaiono: il resto
+dell'app funziona come prima.
 
 ### 2. Utente condiviso
 L'utente condiviso è `marcocasati+storetasks@gmail.com` (alias Gmail del
