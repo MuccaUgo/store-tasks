@@ -341,6 +341,53 @@
   .num-grid label { flex: 1; font-size: .72rem; color: var(--muted); }
   .num-grid input { margin-top: 4px; text-align: center; }
   .badge.soft { background: var(--accent-soft); color: var(--accent); }
+  /* ── Focus Flow ── */
+  .f-card2 {
+    width: 100%; text-align: left; background: var(--card); border: 1px solid var(--line);
+    border-radius: 15px; padding: 13px 14px; margin-bottom: 9px; cursor: pointer;
+    display: flex; flex-direction: column; gap: 9px; font-family: inherit; color: var(--text);
+  }
+  .f-card2:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .f-name2 { font-size: 1rem; font-weight: 700; letter-spacing: -.01em; line-height: 1.3; }
+  .fstate {
+    font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+    padding: 3px 9px; border-radius: 999px; white-space: nowrap; flex: none;
+  }
+  .fs-att { background: var(--accent-soft); color: var(--accent); }
+  .fs-ral { background: var(--warn-soft); color: var(--warn); }
+  .fs-fer { background: rgba(211, 63, 73, .15); color: var(--danger); }
+  .fs-con { background: var(--ok-soft); color: var(--ok); }
+  .fs-abb { background: var(--line); color: var(--muted); }
+  .strip-row { display: flex; align-items: center; gap: 10px; width: 100%; }
+  .strip { display: flex; gap: 3px; align-items: flex-end; height: 18px; flex: 1; }
+  .strip i { flex: 1; border-radius: 2px; background: var(--line); height: 3px; display: block; }
+  .strip i.on { height: 18px; background: var(--sc, var(--accent)); }
+  .strip i.pre { background: none; }
+  .strip i.aft { opacity: .45; }
+  .fmetric { font-size: .74rem; color: var(--muted); white-space: nowrap; }
+  .feed { display: flex; flex-direction: column; }
+  .fitem { display: flex; gap: 12px; padding-bottom: 15px; position: relative; }
+  .fitem:not(:last-child)::before {
+    content: ""; position: absolute; left: 5px; top: 17px; bottom: 0; width: 2px; background: var(--line);
+  }
+  .fdot2 { width: 12px; height: 12px; border-radius: 99px; flex: none; margin-top: 4px; z-index: 2; }
+  .ftxt { flex: 1; min-width: 0; }
+  .fwk { font-size: .72rem; color: var(--muted); display: block; }
+  .fbody { font-size: .92rem; line-height: 1.5; white-space: pre-wrap; }
+  .idea-row {
+    display: flex; align-items: flex-start; gap: 9px; background: var(--card);
+    border: 1px solid var(--line); border-radius: 13px; padding: 11px 13px; margin-bottom: 8px;
+  }
+  .idea-row .ib { flex: 1; font-size: .92rem; min-width: 0; }
+  .idea-row .im { font-size: .72rem; color: var(--muted); display: block; margin-top: 2px; }
+  .quickadd { display: flex; gap: 8px; margin-bottom: 12px; }
+  .quickadd input { flex: 1; }
+  .prompts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .prompt {
+    border: 1px dashed var(--line); background: none; color: var(--muted);
+    border-radius: 999px; padding: 5px 11px; font-size: .78rem; cursor: pointer; font-family: inherit;
+  }
+  .prompt:hover { border-color: var(--accent); color: var(--accent); }
   .hidden { display: none !important; }
 </style>
 </head>
@@ -405,6 +452,9 @@ let hasProjects = false;   // i tab dei progetti compaiono dopo migration-6.sql
 let vSeg = "persone", vFilter = "tutti", openFweId = null, vEditor = false;
 let teamSeg = "key";
 let pSeg = "turni", openSlot = new Set(); // schede turno espanse
+let focusList = [], focusUpd = [], ideaList = [];
+let hasFocus = false;      // il tab Focus si attiva dopo migration-7.sql
+let fSeg = "focus", openFocusId = null;
 let stateMap = {}, pairHist = {};
 
 const $ = (s) => document.querySelector(s);
@@ -528,14 +578,16 @@ function enterApp() {
 
 // ── Dati ────────────────────────────────────────────────────
 async function detectSchema() {
-  const [a, v, p] = await Promise.all([
+  const [a, v, p, f] = await Promise.all([
     db.from("downloads").select("audience").limit(1),
     db.from("fwe_events").select("id").limit(1),
     db.from("projects").select("id").limit(1),
+    db.from("focus").select("id").limit(1),
   ]);
   hasAudience = !a.error;
   hasValidation = !v.error;
   hasProjects = !p.error;
+  hasFocus = !f.error;
 }
 
 async function loadAll() {
@@ -558,6 +610,11 @@ async function loadAll() {
     ["insights", db.from("insights").select("*").order("id")],
     ["replies", db.from("insight_replies").select("*").order("id")],
   );
+  if (hasFocus) q.push(
+    ["focus", db.from("focus").select("*").order("created_at")],
+    ["fupd", db.from("focus_updates").select("*").order("created_at")],
+    ["ideas", db.from("ideas").select("*").order("created_at", { ascending: false })],
+  );
   const res = await Promise.all(q.map(x => x[1]));
   const d = {};
   q.forEach((x, i) => d[x[0]] = res[i].data || []);
@@ -570,6 +627,9 @@ async function loadAll() {
   if (hasProjects) {
     projects = d.projects; slots = d.slots; slotPeople = d.crew; projItems = d.items;
     debriefs = d.debriefs; insights = d.insights; replies = d.replies;
+  }
+  if (hasFocus) {
+    focusList = d.focus; focusUpd = d.fupd; ideaList = d.ideas;
   }
 }
 
@@ -650,6 +710,7 @@ const ICONS = {
   validation: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.4l2.4 2.4 4.6-5"/></svg>`,
   team: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.5" r="3.4"/><path d="M3.2 19.3c.8-3.1 3.1-4.7 5.8-4.7s5 1.6 5.8 4.7"/><circle cx="16.8" cy="9.8" r="2.6"/><path d="M15.6 14.7c2.3.2 4.2 1.6 4.9 4"/></svg>`,
   log: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3.2 2"/></svg>`,
+  focus: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 3.5 3.5L16 9l4 4.5"/><circle cx="8" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="16" cy="9" r="1.7" fill="currentColor" stroke="none"/><path d="M3 21h18"/></svg>`,
 };
 
 // Un tab per progetto attivo, tra Validation e Team.
@@ -657,6 +718,7 @@ function renderNav() {
   const items = [
     { id: "dd", label: "DD", ico: ICONS.dd },
     { id: "validation", label: "Validation", ico: ICONS.validation },
+    ...(hasFocus ? [{ id: "focus", label: "Focus", ico: ICONS.focus }] : []),
     ...projects.map(p => ({ id: "proj:" + p.id, label: p.name, emo: p.icon || "🎯" })),
     { id: "team", label: "Team", ico: ICONS.team },
     { id: "log", label: "Storico", ico: ICONS.log },
@@ -668,7 +730,7 @@ function renderNav() {
   nav.querySelectorAll("button").forEach(b => {
     b.onclick = () => {
       tab = b.dataset.tab;
-      openFweId = null; vEditor = false;
+      openFweId = null; vEditor = false; openFocusId = null;
       render();
     };
   });
@@ -685,6 +747,7 @@ function render() {
   const main = $("#main");
   if (pr) renderProject(main, pr);
   else if (tab === "dd") renderDD(main);
+  else if (tab === "focus") renderFocus(main);
   else if (tab === "validation") renderValidation(main);
   else if (tab === "team") renderTeam(main);
   else renderLog(main);
@@ -694,6 +757,7 @@ function render() {
   });
   main.querySelectorAll("[data-tseg]").forEach(b => b.onclick = () => { teamSeg = b.dataset.tseg; render(); });
   main.querySelectorAll("[data-pseg]").forEach(b => b.onclick = () => { pSeg = b.dataset.pseg; render(); });
+  main.querySelectorAll("[data-fseg]").forEach(b => b.onclick = () => { fSeg = b.dataset.fseg; openFocusId = null; render(); });
 }
 
 // ── DD (Daily Download) ─────────────────────────────────────
@@ -893,6 +957,262 @@ function renderDD(main) {
       await refresh();
     };
   });
+}
+
+// ── Focus Flow ──────────────────────────────────────────────
+// Un focus è una cosa che portiamo avanti nel tempo. Un aggiornamento
+// è un punto sulla scia: dove i punti smettono, il focus è fermo.
+const WEEK_MS = 604800000;
+const updOf = (fid) => focusUpd.filter(u => u.focus_id === fid);
+const weeksSince = (iso) => Math.floor((Date.now() - new Date(iso).getTime()) / WEEK_MS);
+function silenceOf(f) {
+  const u = updOf(f.id);
+  return weeksSince(u.length ? u[u.length - 1].created_at : f.created_at);
+}
+function focusState(f) {
+  if (f.status === "concluso") return { k: "con", lab: "concluso" };
+  if (f.status === "abbandonato") return { k: "abb", lab: "abbandonato" };
+  const s = silenceOf(f);
+  if (s >= 5) return { k: "fer", lab: "fermo" };
+  if (s >= 2) return { k: "ral", lab: "rallentato" };
+  return { k: "att", lab: "attivo" };
+}
+const FS_ORD = { fer: 0, ral: 1, att: 2, con: 3, abb: 4 };
+const FS_COLOR = { att: "var(--accent)", ral: "var(--warn)", fer: "var(--danger)", con: "var(--ok)", abb: "var(--muted)" };
+const focusSorted = () => focusList.slice().sort((a, b) =>
+  (FS_ORD[focusState(a).k] - FS_ORD[focusState(b).k]) || (silenceOf(b) - silenceOf(a)));
+
+function silenceText(f) {
+  if (f.status !== "attivo") return f.status;
+  const s = silenceOf(f);
+  return s === 0 ? "aggiornato questa settimana"
+    : s === 1 ? "1 settimana di silenzio" : `${s} settimane di silenzio`;
+}
+// dieci settimane: 0 la più vecchia, 9 questa
+function stripHtml(f, color) {
+  const idx = updOf(f.id).map(u => 9 - weeksSince(u.created_at)).filter(i => i >= 0 && i <= 9);
+  const first = idx.length ? Math.min(...idx) : 99;
+  const last = idx.length ? Math.max(...idx) : -1;
+  let out = "";
+  for (let i = 0; i <= 9; i++) {
+    const cls = idx.includes(i) ? "on" : i < first ? "pre" : i > last ? "aft" : "";
+    out += `<i class="${cls}"></i>`;
+  }
+  return `<span class="strip" style="--sc:${color}">${out}</span>`;
+}
+
+function renderFocus(main) {
+  if (!hasFocus) {
+    main.innerHTML = `
+      <div class="empty-big">
+        <div class="glyph">📈</div>
+        <h2>Quasi pronto</h2>
+        <p>Manca l'ultimo passaggio sul database.<br>Esegui <strong>migration-7.sql</strong> e questa sezione si accende da sola.</p>
+      </div>`;
+    return;
+  }
+  if (openFocusId) return renderFocusDetail(main);
+
+  const nIdee = ideaList.filter(i => !i.archived && !i.promoted_focus_id).length;
+  const seg = `
+    <div class="seg" role="group" aria-label="Sezione">
+      <button type="button" data-fseg="focus" aria-pressed="${fSeg === "focus"}">Focus · ${focusList.length}</button>
+      <button type="button" data-fseg="idee" aria-pressed="${fSeg === "idee"}">Idee · ${nIdee}</button>
+    </div>`;
+  if (fSeg === "idee") return renderIdee(main, seg);
+
+  const list = focusSorted();
+  const nFermi = list.filter(f => focusState(f).k === "fer").length;
+  const nAttivi = list.filter(f => focusState(f).k === "att").length;
+
+  main.innerHTML = seg + `
+    <div class="section-head"><h2>Cosa stiamo portando avanti</h2>
+      <button class="small" id="add-focus">+ Nuovo</button></div>
+    ${list.length ? `<div class="sub" style="margin:0 4px 12px">${nAttivi} in movimento${nFermi ? ` · ${nFermi} fermi da oltre un mese` : ""}</div>` : ""}
+    ${list.length ? list.map(f => {
+      const st = focusState(f);
+      return `<button type="button" class="f-card2" data-focus="${f.id}">
+        <span class="row spread" style="width:100%;align-items:flex-start;gap:10px">
+          <span class="f-name2">${esc(f.name)}</span>
+          <span class="fstate fs-${st.k}">${st.lab}</span>
+        </span>
+        ${f.goal ? `<span class="sub">${esc(f.goal)}</span>` : ""}
+        <span class="strip-row">${stripHtml(f, FS_COLOR[st.k])}
+          <span class="fmetric">${esc(silenceText(f))}</span></span>
+      </button>`;
+    }).join("") : `<div class="empty">Nessun focus ancora.<br>Aggiungine uno, oppure parti da un'idea.</div>`}`;
+
+  $("#add-focus").onclick = () => openFocusForm(null);
+  main.querySelectorAll("[data-focus]").forEach(b => {
+    b.onclick = () => { openFocusId = b.dataset.focus; render(); };
+  });
+}
+
+function renderFocusDetail(main) {
+  const f = focusList.find(x => x.id === openFocusId);
+  if (!f) { openFocusId = null; return render(); }
+  const st = focusState(f);
+  const ups = updOf(f.id).slice().reverse();
+  const owner = people.find(p => p.id === f.owner_id);
+
+  main.innerHTML = `
+    <button type="button" class="backlink" id="f-back">‹ Tutti i focus</button>
+    <div class="card">
+      <div class="row spread" style="align-items:flex-start;gap:10px">
+        <h3>${esc(f.name)}</h3>
+        <span class="fstate fs-${st.k}">${st.lab}</span>
+      </div>
+      ${f.goal ? `<div class="sub" style="margin-top:6px">${esc(f.goal)}</div>` : ""}
+      ${f.indicator ? `<div class="sub" style="margin-top:6px">Segnale: ${esc(f.indicator)}</div>` : ""}
+      ${owner ? `<div class="sub" style="margin-top:6px">Tiene il filo: ${esc(owner.name)}</div>` : ""}
+      ${f.outcome ? `<div class="sub" style="margin-top:8px;color:var(--text)">${esc(f.outcome)}</div>` : ""}
+      <div class="row" style="margin-top:12px;gap:8px">
+        <button class="small" id="add-upd">+ Aggiornamento</button>
+        <button class="ghost small" id="edit-focus">Modifica</button>
+      </div>
+    </div>
+    <div class="sub" style="margin:14px 4px 8px">${ups.length} aggiornament${ups.length === 1 ? "o" : "i"} · ${esc(silenceText(f))}</div>
+    ${ups.length ? `<div class="feed">${ups.map(u => `
+      <div class="fitem">
+        <span class="fdot2" style="background:${FS_COLOR[st.k]}"></span>
+        <span class="ftxt">
+          <span class="fwk">${esc(u.actor_name)} · ${fmtTs(u.created_at)}</span>
+          <span class="fbody">${esc(u.body)}</span>
+        </span>
+      </div>`).join("")}</div>`
+      : `<div class="empty">Ancora nessun aggiornamento.<br>Il primo racconta da dove si parte.</div>`}`;
+
+  $("#f-back").onclick = () => { openFocusId = null; render(); };
+  $("#add-upd").onclick = () => openUpdForm(f);
+  $("#edit-focus").onclick = () => openFocusForm(f);
+}
+
+function renderIdee(main, seg) {
+  const live = ideaList.filter(i => !i.archived && !i.promoted_focus_id);
+  main.innerHTML = seg + `
+    <div class="section-head"><h2>Serbatoio</h2></div>
+    <div class="sub" style="margin:0 4px 12px">Due parole bastano. Alcune diventeranno focus, la maggior parte no.</div>
+    <div class="quickadd">
+      <input type="text" id="idea-in" placeholder="Es. il caddy in C3 non lo usa nessuno">
+      <button class="small" id="idea-add">Aggiungi</button>
+    </div>
+    ${live.length ? live.map(i => `
+      <div class="idea-row">
+        <span class="ib">${esc(i.body)}
+          <span class="im">${esc(i.actor_name || "—")} · ${fmtTs(i.created_at)}</span></span>
+        <button class="ghost small" data-promote="${i.id}">→ Focus</button>
+        <button class="danger small" data-arch="${i.id}" aria-label="Archivia">✕</button>
+      </div>`).join("") : `<div class="empty">Serbatoio vuoto.</div>`}`;
+
+  const addIdea = async () => {
+    const v = $("#idea-in").value.trim();
+    if (v.length < 2) return;
+    const { error } = await db.from("ideas").insert({ body: v, actor_name: me.name });
+    if (error) { toast("Errore nel salvataggio"); return; }
+    $("#idea-in").value = "";
+    await refresh();
+  };
+  $("#idea-add").onclick = addIdea;
+  $("#idea-in").onkeydown = (e) => { if (e.key === "Enter") addIdea(); };
+
+  main.querySelectorAll("[data-promote]").forEach(b => {
+    b.onclick = async () => {
+      const i = ideaList.find(x => x.id === b.dataset.promote);
+      const { data, error } = await db.from("focus").insert({ name: i.body }).select().single();
+      if (error) { toast("Errore nel salvataggio"); return; }
+      await db.from("ideas").update({ promoted_focus_id: data.id }).eq("id", i.id);
+      await log(`ha aperto il focus “${i.body}” da un'idea`);
+      toast("Diventata un focus");
+      fSeg = "focus"; openFocusId = data.id;
+      await refresh();
+    };
+  });
+  main.querySelectorAll("[data-arch]").forEach(b => {
+    b.onclick = async () => {
+      await db.from("ideas").update({ archived: true }).eq("id", b.dataset.arch);
+      await refresh();
+    };
+  });
+}
+
+function openUpdForm(f) {
+  openDialog("Aggiornamento", `
+    <p class="sub">${esc(f.name)}</p>
+    <div class="field"><label>Cosa è successo</label>
+      <textarea name="body" rows="4" placeholder="Due righe bastano."></textarea></div>
+    <div class="prompts">
+      <button type="button" class="prompt" data-p="Fatto: ">Fatto</button>
+      <button type="button" class="prompt" data-p="Imparato: ">Imparato</button>
+      <button type="button" class="prompt" data-p="Prossimo passo: ">Prossimo passo</button>
+    </div>
+    <div class="sub" style="margin-top:8px">Le tracce sono facoltative: servono solo se ti aiutano.</div>`,
+    async (fd) => {
+      const body = (fd.get("body") || "").trim();
+      if (body.length < 3) { toast("Scrivi qualcosa"); return; }
+      const { error } = await db.from("focus_updates").insert({
+        focus_id: f.id, body, actor_id: me.id, actor_name: me.name,
+      });
+      if (error) { toast("Errore nel salvataggio"); return; }
+      toast("Aggiunto alla scia");
+      await refresh();
+    },
+    (form) => {
+      form.querySelectorAll(".prompt").forEach(b => {
+        b.onclick = () => {
+          const ta = form.querySelector("[name=body]");
+          const cur = ta.value.replace(/[ \t\n]+$/, "");
+          ta.value = (cur ? cur + "\n" : "") + b.dataset.p;
+          ta.focus();
+        };
+      });
+    });
+}
+
+function openFocusForm(f) {
+  const opts = people.map(p =>
+    `<option value="${p.id}" ${f && f.owner_id === p.id ? "selected" : ""}>${esc(p.name)}</option>`).join("");
+  openDialog(f ? "Modifica focus" : "Nuovo focus", `
+    <div class="field"><label>Nome *</label>
+      <input type="text" name="name" value="${f ? esc(f.name) : ""}" required></div>
+    <div class="field"><label>Risultato desiderato</label>
+      <input type="text" name="goal" value="${f ? esc(f.goal || "") : ""}" placeholder="es. il cliente esce sapendo quale Mac fa per lui"></div>
+    <div class="field"><label>Come ci accorgiamo che funziona</label>
+      <input type="text" name="indicator" value="${f ? esc(f.indicator || "") : ""}" placeholder="es. percentuale di demo interattive"></div>
+    <div class="field"><label>Chi tiene il filo</label>
+      <select name="owner"><option value="">— nessuno —</option>${opts}</select></div>
+    ${f ? `<div class="field"><label>Stato</label>
+      <select name="status">
+        <option value="attivo" ${f.status === "attivo" ? "selected" : ""}>Attivo</option>
+        <option value="concluso" ${f.status === "concluso" ? "selected" : ""}>Concluso</option>
+        <option value="abbandonato" ${f.status === "abbandonato" ? "selected" : ""}>Abbandonato</option>
+      </select></div>
+    <div class="field"><label>Com'è andata a finire</label>
+      <input type="text" name="outcome" value="${esc(f.outcome || "")}" placeholder="obbligatorio se lo chiudi o lo abbandoni"></div>` : ""}`,
+    async (fd) => {
+      const name = fd.get("name").trim();
+      if (!name) { toast("Serve un nome"); return; }
+      const row = {
+        name,
+        goal: fd.get("goal").trim() || null,
+        indicator: fd.get("indicator").trim() || null,
+        owner_id: fd.get("owner") || null,
+      };
+      if (f) {
+        row.status = fd.get("status");
+        row.outcome = fd.get("outcome").trim() || null;
+        if (row.status !== "attivo" && !row.outcome) { toast("Scrivi com'è andata a finire"); return; }
+        row.closed_at = row.status === "attivo" ? null : new Date().toISOString();
+        const { error } = await db.from("focus").update(row).eq("id", f.id);
+        if (error) { toast("Errore nel salvataggio"); return; }
+        if (row.status !== "attivo") await log(`ha ${row.status} il focus “${name}”`);
+      } else {
+        const { data, error } = await db.from("focus").insert(row).select().single();
+        if (error) { toast("Errore nel salvataggio"); return; }
+        await log(`ha aperto il focus “${name}”`);
+        openFocusId = data.id;
+      }
+      await refresh();
+    });
 }
 
 // ── Validation ──────────────────────────────────────────────
