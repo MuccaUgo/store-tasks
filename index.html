@@ -236,8 +236,8 @@
   .progress { height: 7px; background: var(--line); border-radius: 999px; overflow: hidden; }
   .progress > div { height: 100%; background: var(--ok); border-radius: 999px; transition: width .3s; }
   .seg button {
-    flex: 1; border: none; background: none; padding: 9px 6px; border-radius: 10px;
-    font-size: .9rem; font-weight: 600; color: var(--muted); cursor: pointer;
+    flex: 1; border: none; background: none; padding: 11px 6px; border-radius: 10px;
+    min-height: 42px; font-size: .9rem; font-weight: 600; color: var(--muted); cursor: pointer;
   }
   .seg button[aria-pressed="true"] { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.13); }
   .wave-head {
@@ -375,11 +375,13 @@
   .fwk { font-size: .72rem; color: var(--muted); display: block; }
   .fbody { font-size: .92rem; line-height: 1.5; white-space: pre-wrap; }
   .idea-row {
-    display: flex; align-items: flex-start; gap: 9px; background: var(--card);
-    border: 1px solid var(--line); border-radius: 13px; padding: 11px 13px; margin-bottom: 8px;
+    display: flex; flex-direction: column; gap: 10px; background: var(--card);
+    border: 1px solid var(--line); border-radius: 13px; padding: 12px 13px; margin-bottom: 8px;
   }
-  .idea-row .ib { flex: 1; font-size: .92rem; min-width: 0; }
-  .idea-row .im { font-size: .72rem; color: var(--muted); display: block; margin-top: 2px; }
+  .idea-row .ib { font-size: .93rem; line-height: 1.4; }
+  .idea-row .im { font-size: .72rem; color: var(--muted); display: block; margin-top: 3px; }
+  .idea-acts { display: flex; gap: 8px; }
+  .idea-acts button { flex: 1; min-height: 44px; padding: 10px 12px; font-size: .86rem; }
   .quickadd { display: flex; gap: 8px; margin-bottom: 12px; }
   .quickadd input { flex: 1; }
   .prompts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
@@ -1100,9 +1102,11 @@ function renderIdee(main, seg) {
       <div class="idea-row">
         <span class="ib">${esc(i.body)}
           <span class="im">${esc(i.actor_name || "—")} · ${fmtTs(i.created_at)}</span></span>
-        <button class="ghost small" data-promote="${i.id}">→ Focus</button>
-        <button class="danger small" data-arch="${i.id}" aria-label="Archivia">✕</button>
-      </div>`).join("") : `<div class="empty">Serbatoio vuoto.</div>`}`;
+        <span class="idea-acts">
+          <button class="ghost" data-promote="${i.id}">Diventa un focus</button>
+          <button class="danger" data-arch="${i.id}">Archivia</button>
+        </span>
+      </div>`).join("") : `<div class="empty">Serbatoio vuoto.<br>Scrivi la prima idea qui sopra.</div>`}`;
 
   const addIdea = async () => {
     const v = $("#idea-in").value.trim();
@@ -1160,9 +1164,10 @@ function openUpdForm(f) {
       form.querySelectorAll(".prompt").forEach(b => {
         b.onclick = () => {
           const ta = form.querySelector("[name=body]");
-          const cur = ta.value.replace(/[ \t\n]+$/, "");
+          const cur = ta.value.replace(/\n+$/, "");   // tolgo solo gli a capo, non lo spazio della traccia
           ta.value = (cur ? cur + "\n" : "") + b.dataset.p;
           ta.focus();
+          ta.setSelectionRange(ta.value.length, ta.value.length);
         };
       });
     });
