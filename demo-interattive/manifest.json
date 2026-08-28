@@ -1,0 +1,11 @@
+{
+  "name": "Demo Interattive",
+  "short_name": "Demo",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#4c1d95",
+  "theme_color": "#4c1d95",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

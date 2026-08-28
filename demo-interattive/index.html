@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0f1220">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>Demo Interattive</title>
+<style>
+  :root {
+    --bg: #f2f3f8;
+    --card: #ffffff;
+    --glass: rgba(255, 255, 255, .58);
+    --glass-line: rgba(255, 255, 255, .75);
+    --text: #14172b;
+    --muted: #6b7085;
+    --line: #e3e5ee;
+    --accent: #7c3aed;
+    --accent-soft: #efe7ff;
+    --ok: #1fa36b;
+    --ok-soft: #e2f6ec;
+    --warn: #c77b12;
+    --warn-soft: #fcefdc;
+    --danger: #d33f49;
+    --radius: 16px;
+    --shadow: 0 10px 30px rgba(20, 23, 43, .10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1220;
+      --card: #191d31;
+      --glass: rgba(25, 29, 49, .55);
+      --glass-line: rgba(255, 255, 255, .10);
+      --text: #eceef7;
+      --muted: #9aa0b8;
+      --line: #2a2f4a;
+      --accent: #b18aff;
+      --accent-soft: #2b2350;
+      --ok: #3ecf8e;
+      --ok-soft: #163a2c;
+      --warn: #e8a13c;
+      --warn-soft: #3d2f14;
+      --danger: #ff6b74;
+      --shadow: 0 10px 30px rgba(0, 0, 0, .35);
+    }
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text);
+    min-height: 100dvh;
+    padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  }
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(22px) saturate(1.8);
+    backdrop-filter: blur(22px) saturate(1.8);
+    padding: calc(12px + env(safe-area-inset-top)) 16px 10px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid var(--glass-line);
+  }
+  header h1 { font-size: 1.15rem; letter-spacing: -.01em; }
+  #whoami-chip {
+    font-size: .85rem; color: var(--accent); background: var(--accent-soft);
+    border: none; border-radius: 999px; padding: 6px 12px; font-weight: 600;
+  }
+  main { padding: 14px 14px 20px; max-width: 640px; margin: 0 auto; }
+  .card {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 14px; margin-bottom: 12px;
+    box-shadow: 0 2px 10px rgba(20, 23, 43, .04);
+  }
+  .card h3 { font-size: 1.02rem; margin-bottom: 2px; letter-spacing: -.01em; }
+  .sub { color: var(--muted); font-size: .82rem; }
+  .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .spread { justify-content: space-between; }
+  .field { margin-top: 10px; }
+  .field label { display: block; font-size: .78rem; color: var(--muted); margin-bottom: 4px; }
+  select, textarea,
+  input[type=text], input[type=date], input[type=password], input[type=search] {
+    width: 100%; padding: 11px 12px; font-size: 1rem;
+    border: 1px solid var(--line); border-radius: 12px;
+    background: var(--bg); color: var(--text);
+    -webkit-appearance: none; appearance: none;
+    font-family: inherit;
+  }
+  textarea { resize: vertical; line-height: 1.4; }
+  button {
+    font-family: inherit; font-size: .95rem; font-weight: 600;
+    border: none; border-radius: 12px; padding: 11px 16px;
+    background: var(--accent); color: #fff; cursor: pointer;
+  }
+  button.ghost { background: var(--accent-soft); color: var(--accent); }
+  button.small { padding: 7px 12px; font-size: .85rem; }
+  button.danger { background: transparent; color: var(--danger); padding: 7px 8px; }
+  button:disabled { opacity: .5; }
+  .badge {
+    font-size: .75rem; font-weight: 700; padding: 3px 9px; border-radius: 999px;
+    background: var(--warn-soft); color: var(--warn); white-space: nowrap;
+  }
+  .badge.done { background: var(--ok-soft); color: var(--ok); }
+  .badge.soft { background: var(--accent-soft); color: var(--accent); }
+  .badge.off { background: var(--line); color: var(--muted); }
+  .section-head { display: flex; justify-content: space-between; align-items: center; margin: 6px 2px 12px; }
+  .section-head h2 { font-size: 1.05rem; letter-spacing: -.01em; }
+  .cat-head {
+    margin: 18px 4px 8px; font-size: .82rem; font-weight: 700;
+    color: var(--muted); text-transform: uppercase; letter-spacing: .05em;
+  }
+  .empty { text-align: center; color: var(--muted); padding: 30px 10px; font-size: .9rem; }
+  .empty-big { text-align: center; color: var(--muted); padding: 90px 24px 30px; }
+  .empty-big .glyph { font-size: 2.6rem; margin-bottom: 12px; }
+  .empty-big h2 { color: var(--text); font-size: 1.1rem; margin-bottom: 6px; }
+  nav {
+    position: fixed; z-index: 10;
+    left: max(12px, env(safe-area-inset-left));
+    right: max(12px, env(safe-area-inset-right));
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    display: flex;
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(24px) saturate(1.8);
+    backdrop-filter: blur(24px) saturate(1.8);
+    border: 1px solid var(--glass-line);
+    border-radius: 32px;
+    box-shadow: var(--shadow);
+    padding: 6px;
+    max-width: 420px; margin: 0 auto;
+  }
+  nav button {
+    flex: 1; background: none; color: var(--muted); border-radius: 24px;
+    padding: 7px 0 6px; font-size: .68rem; font-weight: 600;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+  }
+  nav button .ico {
+    display: flex; align-items: center; justify-content: center;
+    width: 46px; height: 28px; border-radius: 999px; transition: background .2s;
+  }
+  nav button .ico svg { width: 21px; height: 21px; }
+  nav button.active { color: var(--accent); }
+  nav button.active .ico { background: var(--accent-soft); }
+  /* ── Catalogo ── */
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .filters { margin-bottom: 12px; overflow-x: auto; flex-wrap: nowrap; padding-bottom: 2px; }
+  .fchip {
+    border: 1px solid var(--line); background: var(--card); color: var(--muted);
+    border-radius: 999px; padding: 7px 14px; font-size: .82rem; font-weight: 600;
+    cursor: pointer; font-family: inherit; white-space: nowrap;
+  }
+  .fchip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .d-summary { cursor: pointer; align-items: flex-start; gap: 10px; }
+  .d-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .star {
+    background: none; border: none; padding: 0 2px; font-size: 1rem; line-height: 1;
+    cursor: pointer; filter: grayscale(1); opacity: .35;
+  }
+  .star.on { filter: none; opacity: 1; }
+  .dmeta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .dmeta span {
+    font-size: .7rem; font-weight: 700; padding: 3px 9px; border-radius: 999px;
+    text-transform: uppercase; letter-spacing: .04em;
+    background: var(--bg); color: var(--muted);
+  }
+  .dmeta span.dur { background: var(--accent-soft); color: var(--accent); }
+  .dmeta span.lev-avanzata { background: rgba(211, 63, 73, .14); color: var(--danger); }
+  .dmeta span.lev-media { background: var(--warn-soft); color: var(--warn); }
+  .hook {
+    margin-top: 12px; font-size: .95rem; line-height: 1.45; font-style: italic;
+    border-left: 3px solid var(--accent); padding-left: 10px;
+  }
+  .dline { margin-top: 10px; font-size: .85rem; color: var(--muted); }
+  .dline b { color: var(--text); font-weight: 600; }
+  .dsteps { counter-reset: st; margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .dstep { display: flex; gap: 10px; font-size: .92rem; line-height: 1.4; align-items: flex-start; }
+  .dstep i {
+    counter-increment: st; flex: none; width: 21px; height: 21px; border-radius: 999px;
+    background: var(--accent-soft); color: var(--accent);
+    font-size: .72rem; font-weight: 700; font-style: normal;
+    display: grid; place-items: center; margin-top: 1px;
+  }
+  .dstep i::before { content: counter(st); }
+  .acts { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .acts button { min-height: 44px; }
+  .acts .grow { flex: 1; }
+  /* ── Uso ── */
+  .stats { display: flex; gap: 8px; margin-bottom: 14px; }
+  .stat {
+    flex: 1; background: var(--card); border: 1px solid var(--line);
+    border-radius: 14px; padding: 10px 6px; text-align: center;
+  }
+  .stat b { display: block; font-size: 1.3rem; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: .66rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .rank {
+    display: flex; align-items: center; gap: 12px; padding: 11px 14px;
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 14px; margin-bottom: 8px;
+  }
+  .rank-name { flex: 0 0 40%; font-size: .9rem; font-weight: 600; }
+  .rank-name em { display: block; font-style: normal; font-size: .72rem; color: var(--muted); font-weight: 400; }
+  .bar { flex: 1; height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; display: flex; }
+  .bar i { display: block; height: 100%; }
+  .bar i.w { background: var(--ok); }
+  .bar i.o { background: var(--accent); }
+  .bar i.f { background: var(--warn); }
+  .rank-num { font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums; flex: none; min-width: 40px; text-align: right; }
+  .feed { display: flex; flex-direction: column; }
+  .fitem { display: flex; gap: 12px; padding-bottom: 15px; position: relative; }
+  .fitem:not(:last-child)::before {
+    content: ""; position: absolute; left: 5px; top: 17px; bottom: 0; width: 2px; background: var(--line);
+  }
+  .fdot { width: 12px; height: 12px; border-radius: 99px; flex: none; margin-top: 4px; z-index: 2; }
+  .ftxt { flex: 1; min-width: 0; }
+  .fwk { font-size: .72rem; color: var(--muted); display: block; }
+  .fbody { font-size: .92rem; line-height: 1.5; }
+  .fbody b { font-weight: 600; }
+  .day-head {
+    margin: 16px 4px 8px; font-size: .78rem; font-weight: 700;
+    color: var(--muted); text-transform: uppercase; letter-spacing: .05em;
+  }
+  /* ── Dialog, toast, login ── */
+  dialog {
+    border: none; border-radius: 20px; background: var(--card); color: var(--text);
+    width: min(92vw, 420px); padding: 18px;
+    max-height: 86dvh; overflow-y: auto; box-shadow: var(--shadow);
+  }
+  dialog::backdrop {
+    background: rgba(10, 12, 25, .35);
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  }
+  dialog h3 { margin-bottom: 4px; }
+  .dialog-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+  #toast {
+    position: fixed; left: 50%; transform: translateX(-50%);
+    bottom: calc(96px + env(safe-area-inset-bottom));
+    background: var(--text); color: var(--bg); padding: 10px 18px;
+    border-radius: 999px; font-size: .85rem; opacity: 0; transition: opacity .25s;
+    pointer-events: none; z-index: 50; max-width: 88vw; text-align: center;
+  }
+  #toast.show { opacity: 1; }
+  .login-wrap { min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .login-box { width: min(92vw, 380px); text-align: center; }
+  .login-box .logo { font-size: 3rem; margin-bottom: 8px; }
+  .login-box h1 { margin-bottom: 4px; }
+  .login-box p { color: var(--muted); font-size: .9rem; margin-bottom: 20px; }
+  .login-box form { display: flex; flex-direction: column; gap: 12px; text-align: left; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div id="view-login" class="login-wrap hidden">
+  <div class="login-box">
+    <div class="logo">✨</div>
+    <h1>Demo Interattive</h1>
+    <p>Inserisci la password del team per entrare.</p>
+    <form id="login-form">
+      <input type="password" id="login-password" placeholder="Password del team" autocomplete="current-password" required>
+      <button type="submit" id="login-btn">Entra</button>
+    </form>
+  </div>
+</div>
+
+<div id="view-whoami" class="login-wrap hidden">
+  <div class="login-box">
+    <div class="logo">👋</div>
+    <h1>Chi sei?</h1>
+    <p>Il nome finisce accanto alle demo che fai: serve a sapere chi le porta in reparto.</p>
+    <form id="whoami-form">
+      <input type="text" id="whoami-name" placeholder="Il tuo nome" autocomplete="name" required>
+      <button type="submit">Continua</button>
+    </form>
+  </div>
+</div>
+
+<div id="view-app" class="hidden">
+  <header>
+    <h1 id="tab-title">Catalogo</h1>
+    <button id="whoami-chip" title="Cambia nome"></button>
+  </header>
+  <main id="main"></main>
+  <nav id="nav"></nav>
+</div>
+
+<div id="toast"></div>
+
+<dialog id="dlg">
+  <form method="dialog" id="dlg-form"></form>
+</dialog>
+
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
+// ── Configurazione ──────────────────────────────────────────
+// Stesso progetto Supabase di Store Tasks, tabelle sue: il sito è
+// separato, il login è lo stesso che il team già conosce.
+const SUPABASE_URL = "https://nrxnmucuwucfecnphrtf.supabase.co";
+const SUPABASE_KEY = "sb_publishable_OJnekj88Hcc4zCXVo8k9Uw_oSlwAmXm";
+const SHARED_EMAIL = "marcocasati+storetasks@gmail.com"; // utente condiviso in Supabase Auth
+
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── Stato ───────────────────────────────────────────────────
+const CATS = ["iPhone", "iPad", "Mac", "Watch", "Audio", "Servizi", "Altro"];
+const DURATIONS = ["lampo", "breve", "completa"];
+const DUR_HINT = { lampo: "30 secondi", breve: "2 minuti", completa: "5 minuti" };
+const LEVELS = ["facile", "media", "avanzata"];
+const OUTCOMES = ["wow", "ok", "fiacca"];
+const OUT_COLOR = { wow: "var(--ok)", ok: "var(--accent)", fiacca: "var(--warn)" };
+const STATUS = ["bozza", "pronta", "ritirata"];
+
+let demos = [], runs = [];
+let hasSchema = true;
+let tab = "catalogo";
+let me = localStorage.getItem("demo-whoami") || "";
+let openIds = new Set();     // schede aperte
+let catFilter = "tutte";
+let query = "";
+
+const $ = (s) => document.querySelector(s);
+const views = { login: $("#view-login"), whoami: $("#view-whoami"), app: $("#view-app") };
+function show(name) {
+  Object.entries(views).forEach(([k, el]) => el.classList.toggle("hidden", k !== name));
+}
+function toast(msg) {
+  const t = $("#toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2600);
+}
+const esc = (s) => (s ?? "").toString().replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const fmtTs = (ts) => new Date(ts).toLocaleString("it-IT", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const fmtDay = (ts) => new Date(ts).toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" });
+const dayKey = (ts) => new Date(ts).toISOString().slice(0, 10);
+const DAY_MS = 86400000;
+const daysAgo = (n) => new Date(Date.now() - n * DAY_MS).toISOString();
+
+// ── Login ───────────────────────────────────────────────────
+$("#login-form").onsubmit = async (e) => {
+  e.preventDefault();
+  const btn = $("#login-btn");
+  btn.disabled = true; btn.textContent = "Entro…";
+  const { error } = await db.auth.signInWithPassword({
+    email: SHARED_EMAIL, password: $("#login-password").value,
+  });
+  btn.disabled = false; btn.textContent = "Entra";
+  if (error) { toast("Password non valida"); return; }
+  await start();
+};
+
+$("#whoami-form").onsubmit = (e) => {
+  e.preventDefault();
+  const v = $("#whoami-name").value.trim();
+  if (v.length < 2) { toast("Scrivi il tuo nome"); return; }
+  me = v; localStorage.setItem("demo-whoami", me);
+  enterApp();
+};
+
+$("#whoami-chip").onclick = () => {
+  $("#whoami-name").value = me;
+  show("whoami");
+};
+
+async function start() {
+  await loadAll();
+  if (!me) { show("whoami"); return; }
+  enterApp();
+}
+
+function enterApp() {
+  show("app");
+  $("#whoami-chip").textContent = me;
+  render();
+  subscribeRealtime();
+}
+
+// ── Dati ────────────────────────────────────────────────────
+async function loadAll() {
+  const [d, r] = await Promise.all([
+    db.from("demos").select("*").order("position"),
+    db.from("demo_runs").select("*").order("created_at"),
+  ]);
+  hasSchema = !d.error;
+  demos = d.data || [];
+  runs = r.data || [];
+}
+
+let rtChannel = null, reloadTimer = null;
+function subscribeRealtime() {
+  if (rtChannel) return;
+  rtChannel = db.channel("demo-changes")
+    .on("postgres_changes", { event: "*", schema: "public" }, () => {
+      clearTimeout(reloadTimer);
+      reloadTimer = setTimeout(async () => { await loadAll(); render(); }, 400);
+    })
+    .subscribe();
+}
+document.addEventListener("visibilitychange", async () => {
+  if (!document.hidden && !views.app.classList.contains("hidden")) { await loadAll(); render(); }
+});
+async function refresh() { await loadAll(); render(); }
+
+// ── Letture ─────────────────────────────────────────────────
+const runsOf = (id) => runs.filter(r => r.demo_id === id);
+const lastRun = (id) => { const a = runsOf(id); return a.length ? a[a.length - 1] : null; };
+const recentRuns = (id, days = 30) => runsOf(id).filter(r => r.created_at >= daysAgo(days)).length;
+const demoOf = (id) => demos.find(d => d.id === id) || null;
+const stepsOf = (d) => Array.isArray(d.steps) ? d.steps : [];
+const inCatalog = () => demos.filter(d => d.status !== "ritirata");
+
+// L'ordine del catalogo: prima quelle in evidenza, poi le pronte,
+// poi le bozze; a parità, quelle usate di recente più in alto.
+function catalogSorted(list) {
+  const rank = (d) => (d.featured ? 0 : d.status === "pronta" ? 1 : 2);
+  return list.slice().sort((a, b) =>
+    (rank(a) - rank(b)) ||
+    (recentRuns(b.id) - recentRuns(a.id)) ||
+    (a.position - b.position) ||
+    a.name.localeCompare(b.name));
+}
+
+// ── Navigazione ─────────────────────────────────────────────
+const TITLES = { catalogo: "Catalogo", uso: "Uso", storico: "Storico" };
+const ICONS = {
+  catalogo: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.2l1.7 4.4 4.4 1.7-4.4 1.7L12 15.4l-1.7-4.4L5.9 9.3l4.4-1.7z"/><path d="M18 15.4l.7 1.9 1.9.7-1.9.7-.7 1.9-.7-1.9-1.9-.7 1.9-.7z"/></svg>`,
+  uso: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>`,
+  storico: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3.2 2"/></svg>`,
+};
+
+function renderNav() {
+  const items = [
+    { id: "catalogo", label: "Catalogo" },
+    { id: "uso", label: "Uso" },
+    { id: "storico", label: "Storico" },
+  ];
+  const nav = $("#nav");
+  nav.innerHTML = items.map(it => `<button data-tab="${it.id}" class="${tab === it.id ? "active" : ""}">
+      <span class="ico">${ICONS[it.id]}</span>${esc(it.label)}</button>`).join("");
+  nav.querySelectorAll("button").forEach(b => {
+    b.onclick = () => { tab = b.dataset.tab; render(); };
+  });
+}
+
+function render() {
+  renderNav();
+  $("#tab-title").textContent = TITLES[tab];
+  const main = $("#main");
+  if (!hasSchema) {
+    main.innerHTML = `
+      <div class="empty-big">
+        <div class="glyph">✨</div>
+        <h2>Quasi pronto</h2>
+        <p>Manca il passaggio sul database.<br>Esegui <strong>schema.sql</strong> nel progetto Supabase
+        e il catalogo si accende da solo.</p>
+      </div>`;
+    return;
+  }
+  if (tab === "catalogo") renderCatalogo(main);
+  else if (tab === "uso") renderUso(main);
+  else renderStorico(main);
+}
+
+// ── Catalogo ────────────────────────────────────────────────
+function demoCard(d) {
+  const open = openIds.has(d.id);
+  const n = runsOf(d.id).length;
+  const last = lastRun(d.id);
+  const steps = stepsOf(d);
+  const summary = [
+    d.who || null,
+    n ? `fatta ${n} volt${n === 1 ? "a" : "e"}` : "mai fatta",
+    last ? `ultima: ${esc(last.actor_name)}` : null,
+  ].filter(Boolean).join(" · ");
+
+  return `<div class="card" data-id="${d.id}">
+    <div class="row spread d-summary" data-toggle="${d.id}">
+      <div style="min-width:0">
+        <div class="d-title">
+          <h3>${esc(d.name)}</h3>
+          <button class="star ${d.featured ? "on" : ""}" data-act="star" data-id="${d.id}"
+            title="${d.featured ? "Togli dalle demo in evidenza" : "Metti in evidenza"}">⭐️</button>
+        </div>
+        <div class="sub">${esc(summary)}</div>
+      </div>
+      <span class="badge ${d.status === "pronta" ? "done" : "off"}">${d.status === "pronta" ? "Pronta" : "Bozza"}</span>
+    </div>
+    <div class="dmeta">
+      <span>${esc(d.category)}</span>
+      <span class="dur">${esc(d.duration)} · ${DUR_HINT[d.duration] || ""}</span>
+      <span class="lev-${esc(d.level)}">${esc(d.level)}</span>
+    </div>
+    ${!open ? "" : `
+    ${d.hook ? `<div class="hook">“${esc(d.hook)}”</div>` : ""}
+    ${steps.length ? `<div class="dsteps">${steps.map(s => `<div class="dstep"><i></i><span>${esc(s)}</span></div>`).join("")}</div>`
+      : `<div class="dline">Nessun passo scritto: aprila in modifica e racconta come si fa.</div>`}
+    ${d.wow ? `<div class="dline">✨ <b>Il momento:</b> ${esc(d.wow)}</div>` : ""}
+    ${d.needs ? `<div class="dline">🧰 <b>Serve:</b> ${esc(d.needs)}</div>` : ""}
+    ${d.owner ? `<div class="dline">👤 <b>La cura:</b> ${esc(d.owner)}</div>` : ""}
+    <div class="acts">
+      <button class="grow" data-act="run" data-id="${d.id}">✓ L'ho fatta</button>
+      <button class="ghost small" data-act="status" data-id="${d.id}">${d.status === "pronta" ? "Rimetti in bozza" : "Segna pronta"}</button>
+      <button class="ghost small" data-act="edit" data-id="${d.id}">Modifica</button>
+    </div>`}
+  </div>`;
+}
+
+function renderCatalogo(main) {
+  const list = inCatalog().filter(d => catFilter === "tutte" || d.category === catFilter)
+    .filter(d => !query || (d.name + " " + (d.hook || "") + " " + (d.who || "") + " " + stepsOf(d).join(" "))
+      .toLowerCase().includes(query.toLowerCase()));
+  const used = CATS.filter(c => inCatalog().some(d => d.category === c));
+  const sorted = catalogSorted(list);
+  const featured = sorted.filter(d => d.featured);
+  const rest = sorted.filter(d => !d.featured);
+
+  // Il resto va per prodotto: sul reparto si cerca così, non per nome.
+  const groups = [];
+  for (const d of rest) {
+    const g = groups.find(x => x.cat === d.category);
+    if (g) g.items.push(d); else groups.push({ cat: d.category, items: [d] });
+  }
+
+  main.innerHTML = `
+    <div class="section-head"><h2>${inCatalog().length} demo</h2>
+      <button class="small" id="add-demo">+ Nuova demo</button></div>
+    <div class="field" style="margin-top:0">
+      <input type="search" id="q" placeholder="Cerca una demo, un cliente, un passo" value="${esc(query)}"></div>
+    <div class="chips filters" style="margin-top:12px">
+      <button type="button" class="fchip" data-cat="tutte" aria-pressed="${catFilter === "tutte"}">Tutte</button>
+      ${used.map(c => `<button type="button" class="fchip" data-cat="${esc(c)}" aria-pressed="${catFilter === c}">${esc(c)}</button>`).join("")}
+    </div>
+    ${featured.length ? `<div class="cat-head">In evidenza adesso</div>${featured.map(demoCard).join("")}` : ""}
+    ${groups.map(g => `<div class="cat-head">${esc(g.cat)}</div>${g.items.map(demoCard).join("")}`).join("")}
+    ${sorted.length ? "" : `<div class="empty">Nessuna demo qui.<br>${query || catFilter !== "tutte" ? "Prova a togliere il filtro." : "Aggiungine una con “+ Nuova demo”."}</div>`}`;
+
+  $("#add-demo").onclick = () => openDemoForm(null);
+
+  const q = $("#q");
+  q.oninput = () => {
+    query = q.value;
+    clearTimeout(q._h);
+    q._h = setTimeout(() => {
+      const pos = q.selectionStart;
+      render();
+      const nq = $("#q"); nq.focus(); nq.setSelectionRange(pos, pos);
+    }, 250);
+  };
+
+  main.querySelectorAll("[data-cat]").forEach(b => {
+    b.onclick = () => { catFilter = b.dataset.cat; render(); };
+  });
+  main.querySelectorAll("[data-toggle]").forEach(el => {
+    el.onclick = (e) => {
+      if (e.target.closest("[data-act]")) return; // la stella non apre la scheda
+      const id = el.dataset.toggle;
+      openIds.has(id) ? openIds.delete(id) : openIds.add(id);
+      render();
+    };
+  });
+  main.querySelectorAll("[data-act=star]").forEach(b => {
+    b.onclick = async (e) => {
+      e.stopPropagation();
+      const d = demoOf(b.dataset.id);
+      const { error } = await db.from("demos")
+        .update({ featured: !d.featured, updated_at: new Date().toISOString() }).eq("id", d.id);
+      if (error) { toast("Errore nel salvataggio"); return; }
+      toast(d.featured ? "Tolta dall'evidenza" : "In evidenza");
+      await refresh();
+    };
+  });
+  main.querySelectorAll("[data-act=status]").forEach(b => {
+    b.onclick = async () => {
+      const d = demoOf(b.dataset.id);
+      const status = d.status === "pronta" ? "bozza" : "pronta";
+      const { error } = await db.from("demos")
+        .update({ status, updated_at: new Date().toISOString() }).eq("id", d.id);
+      if (error) { toast("Errore nel salvataggio"); return; }
+      await refresh();
+    };
+  });
+  main.querySelectorAll("[data-act=run]").forEach(b => {
+    b.onclick = () => openRunDialog(demoOf(b.dataset.id));
+  });
+  main.querySelectorAll("[data-act=edit]").forEach(b => {
+    b.onclick = () => openDemoForm(demoOf(b.dataset.id));
+  });
+}
+
+// ── Scheda demo: creazione e modifica ───────────────────────
+function demoFormFields(d) {
+  const opt = (name, values, cur) => values.map(v =>
+    `<option value="${v}" ${cur === v ? "selected" : ""}>${v}${name === "duration" ? ` · ${DUR_HINT[v]}` : ""}</option>`).join("");
+  return `
+    <div class="field"><label>Nome della demo *</label>
+      <input type="text" name="name" value="${esc(d?.name || "")}" placeholder="es. Ripulisci in Foto" required></div>
+    <div class="field"><label>Prodotto</label>
+      <select name="category">${opt("category", CATS, d?.category || "iPhone")}</select></div>
+    <div class="field"><label>La frase con cui si apre</label>
+      <input type="text" name="hook" value="${esc(d?.hook || "")}" placeholder="es. Hai già l'iPhone? Guarda cosa fa adesso."></div>
+    <div class="field"><label>A quale cliente sta bene</label>
+      <input type="text" name="who" value="${esc(d?.who || "")}" placeholder="es. chi entra a curiosare, senza un modello in mente"></div>
+    <div class="row" style="gap:8px">
+      <div class="field" style="flex:1"><label>Quanto dura</label>
+        <select name="duration">${opt("duration", DURATIONS, d?.duration || "breve")}</select></div>
+      <div class="field" style="flex:1"><label>Quanto è difficile</label>
+        <select name="level">${opt("level", LEVELS, d?.level || "facile")}</select></div>
+    </div>
+    <div class="field"><label>I passi, uno per riga</label>
+      <textarea name="steps" rows="6" placeholder="Apri Fotocamera&#10;Inquadra un oggetto del reparto&#10;Tocca Cerca">${esc(stepsOf(d || {}).join("\n"))}</textarea></div>
+    <div class="field"><label>Il momento che fa effetto</label>
+      <input type="text" name="wow" value="${esc(d?.wow || "")}" placeholder="es. il prima/dopo tenendo premuto sulla foto"></div>
+    <div class="field"><label>Cosa serve prima di iniziare</label>
+      <input type="text" name="needs" value="${esc(d?.needs || "")}" placeholder="es. un iPhone demo con qualche foto"></div>
+    <div class="field"><label>Chi la cura</label>
+      <input type="text" name="owner" value="${esc(d?.owner || "")}" placeholder="es. Vladi"></div>
+    <div class="field"><label>Stato</label>
+      <select name="status">
+        <option value="bozza" ${d?.status === "bozza" || !d ? "selected" : ""}>Bozza · si sta ancora scrivendo</option>
+        <option value="pronta" ${d?.status === "pronta" ? "selected" : ""}>Pronta · si può fare in reparto</option>
+        <option value="ritirata" ${d?.status === "ritirata" ? "selected" : ""}>Ritirata · fuori dal catalogo</option>
+      </select></div>`;
+}
+
+function readDemoForm(fd) {
+  const steps = (fd.get("steps") || "").split("\n").map(s => s.trim()).filter(Boolean);
+  return {
+    name: (fd.get("name") || "").trim(),
+    category: fd.get("category"),
+    hook: (fd.get("hook") || "").trim() || null,
+    who: (fd.get("who") || "").trim() || null,
+    duration: fd.get("duration"),
+    level: fd.get("level"),
+    steps,
+    wow: (fd.get("wow") || "").trim() || null,
+    needs: (fd.get("needs") || "").trim() || null,
+    owner: (fd.get("owner") || "").trim() || null,
+    status: fd.get("status"),
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function openDemoForm(d) {
+  openDialog(d ? "Modifica demo" : "Nuova demo",
+    demoFormFields(d) + (d ? `
+      <div class="row" style="margin-top:14px">
+        <button type="button" class="danger small" id="dlg-delete">Elimina questa demo</button>
+      </div>` : ""),
+    async (fd) => {
+      const row = readDemoForm(fd);
+      if (!row.name) { toast("Serve un nome"); return false; }
+      if (d) {
+        const { error } = await db.from("demos").update(row).eq("id", d.id);
+        if (error) { toast("Errore nel salvataggio"); return false; }
+      } else {
+        row.position = (demos.reduce((m, x) => Math.max(m, x.position || 0), 0) || 0) + 1;
+        const { data, error } = await db.from("demos").insert(row).select().single();
+        if (error) { toast("Errore nel salvataggio"); return false; }
+        openIds.add(data.id);
+        toast("Demo aggiunta");
+      }
+      await refresh();
+    },
+    (form) => {
+      const del = form.querySelector("#dlg-delete");
+      if (!del) return;
+      del.onclick = async () => {
+        if (!confirm(`Eliminare “${d.name}”? Sparisce anche il registro di quando è stata fatta.`)) return;
+        await db.from("demos").delete().eq("id", d.id);
+        $("#dlg").close();
+        await refresh();
+      };
+    });
+}
+
+// ── "L'ho fatta": il registro ───────────────────────────────
+function chipRow(name, values, current) {
+  return `<div class="chips" data-chips="${name}">
+    ${values.map(v => `<button type="button" class="fchip" data-v="${esc(v)}"
+        aria-pressed="${v === current}">${esc(v)}</button>`).join("")}
+    <input type="hidden" name="${name}" value="${esc(current || "")}">
+  </div>`;
+}
+
+function wireChips(form) {
+  form.querySelectorAll("[data-chips]").forEach(box => {
+    const hidden = box.querySelector("input[type=hidden]");
+    box.querySelectorAll("button[data-v]").forEach(b => {
+      b.onclick = () => {
+        box.querySelectorAll("button[data-v]").forEach(x => x.setAttribute("aria-pressed", "false"));
+        b.setAttribute("aria-pressed", "true");
+        hidden.value = b.dataset.v;
+      };
+    });
+  });
+}
+
+function openRunDialog(d) {
+  if (!d) return;
+  openDialog("L'ho fatta", `
+    <p class="sub">${esc(d.name)}</p>
+    <div class="field"><label>Com'è andata</label>${chipRow("outcome", OUTCOMES, "ok")}</div>
+    <div class="field"><label>Una riga, se serve</label>
+      <input type="text" name="note" placeholder="es. l'ha rifatta da sola sul suo iPhone"></div>
+    <div class="sub" style="margin-top:8px">Resta scritto: una demo fatta non si cancella.</div>`,
+    async (fd) => {
+      const { error } = await db.from("demo_runs").insert({
+        demo_id: d.id,
+        actor_name: me,
+        outcome: fd.get("outcome") || "ok",
+        note: (fd.get("note") || "").trim() || null,
+      });
+      if (error) { toast("Errore nel salvataggio"); return false; }
+      toast("Segnata");
+      await refresh();
+    },
+    wireChips);
+}
+
+// ── Uso ─────────────────────────────────────────────────────
+function renderUso(main) {
+  const list = inCatalog();
+  const pronte = list.filter(d => d.status === "pronta").length;
+  const last30 = runs.filter(r => r.created_at >= daysAgo(30)).length;
+  const mai = list.filter(d => !runsOf(d.id).length);
+  const ranked = list.map(d => ({ d, n: runsOf(d.id).length }))
+    .filter(x => x.n).sort((a, b) => b.n - a.n);
+  const top = ranked.length ? ranked[0].n : 1;
+
+  const people = {};
+  runs.forEach(r => { people[r.actor_name] = (people[r.actor_name] || 0) + 1; });
+  const persone = Object.entries(people).sort((a, b) => b[1] - a[1]).slice(0, 8);
+
+  main.innerHTML = `
+    <div class="stats">
+      <div class="stat"><b>${pronte}</b><span>Pronte</span></div>
+      <div class="stat"><b>${last30}</b><span>Fatte 30 gg</span></div>
+      <div class="stat"><b>${mai.length}</b><span>Mai fatte</span></div>
+    </div>
+    <div class="section-head"><h2>Quali vivono davvero</h2></div>
+    ${ranked.length ? ranked.map(({ d, n }) => {
+      const rs = runsOf(d.id);
+      const w = rs.filter(r => r.outcome === "wow").length;
+      const o = rs.filter(r => r.outcome === "ok").length;
+      const f = rs.filter(r => r.outcome === "fiacca").length;
+      const pct = (x) => `${(x / top) * 100}%`;
+      return `<div class="rank">
+        <span class="rank-name">${esc(d.name)}<em>${esc(d.category)} · ${recentRuns(d.id)} negli ultimi 30 gg</em></span>
+        <span class="bar">
+          <i class="w" style="width:${pct(w)}"></i>
+          <i class="o" style="width:${pct(o)}"></i>
+          <i class="f" style="width:${pct(f)}"></i>
+        </span>
+        <span class="rank-num">${n}</span>
+      </div>`;
+    }).join("") : `<div class="empty">Nessuna demo ancora segnata.<br>Nel catalogo, apri una scheda e tocca “L'ho fatta”.</div>`}
+    ${ranked.length ? `<div class="sub" style="margin:2px 4px 0">Le barre: <span style="color:var(--ok)">wow</span> ·
+      <span style="color:var(--accent)">ok</span> · <span style="color:var(--warn)">fiacca</span></div>` : ""}
+
+    ${mai.length ? `<div class="section-head" style="margin-top:24px"><h2>Mai uscite dal catalogo</h2></div>
+      <div class="chips">${mai.map(d => `<button type="button" class="fchip" data-go="${d.id}">${esc(d.name)}</button>`).join("")}</div>
+      <div class="sub" style="margin:10px 4px 0">Scritte ma mai fatte: o non servono, o nessuno se le ricorda.</div>` : ""}
+
+    ${persone.length ? `<div class="section-head" style="margin-top:24px"><h2>Chi le porta in reparto</h2></div>
+      ${persone.map(([nome, n]) => `<div class="rank">
+        <span class="rank-name">${esc(nome)}</span>
+        <span class="bar"><i class="o" style="width:${(n / persone[0][1]) * 100}%"></i></span>
+        <span class="rank-num">${n}</span>
+      </div>`).join("")}` : ""}`;
+
+  main.querySelectorAll("[data-go]").forEach(b => {
+    b.onclick = () => { tab = "catalogo"; catFilter = "tutte"; query = ""; openIds.add(b.dataset.go); render(); };
+  });
+}
+
+// ── Storico ─────────────────────────────────────────────────
+function renderStorico(main) {
+  const list = runs.slice().reverse().slice(0, 120);
+  const days = [];
+  for (const r of list) {
+    const k = dayKey(r.created_at);
+    const g = days.find(x => x.k === k);
+    if (g) g.items.push(r); else days.push({ k, ts: r.created_at, items: [r] });
+  }
+  main.innerHTML = `
+    <div class="section-head"><h2>Demo fatte</h2></div>
+    ${days.length ? days.map(g => `
+      <div class="day-head">${fmtDay(g.ts)} · ${g.items.length}</div>
+      <div class="feed">${g.items.map(r => {
+        const d = demoOf(r.demo_id);
+        return `<div class="fitem">
+          <span class="fdot" style="background:${OUT_COLOR[r.outcome] || "var(--line)"}"></span>
+          <span class="ftxt">
+            <span class="fwk">${esc(r.actor_name)} · ${fmtTs(r.created_at)} · ${esc(r.outcome)}</span>
+            <span class="fbody"><b>${esc(d ? d.name : "demo eliminata")}</b>${r.note ? ` — ${esc(r.note)}` : ""}</span>
+          </span>
+        </div>`;
+      }).join("")}</div>`).join("")
+      : `<div class="empty">Ancora niente.<br>Il registro si riempie da solo, una demo alla volta.</div>`}`;
+}
+
+// ── Dialog generico ─────────────────────────────────────────
+function openDialog(title, fieldsHtml, onSubmit, onOpen) {
+  const dlg = $("#dlg"), form = $("#dlg-form");
+  form.innerHTML = `<h3>${title}</h3>${fieldsHtml}
+    <div class="dialog-actions">
+      <button type="button" class="ghost" id="dlg-cancel">Annulla</button>
+      <button type="submit">Salva</button>
+    </div>`;
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    // chi salva può restituire false per tenere aperto il foglio
+    // senza far perdere quello che è stato scritto
+    if (await onSubmit(new FormData(form)) === false) return;
+    dlg.close();
+  };
+  form.querySelector("#dlg-cancel").onclick = () => dlg.close();
+  if (onOpen) onOpen(form);
+  dlg.showModal();
+}
+
+// ── Avvio ───────────────────────────────────────────────────
+const { data: { session } } = await db.auth.getSession();
+if (session) { await start(); } else { show("login"); }
+</script>
+</body>
+</html>
