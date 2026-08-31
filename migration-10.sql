@@ -1,7 +1,9 @@
 -- ============================================================
--- Migrazione 10 — La data dell'aggiornamento nel Focus
--- L'aggiornamento si scrive spesso il giorno dopo: la data del
--- fatto è una cosa, il momento in cui lo si annota è un'altra.
+-- Migrazione 10 — FACOLTATIVA
+-- L'app non ne ha bisogno: la data del fatto la tiene nel momento
+-- dell'aggiornamento, e una correzione riscrive la riga.
+-- Questa migrazione aggiunge solo una colonna dedicata, l'indice
+-- per l'ordinamento e il permesso di modifica diretta.
 -- ============================================================
 
 alter table public.focus_updates
