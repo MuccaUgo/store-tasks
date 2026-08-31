@@ -222,7 +222,7 @@
   .log-item { padding: 9px 2px; border-bottom: 1px solid var(--line); font-size: .85rem; }
   .log-item:last-child { border-bottom: none; }
   .log-item .sub { margin-top: 2px; }
-  /* ── Validation ── */
+  /* ── Segmenti e chip ── */
   .seg {
     display: flex; gap: 4px; padding: 4px; background: var(--bg);
     border: 1px solid var(--line); border-radius: 13px; margin-bottom: 14px;
@@ -659,13 +659,12 @@ const TITLES = { dd: "Daily Download", focus: "Focus", team: "Team", log: "Stori
 
 const ICONS = {
   dd: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="4.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>`,
-  validation: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.4l2.4 2.4 4.6-5"/></svg>`,
   team: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.5" r="3.4"/><path d="M3.2 19.3c.8-3.1 3.1-4.7 5.8-4.7s5 1.6 5.8 4.7"/><circle cx="16.8" cy="9.8" r="2.6"/><path d="M15.6 14.7c2.3.2 4.2 1.6 4.9 4"/></svg>`,
   log: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3.2 2"/></svg>`,
   focus: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 3.5 3.5L16 9l4 4.5"/><circle cx="8" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="16" cy="9" r="1.7" fill="currentColor" stroke="none"/><path d="M3 21h18"/></svg>`,
 };
 
-// Un tab per progetto attivo, tra Validation e Team.
+// Un tab per ogni progetto, tra Focus e Team.
 function renderNav() {
   const items = [
     { id: "dd", label: "DD", ico: ICONS.dd },
