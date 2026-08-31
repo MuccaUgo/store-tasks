@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0f1220">
-<meta name="app-version" content="12">
+<meta name="app-version" content="13">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -978,9 +978,11 @@ function renderDD(main) {
 // Un focus è una cosa che portiamo avanti nel tempo. Un aggiornamento
 // è un punto sulla scia: dove i punti smettono, il focus è fermo.
 const WEEK_MS = 604800000;
-// Un aggiornamento si scrive spesso il giorno dopo: quello che conta
-// è quando è successo.
+// Un aggiornamento si scrive spesso il giorno dopo: quello che conta è
+// quando è successo, e lo teniamo nel momento stesso dell'aggiornamento.
+// (happened_on esiste solo se è stata eseguita migration-10, facoltativa.)
 const updDate = (u) => u.happened_on || u.created_at;
+const giornoISO = (g) => new Date(g + "T12:00:00").toISOString();
 const updOf = (fid) => focusUpd.filter(u => u.focus_id === fid)
   .sort((a, b) => String(updDate(a)).localeCompare(String(updDate(b))) || a.id - b.id);
 const weeksSince = (iso) => Math.floor((Date.now() - new Date(iso).getTime()) / WEEK_MS);
@@ -1093,16 +1095,14 @@ function renderFocusDetail(main) {
     <div class="sub" style="margin:14px 4px 8px">${ups.length} aggiornament${ups.length === 1 ? "o" : "i"} · ${esc(silenceText(f))}</div>
     ${ups.length ? `<div class="feed">${ups.map(u => {
       const quando = updDate(u);
-      const annotato = u.happened_on && u.happened_on !== (u.created_at || "").slice(0, 10)
-        ? ` · annotato il ${fmtDateShort(u.created_at.slice(0, 10))}` : "";
-      return `<button type="button" class="fitem" ${hasUpdDate ? `data-upd="${u.id}"` : "disabled"}>
+      return `<button type="button" class="fitem" data-upd="${u.id}">
         <span class="fdot2" style="background:${FS_COLOR[st.k]}"></span>
         <span class="ftxt">
           <span class="fwk">${esc(fmtDate(String(quando).slice(0, 10)))}</span>
           <span class="fbody">${esc(u.body)}</span>
-          <span class="fauth">${esc(u.actor_name)}${annotato}</span>
+          <span class="fauth">${esc(u.actor_name)}</span>
         </span>
-        ${hasUpdDate ? `<span class="fchev">›</span>` : ""}
+        <span class="fchev">›</span>
       </button>`;
     }).join("")}</div>`
       : `<div class="empty">Ancora nessun aggiornamento.<br>Il primo racconta da dove si parte.</div>`}`;
@@ -1168,8 +1168,8 @@ function renderIdee(main, seg) {
 function openUpdForm(f, u) {
   openDialog(u ? "Modifica aggiornamento" : "Aggiornamento", `
     <p class="sub">${esc(f.name)}</p>
-    ${hasUpdDate ? `<div class="field"><label>Quando è successo</label>
-      <input type="date" name="quando" value="${esc(String(u ? updDate(u) : todayStr()).slice(0, 10))}"></div>` : ""}
+    <div class="field"><label>Quando è successo</label>
+      <input type="date" name="quando" value="${esc(String(u ? updDate(u) : todayStr()).slice(0, 10))}"></div>
     <div class="field"><label>Cosa è successo</label>
       <textarea name="body" rows="4" placeholder="Due righe bastano.">${esc(u?.body || "")}</textarea></div>
     <div class="prompts">
@@ -1184,13 +1184,17 @@ function openUpdForm(f, u) {
     async (fd) => {
       const body = (fd.get("body") || "").trim();
       if (body.length < 3) { toast("Scrivi qualcosa"); return false; }
-      const quando = hasUpdDate ? { happened_on: fd.get("quando") || todayStr() } : {};
-      const { error } = u
-        ? await db.from("focus_updates").update({ body, ...quando }).eq("id", u.id)
-        : await db.from("focus_updates").insert({
-            focus_id: f.id, body, ...quando, actor_id: me.id, actor_name: me.name,
-          });
+      const giorno = fd.get("quando") || todayStr();
+      const riga = {
+        focus_id: f.id, body,
+        created_at: giornoISO(giorno),
+        ...(hasUpdDate ? { happened_on: giorno } : {}),
+        actor_id: u ? u.actor_id : me.id,
+        actor_name: u ? u.actor_name : me.name,
+      };
+      const { error } = await db.from("focus_updates").insert(riga);
       if (error) { toast("Errore nel salvataggio"); return false; }
+      if (u) await db.from("focus_updates").delete().eq("id", u.id);
       toast(u ? "Aggiornamento corretto" : "Aggiunto alla scia");
       await refresh();
     },
