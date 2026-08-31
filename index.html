@@ -390,6 +390,57 @@
     border-radius: 999px; padding: 5px 11px; font-size: .78rem; cursor: pointer; font-family: inherit;
   }
   .prompt:hover { border-color: var(--accent); color: var(--accent); }
+  /* ── Brief e Debrief ── */
+  .head-right { display: flex; align-items: center; gap: 4px; }
+  #refresh-btn {
+    background: none; color: var(--muted); font-size: 1.3rem; line-height: 1;
+    padding: 5px 8px; border-radius: 999px;
+  }
+  #refresh-btn:active { background: var(--accent-soft); color: var(--accent); }
+  #refresh-btn.spin { animation: spin .7s linear; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .menu2 { display: flex; gap: 10px; }
+  .menu2 .big {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px;
+    padding: 16px 10px; border-radius: 18px; font-size: .95rem;
+    background: var(--accent-soft); color: var(--accent);
+  }
+  .menu2 .big span { font-size: 1.5rem; line-height: 1; }
+  .menu2-sub { text-align: center; margin-top: 8px; }
+  .pt-block { margin-top: 14px; }
+  .pt-head {
+    display: flex; align-items: center; gap: 8px; font-size: .76rem; font-weight: 700;
+    color: var(--muted); text-transform: uppercase; letter-spacing: .04em;
+  }
+  .pt-head button { margin-left: auto; padding: 3px 14px; font-size: 1rem; }
+  .pt-row {
+    display: flex; gap: 8px; align-items: flex-start; font-size: .88rem;
+    padding: 8px 0; border-bottom: 1px solid var(--line);
+  }
+  .pt-row:last-child { border-bottom: none; }
+  .pt-row span { flex: 1; }
+  .pt-row em { display: block; font-style: normal; font-size: .75rem; color: var(--muted); margin-top: 3px; }
+  .pt-x { background: none; color: var(--muted); font-size: 1.15rem; line-height: 1; padding: 0 6px; }
+  .pt-count { font-size: .78rem; font-weight: 700; }
+  .pt-count.ok { color: var(--ok); }
+  .pt-count.ko { color: var(--danger); }
+  .add-row { display: flex; gap: 8px; align-items: center; }
+  .add-row input { flex: 1; }
+  .pl-add { padding: 11px 17px; font-size: 1.15rem; line-height: 1; }
+  .pl-item {
+    display: flex; align-items: center; gap: 8px; background: var(--bg);
+    border-radius: 10px; padding: 9px 10px; margin-top: 6px; font-size: .88rem;
+  }
+  .pl-item span { flex: 1; }
+  .chk { display: flex; align-items: flex-start; gap: 11px; padding: 9px 0; font-size: .92rem; }
+  .chk input { width: 22px; height: 22px; flex: none; margin-top: 1px; accent-color: var(--accent); }
+  .pick-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; max-height: 55dvh; overflow-y: auto; }
+  .pick {
+    text-align: left; background: var(--bg); color: var(--text); border: 1px solid var(--line);
+    border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px;
+  }
+  .pick-name { font-weight: 600; }
+  .pick-meta { font-size: .78rem; color: var(--muted); font-weight: 400; }
   .hidden { display: none !important; }
 </style>
 </head>
@@ -419,7 +470,10 @@
 <div id="view-app" class="hidden">
   <header>
     <h1 id="tab-title">Daily Download</h1>
-    <button id="whoami-chip" title="Cambia utente"></button>
+    <div class="head-right">
+      <button id="refresh-btn" title="Aggiorna" aria-label="Aggiorna">⟳</button>
+      <button id="whoami-chip" title="Cambia utente"></button>
+    </div>
   </header>
   <main id="main"></main>
   <nav id="nav"></nav>
@@ -445,6 +499,7 @@ const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 let people = [], downloads = [], logRows = [];
 let comps = [], fweList = [], events = [];
 let projects = [], slots = [], slotPeople = [], projItems = [], debriefs = [], insights = [], replies = [];
+let shiftPoints = [], briefs = [];
 let tab = "dd";
 let me = JSON.parse(localStorage.getItem("whoami") || "null");
 let openDD = new Set(); // schede DD espanse
@@ -454,6 +509,7 @@ let hasProjects = false;   // i tab dei progetti compaiono dopo migration-6.sql
 let vSeg = "persone", vFilter = "tutti", openFweId = null, vEditor = false;
 let teamSeg = "key";
 let pSeg = "turni", openSlot = new Set(); // schede turno espanse
+let tuttiPunti = { good: false, bad: false }; // elenchi lunghi, aperti a richiesta
 let focusList = [], focusUpd = [], ideaList = [];
 let hasFocus = false;      // il tab Focus si attiva dopo migration-7.sql
 let fSeg = "focus", openFocusId = null;
@@ -545,6 +601,14 @@ $("#login-form").addEventListener("submit", async (e) => {
   await start();
 });
 
+$("#refresh-btn").addEventListener("click", async (e) => {
+  const b = e.currentTarget;
+  b.classList.add("spin");
+  await refresh();
+  toast("Aggiornato");
+  setTimeout(() => b.classList.remove("spin"), 700);
+});
+
 $("#whoami-chip").addEventListener("click", () => {
   if (confirm("Vuoi cambiare nome utente?")) {
     localStorage.removeItem("whoami"); me = null;
@@ -611,6 +675,8 @@ async function loadAll() {
     ["debriefs", db.from("debriefs").select("*").order("id")],
     ["insights", db.from("insights").select("*").order("id")],
     ["replies", db.from("insight_replies").select("*").order("id")],
+    ["points", db.from("shift_points").select("*").order("id")],
+    ["briefs", db.from("briefs").select("*").order("id")],
   );
   if (hasFocus) q.push(
     ["focus", db.from("focus").select("*").order("created_at")],
@@ -629,6 +695,7 @@ async function loadAll() {
   if (hasProjects) {
     projects = d.projects; slots = d.slots; slotPeople = d.crew; projItems = d.items;
     debriefs = d.debriefs; insights = d.insights; replies = d.replies;
+    shiftPoints = d.points; briefs = d.briefs;
   }
   if (hasFocus) {
     focusList = d.focus; focusUpd = d.fupd; ideaList = d.ideas;
@@ -705,7 +772,7 @@ document.addEventListener("visibilitychange", async () => {
 async function refresh() { await loadAll(); render(); }
 
 // ── Navigazione ─────────────────────────────────────────────
-const TITLES = { dd: "Daily Download", validation: "Validation", team: "Team", log: "Storico" };
+const TITLES = { dd: "Daily Download", validation: "Validation", focus: "Focus", team: "Team", log: "Storico" };
 
 const ICONS = {
   dd: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="4.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>`,
@@ -1669,10 +1736,9 @@ function renderLog(main) {
 }
 
 // ── Progetti ────────────────────────────────────────────────
-// Ogni progetto attivo è un tab a sé: il pilot vive accanto a
-// Validation, non dentro un menu.
-const ROLES = ["Specialist", "OnPoint", "Keyrole", "Coach"];
-const TRAFFIC = ["poco", "medio", "tanto"];
+// Ogni progetto attivo è un tab a sé. Dentro, l'unità di lavoro è
+// il gruppo che copre un turno: il brief e il debrief sono suoi.
+const ROLES = ["Specialist", "Point", "Keyrole", "Coach", "Brief/Debrief"];
 const KINDS = ["osservazione", "idea", "problema", "domanda"];
 
 const projectOf = (id) => projects.find(p => p.id === id) || null;
@@ -1684,15 +1750,20 @@ const slotsOf = (pr) => slots.filter(s => s.project_id === pr.id)
 const crewOf = (slotId) => slotPeople.filter(x => x.slot_id === slotId).sort((a, b) => a.position - b.position);
 const roleNames = (slotId, role) => crewOf(slotId).filter(x => x.role === role).map(x => x.person_name);
 const debriefsOf = (slotId) => debriefs.filter(d => d.slot_id === slotId);
+const pointsOf = (slotId, kind) => shiftPoints.filter(x => x.slot_id === slotId && x.kind === kind);
+const briefsOf = (slotId) => briefs.filter(b => b.slot_id === slotId);
 const projDebriefs = (pr) => debriefs.filter(d => d.project_id === pr.id);
 const repliesOf = (insightId) => replies.filter(r => r.insight_id === insightId);
-const slotLabel = (s) => s.start_time ? `${s.start_time}–${s.end_time || ""}`.replace(/–$/, "") : "Turno";
-const projPeriod = (pr) => pr.starts_on
-  ? `${fmtDateShort(pr.starts_on)} – ${fmtDateShort(pr.ends_on)}` : "";
+
+// Il nome del gruppo sono gli specialist: è così che li chiamate.
+const groupName = (s) => roleNames(s.id, "Specialist").join(", ") || "Gruppo da assegnare";
+const slotHours = (s) => s.start_time ? `${s.start_time}–${s.end_time || ""}`.replace(/–$/, "") : "";
+const slotOf = (id) => slots.find(s => s.id === id) || null;
+const daysFromToday = (d) => Math.round((new Date(d + "T00:00:00") - new Date(todayStr() + "T00:00:00")) / 86400000);
+const projPeriod = (pr) => pr.starts_on ? `${fmtDateShort(pr.starts_on)} – ${fmtDateShort(pr.ends_on)}` : "";
 
 function slotState(s) {
-  const n = debriefsOf(s.id).length;
-  if (n) return { cls: "done", label: n === 1 ? "Debriefato" : `${n} debrief` };
+  if (debriefsOf(s.id).length) return { cls: "done", label: "Debriefato" };
   const t = todayStr();
   if (s.date < t) return { cls: "", label: "Da debriefare" };
   return { cls: "soft", label: s.date === t ? "Oggi" : "In programma" };
@@ -1711,7 +1782,7 @@ function renderProject(main, pr) {
 // ── Turni ───────────────────────────────────────────────────
 function renderProjectTurni(main, pr, seg) {
   const list = slotsOf(pr), today = todayStr();
-  const nDeb = projDebriefs(pr).length;
+  const oggi = list.filter(s => s.date === today);
   const nTodo = list.filter(s => s.date < today && !debriefsOf(s.id).length).length;
 
   const groups = [];
@@ -1725,13 +1796,24 @@ function renderProjectTurni(main, pr, seg) {
       ${g.date === today ? "Oggi · " : ""}${fmtDate(g.date)}</div>
     ${g.items.map(s => slotCard(pr, s)).join("")}`).join("");
 
-  const recap = [projPeriod(pr), `${list.length} turni`, `${nDeb} debrief`].filter(Boolean).join(" · ");
+  const sottotitolo = oggi.length
+    ? `Oggi: ${oggi.map(groupName).join(" · ")}`
+    : nTodo ? `${nTodo} ${nTodo === 1 ? "gruppo" : "gruppi"} senza debrief`
+    : projPeriod(pr);
+
   main.innerHTML = seg + `
-    <div class="section-head"><h2>Turni</h2>
-      <button class="small" id="add-slot">+ Nuovo turno</button></div>
-    <div class="sub" style="margin:-6px 4px 12px">${esc(recap)}${
-      nTodo ? ` · <strong style="color:var(--warn)">${nTodo} da debriefare</strong>` : ""}</div>
-    ${cal || `<div class="empty">Nessun turno ancora.<br>Aggiungine uno con “+ Nuovo turno”.</div>`}`;
+    <div class="menu2">
+      <button type="button" class="big" id="go-brief"><span>📋</span>Brief</button>
+      <button type="button" class="big" id="go-debrief"><span>📝</span>Debrief</button>
+    </div>
+    <div class="sub menu2-sub">${esc(sottotitolo)}</div>
+
+    <div class="section-head" style="margin-top:20px"><h2>Turni</h2>
+      <button class="small ghost" id="add-slot">+ Turno</button></div>
+    ${cal || `<div class="empty">Nessun turno ancora.<br>Aggiungine uno con “+ Turno”.</div>`}`;
+
+  $("#go-brief").onclick = () => pickGroup(pr, "Brief di quale gruppo?", s => openBriefDialog(pr, s));
+  $("#go-debrief").onclick = () => pickGroup(pr, "Debrief di quale gruppo?", s => openDebriefDialog(pr, s));
 
   $("#add-slot").onclick = () => openDialog("Nuovo turno", slotFields(pr, null),
     async (fd) => {
@@ -1755,16 +1837,29 @@ function renderProjectTurni(main, pr, seg) {
       render();
     };
   });
+  main.querySelectorAll("[data-act=brief]").forEach(b => {
+    b.onclick = () => openBriefDialog(pr, slotOf(b.dataset.id));
+  });
   main.querySelectorAll("[data-act=debrief]").forEach(b => {
-    b.onclick = () => openDebriefDialog(pr, list.find(s => s.id === b.dataset.id));
+    b.onclick = () => openDebriefDialog(pr, slotOf(b.dataset.id));
+  });
+  main.querySelectorAll("[data-act=add-point]").forEach(b => {
+    b.onclick = () => openPointDialog(slotOf(b.dataset.id), b.dataset.kind);
+  });
+  main.querySelectorAll("[data-act=del-point]").forEach(b => {
+    b.onclick = async () => {
+      if (!confirm("Togliere questo punto?")) return;
+      await db.from("shift_points").delete().eq("id", Number(b.dataset.id));
+      await refresh();
+    };
   });
   main.querySelectorAll("[data-act=slot-ics]").forEach(b => {
-    const s = list.find(x => x.id === b.dataset.id);
+    const s = slotOf(b.dataset.id);
     b.onclick = () => saveICS(slotToICS(pr, s), `${pr.name.toLowerCase()}-${s.date}.ics`);
   });
   main.querySelectorAll("[data-act=edit-slot]").forEach(b => {
     b.onclick = () => {
-      const s = list.find(x => x.id === b.dataset.id);
+      const s = slotOf(b.dataset.id);
       openDialog("Modifica turno", slotFields(pr, s) + `
         <div class="row" style="margin-top:14px">
           <button type="button" class="danger small" id="dlg-del-slot">Elimina questo turno</button>
@@ -1785,9 +1880,7 @@ function renderProjectTurni(main, pr, seg) {
         (form) => {
           wireSlotForm(form);
           form.querySelector("#dlg-del-slot").onclick = async () => {
-            const n = debriefsOf(s.id).length;
-            if (!confirm(`Eliminare il turno del ${fmtDateShort(s.date)}?${
-              n ? `\nI ${n} debrief restano, senza turno collegato.` : ""}`)) return;
+            if (!confirm(`Eliminare il turno di ${groupName(s)} del ${fmtDateShort(s.date)}?`)) return;
             await db.from("project_slots").delete().eq("id", s.id);
             await log(`ha eliminato il turno ${pr.name} del ${fmtDateShort(s.date)}`);
             $("#dlg").close();
@@ -1800,51 +1893,266 @@ function renderProjectTurni(main, pr, seg) {
 
 function slotCard(pr, s) {
   const st = slotState(s);
-  const lines = ROLES.map(r => ({ r, n: roleNames(s.id, r) })).filter(x => x.n.length);
-  const summary = lines.map(x => `${x.r}: ${x.n.join(", ")}`).join(" · ") || "nessuno assegnato";
+  const point = roleNames(s.id, "Point");
+  const sotto = [slotHours(s), point.length ? `Point ${point.join(", ")}` : null]
+    .filter(Boolean).join(" · ");
+  const aperta = openSlot.has(s.id);
+  const good = pointsOf(s.id, "good"), bad = pointsOf(s.id, "bad");
+  const dbs = debriefsOf(s.id);
+  const bfs = briefsOf(s.id);
+
+  const riepilogo = !aperta && (good.length || bad.length)
+    ? `<div class="row" style="gap:10px;margin-top:8px">
+         ${good.length ? `<span class="pt-count ok">✅ ${good.length}</span>` : ""}
+         ${bad.length ? `<span class="pt-count ko">❌ ${bad.length}</span>` : ""}
+       </div>` : "";
+
   return `<div class="card">
     <div class="row spread dd-summary slot-head" data-slot-toggle="${s.id}">
       <div style="min-width:0">
-        <h3>${esc(slotLabel(s))}</h3>
-        ${openSlot.has(s.id) ? "" : `<div class="sub">${esc(summary)}</div>`}
+        <h3>${esc(groupName(s))}</h3>
+        <div class="sub">${esc(sotto)}</div>
+        ${riepilogo}
       </div>
       <span class="badge ${st.cls}">${esc(st.label)}</span>
     </div>
-    ${!openSlot.has(s.id) ? "" : `
-      ${lines.map(x => `<div class="role-line"><b>${esc(x.r)}</b><span>${esc(x.n.join(", "))}</span></div>`).join("")}
+    ${!aperta ? "" : `
+      ${ROLES.filter(r => r !== "Specialist").map(r => {
+        const n = roleNames(s.id, r);
+        return n.length ? `<div class="role-line"><b>${esc(r)}</b><span>${esc(n.join(", "))}</span></div>` : "";
+      }).join("")}
       ${s.note ? `<div class="manager-line">📝 ${esc(s.note)}</div>` : ""}
-      ${debriefsOf(s.id).map(debriefBlock).join("")}
-      <div class="row" style="margin-top:12px">
-        <button class="small" data-act="debrief" data-id="${s.id}">+ Debrief</button>
+      ${bfs.length ? `<div class="manager-line">📋 Brief fatto da ${esc(bfs.map(b => b.person_name).join(", "))}</div>` : ""}
+      ${dbs.map(debriefNumbers).join("")}
+      ${pointBlock(s, "good", good)}
+      ${pointBlock(s, "bad", bad)}
+      <div class="row" style="margin-top:14px">
+        <button class="ghost small" data-act="brief" data-id="${s.id}">📋 Brief</button>
+        <button class="small" data-act="debrief" data-id="${s.id}">📝 Debrief</button>
         <span style="flex:1"></span>
-        <button class="ghost small" data-act="slot-ics" data-id="${s.id}">📅 Calendario</button>
+        <button class="ghost small" data-act="slot-ics" data-id="${s.id}">📅</button>
         <button class="ghost small" data-act="edit-slot" data-id="${s.id}">Modifica</button>
       </div>`}
   </div>`;
 }
 
-function debriefBlock(d) {
+function pointBlock(s, kind, list) {
+  return `<div class="pt-block">
+    <div class="pt-head">${kind === "good" ? "✅ Cosa è andato bene" : "❌ Cosa poteva andare meglio"}
+      <button class="ghost small" data-act="add-point" data-kind="${kind}" data-id="${s.id}">+</button></div>
+    ${list.length ? list.map(pt => `<div class="pt-row">
+        <span>${esc(pt.text)}</span>
+        <button class="pt-x" data-act="del-point" data-id="${pt.id}" title="Togli">×</button>
+      </div>`).join("") : `<div class="sub" style="padding:2px 2px 6px">—</div>`}
+  </div>`;
+}
+
+function debriefNumbers(d) {
   const nums = [
-    d.in_list != null ? `👥 ${d.in_list} in lista` : null,
-    d.bags != null ? `🛍 ${d.bags} bag` : null,
+    d.reached != null ? `👥 ${d.reached} raggiunte` : null,
     d.conversions != null ? `✅ ${d.conversions} conversion` : null,
-    d.traffic ? `traffico ${d.traffic}` : null,
   ].filter(Boolean);
   const demos = Array.isArray(d.demos) ? d.demos : [];
+  if (!nums.length && !demos.length) return "";
   return `<div class="db-item">
     <div class="row spread"><strong>${esc(d.author_name)}</strong>
       <span class="sub">${fmtTs(d.created_at)}</span></div>
     ${nums.length ? `<div class="db-nums">${nums.map(n => `<span>${esc(n)}</span>`).join("")}</div>` : ""}
     ${demos.length ? `<div class="db-line">Demo: ${esc(demos.join(", "))}</div>` : ""}
-    ${d.best_demo ? `<div class="db-line">★ La più efficace: <b>${esc(d.best_demo)}</b></div>` : ""}
-    ${d.icebreaker ? `<div class="db-line">🗣 “${esc(d.icebreaker)}”</div>` : ""}
-    ${d.worked ? `<div class="db-line">✔ <b>${esc(d.worked)}</b></div>` : ""}
-    ${d.improve ? `<div class="db-line">↻ ${esc(d.improve)}</div>` : ""}
   </div>`;
 }
 
-// I nomi dei ruoli si scrivono separati da virgola: i suggerimenti
-// sotto al campo evitano di riscriverli ogni volta.
+// ── Scegliere il gruppo ─────────────────────────────────────
+// Se c'è un solo turno oggi si salta il passaggio: è quasi sempre quello.
+function pickGroup(pr, titolo, onPick) {
+  const list = slotsOf(pr);
+  if (!list.length) { toast("Nessun turno: aggiungine uno"); return; }
+  const oggi = list.filter(s => s.date === todayStr());
+  if (oggi.length === 1) return onPick(oggi[0]);
+
+  const vicini = list.slice().sort((a, b) =>
+    Math.abs(daysFromToday(a.date)) - Math.abs(daysFromToday(b.date)) ||
+    (a.start_time || "").localeCompare(b.start_time || ""));
+
+  openDialog(titolo, `<div class="pick-list">${vicini.map(s => {
+      const d = daysFromToday(s.date);
+      const quando = d === 0 ? "oggi" : d === -1 ? "ieri" : d === 1 ? "domani" : fmtDateShort(s.date);
+      return `<button type="button" class="pick" data-pick="${s.id}">
+        <span class="pick-name">${esc(groupName(s))}</span>
+        <span class="pick-meta">${esc(quando)} · ${esc(slotHours(s))}</span>
+      </button>`;
+    }).join("")}</div>`,
+    null,
+    (form) => {
+      form.querySelector("button[type=submit]").style.display = "none";
+      form.querySelectorAll("[data-pick]").forEach(b => {
+        b.onclick = () => { $("#dlg").close(); onPick(slotOf(b.dataset.pick)); };
+      });
+    });
+}
+
+// ── Brief ───────────────────────────────────────────────────
+function openBriefDialog(pr, s) {
+  if (!s) return;
+  const punti = itemsOf(pr, "brief").map(i => i.label);
+  const demo = itemsOf(pr, "demo").slice(0, 6).map(i => i.label);
+  const mio = briefsOf(s.id).find(b => b.person_name === me?.name);
+
+  openDialog(`Brief · ${groupName(s)}`, `
+      <p class="sub">${esc(fmtDate(s.date))} · ${esc(slotHours(s))}</p>
+      <div class="field"><label>Prima di iniziare</label>
+        ${punti.map((p, i) => `<label class="chk">
+          <input type="checkbox" name="b${i}" ${mio && (mio.items || []).includes(p) ? "checked" : ""}>
+          <span>${esc(p)}</span></label>`).join("")}
+      </div>
+      ${demo.length ? `<div class="field"><label>Le demo scelte</label>
+        <div class="chips">${demo.map(d => `<span class="fchip">${esc(d)}</span>`).join("")}</div></div>` : ""}`,
+    async (fd) => {
+      const items = punti.filter((p, i) => fd.get("b" + i));
+      const { error } = await db.from("briefs").upsert({
+        slot_id: s.id, person_id: me.id, person_name: me.name, items,
+      }, { onConflict: "slot_id,person_name" });
+      if (error) { toast("Errore nel salvataggio"); return false; }
+      await log(`ha fatto il brief del gruppo ${groupName(s)} del ${fmtDateShort(s.date)}`);
+      toast(`Brief ${items.length}/${punti.length}`);
+      openSlot.add(s.id);
+      await refresh();
+    });
+}
+
+// ── Debrief ─────────────────────────────────────────────────
+// Cinque cose sole: cosa è andato bene, cosa poteva andare meglio,
+// le demo, le persone raggiunte, le conversion.
+function pointField(name, label, placeholder) {
+  return `<div class="field pl-field"><label>${label}</label>
+    <div class="add-row">
+      <input type="text" class="pl-in" placeholder="${placeholder}" autocomplete="off">
+      <button type="button" class="pl-add">+</button>
+    </div>
+    <div class="pl-items"></div>
+    <input type="hidden" name="${name}" value="[]">
+  </div>`;
+}
+
+function wirePointFields(form) {
+  form.querySelectorAll(".pl-field").forEach(box => {
+    const input = box.querySelector(".pl-in");
+    const hidden = box.querySelector("input[type=hidden]");
+    const items = box.querySelector(".pl-items");
+    const draw = () => {
+      const list = JSON.parse(hidden.value || "[]");
+      items.innerHTML = list.map((t, i) => `<div class="pl-item"><span>${esc(t)}</span>
+        <button type="button" class="pt-x" data-i="${i}">×</button></div>`).join("");
+      items.querySelectorAll("[data-i]").forEach(b => b.onclick = () => {
+        const l = JSON.parse(hidden.value || "[]");
+        l.splice(Number(b.dataset.i), 1);
+        hidden.value = JSON.stringify(l);
+        draw();
+      });
+    };
+    const add = () => {
+      const t = input.value.trim();
+      if (!t) return;
+      const l = JSON.parse(hidden.value || "[]");
+      l.push(t);
+      hidden.value = JSON.stringify(l);
+      input.value = "";
+      draw();
+      input.focus();
+    };
+    box.querySelector(".pl-add").onclick = add;
+    input.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); add(); } };
+  });
+}
+
+function openDebriefDialog(pr, s) {
+  if (!s) return;
+  const uso = {};
+  projDebriefs(pr).forEach(d => (Array.isArray(d.demos) ? d.demos : [])
+    .forEach(n => uso[n] = (uso[n] || 0) + 1));
+  const demo = itemsOf(pr, "demo")
+    .sort((a, b) => (uso[b.label] || 0) - (uso[a.label] || 0) || a.position - b.position)
+    .map(i => i.label);
+
+  openDialog(`Debrief · ${groupName(s)}`, `
+      <p class="sub">${esc(fmtDate(s.date))} · ${esc(slotHours(s))}</p>
+      ${pointField("good", "✅ Cosa è andato bene", "una cosa per riga")}
+      ${pointField("bad", "❌ Cosa poteva andare meglio", "una cosa per riga")}
+      <div class="field"><label>Demo fatte</label>${chipRow("demos", demo.slice(0, 6), [], true)}
+        ${demo.length > 6 ? `<button type="button" class="ghost small" id="altre-demo" style="margin-top:6px">Altre ${demo.length - 6} demo…</button>
+        <div class="chips hidden" id="demo-extra" style="margin-top:6px">${demo.slice(6).map(d =>
+          `<button type="button" class="fchip" data-extra="${esc(d)}">${esc(d)}</button>`).join("")}</div>` : ""}
+        <div class="add-row" style="margin-top:6px">
+          <input type="text" name="altra_demo" placeholder="un'altra demo…" autocomplete="off">
+        </div>
+      </div>
+      <div class="num-grid">
+        <label>Persone raggiunte<input type="number" name="reached" min="0" inputmode="numeric" placeholder="—"></label>
+        <label>Conversion<input type="number" name="conversions" min="0" inputmode="numeric" placeholder="—"></label>
+      </div>`,
+    async (fd) => {
+      const num = (k) => { const v = (fd.get(k) || "").trim(); return v === "" ? null : parseInt(v, 10); };
+      const good = JSON.parse(fd.get("good") || "[]");
+      const bad = JSON.parse(fd.get("bad") || "[]");
+      const demos = JSON.parse(fd.get("demos") || "[]");
+      const altra = (fd.get("altra_demo") || "").trim();
+      if (altra) demos.push(altra);
+      const reached = num("reached"), conversions = num("conversions");
+
+      if (!good.length && !bad.length && !demos.length && reached == null && conversions == null) {
+        toast("Scrivi almeno una cosa"); return false;
+      }
+      const { error } = await db.from("debriefs").insert({
+        project_id: pr.id, slot_id: s.id,
+        author_id: me.id, author_name: me.name,
+        reached, conversions, demos,
+      });
+      if (error) { toast("Errore nel salvataggio"); return false; }
+      const punti = [...good.map(t => ({ kind: "good", text: t })), ...bad.map(t => ({ kind: "bad", text: t }))]
+        .map(x => ({ slot_id: s.id, kind: x.kind, text: x.text, actor_id: me.id, actor_name: me.name }));
+      if (punti.length) await db.from("shift_points").insert(punti);
+      await log(`ha fatto il debrief del gruppo ${groupName(s)} del ${fmtDateShort(s.date)}`);
+      toast("Debrief salvato");
+      openSlot.add(s.id);
+      await refresh();
+    },
+    (form) => {
+      wirePointFields(form);
+      wireChips(form);
+      const piu = form.querySelector("#altre-demo");
+      if (piu) piu.onclick = () => { form.querySelector("#demo-extra").classList.remove("hidden"); piu.remove(); };
+      // una demo dell'elenco lungo entra fra quelle scelte
+      form.querySelectorAll("[data-extra]").forEach(b => b.onclick = () => {
+        const hidden = form.querySelector('[data-chips="demos"] input[type=hidden]');
+        const cur = JSON.parse(hidden.value || "[]");
+        const i = cur.indexOf(b.dataset.extra);
+        if (i < 0) cur.push(b.dataset.extra); else cur.splice(i, 1);
+        hidden.value = JSON.stringify(cur);
+        b.setAttribute("aria-pressed", i < 0);
+      });
+    });
+}
+
+// Un punto singolo, aggiunto anche dopo il debrief
+function openPointDialog(s, kind) {
+  if (!s) return;
+  openDialog(kind === "good" ? "✅ Cosa è andato bene" : "❌ Cosa poteva andare meglio", `
+      <p class="sub">${esc(groupName(s))} · ${esc(fmtDateShort(s.date))}</p>
+      <div class="field"><input type="text" name="text" required autocomplete="off"
+        placeholder="${kind === "good" ? "es. il Point ha posizionato bene le persone" : "es. clienti in attesa allo stesso tavolo"}"></div>`,
+    async (fd) => {
+      const text = (fd.get("text") || "").trim();
+      if (text.length < 2) { toast("Scrivi il punto"); return false; }
+      const { error } = await db.from("shift_points").insert({
+        slot_id: s.id, kind, text, actor_id: me.id, actor_name: me.name,
+      });
+      if (error) { toast("Errore nel salvataggio"); return false; }
+      openSlot.add(s.id);
+      await refresh();
+    });
+}
+
+// ── Turni: campi e salvataggio ──────────────────────────────
 function suggestNames(pr, role) {
   const ids = new Set(slotsOf(pr).map(s => s.id));
   const freq = {};
@@ -1877,7 +2185,7 @@ function slotFields(pr, s) {
       </div>`;
     }).join("")}
     <div class="field"><label>Note</label>
-      <input type="text" name="note" value="${esc(s?.note || "")}" placeholder="es. store pieno per il lancio"></div>`;
+      <input type="text" name="note" value="${esc(s?.note || "")}" placeholder="es. brief 16:00-16:15"></div>`;
 }
 
 function wireSlotForm(form) {
@@ -1893,8 +2201,6 @@ function wireSlotForm(form) {
   });
 }
 
-// Sostituisce in blocco chi copre il turno: più semplice di
-// inseguire le singole differenze, e il turno resta coerente.
 async function saveCrew(slotId, fd) {
   await db.from("slot_people").delete().eq("slot_id", slotId);
   const rows = [];
@@ -1913,7 +2219,7 @@ function slotToICS(pr, s) {
     const n = roleNames(s.id, r);
     return n.length ? `${r}: ${n.join(", ")}` : null;
   }).filter(Boolean).join("\n");
-  const title = `${pr.full_name || pr.name}: turno ${slotLabel(s)}`;
+  const title = `${pr.full_name || pr.name}: ${groupName(s)}`;
   return [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
@@ -1935,7 +2241,6 @@ function slotToICS(pr, s) {
   ].filter(Boolean).join("\r\n");
 }
 
-// ── Debrief ─────────────────────────────────────────────────
 function chipRow(name, values, current, multi) {
   const sel = multi ? (current || []) : (current ? [current] : []);
   return `<div class="chips" data-chips="${name}" data-multi="${multi ? 1 : 0}">
@@ -1968,152 +2273,75 @@ function wireChips(form) {
   });
 }
 
-function openDebriefDialog(pr, s) {
-  if (!s) return;
-  const demos = itemsOf(pr, "demo").map(i => i.label);
-  const phrases = [...new Set(projDebriefs(pr).filter(d => d.icebreaker)
-    .map(d => d.icebreaker.trim()))].reverse().slice(0, 5);
-
-  openDialog(`Debrief · ${fmtDateShort(s.date)}`, `
-      <p class="sub">${esc(slotLabel(s))} · quello che scrivi qui finisce negli Spunti.</p>
-      <div class="num-grid">
-        <label>In lista<input type="number" name="in_list" min="0" inputmode="numeric" placeholder="—"></label>
-        <label>Shopping bag<input type="number" name="bags" min="0" inputmode="numeric" placeholder="—"></label>
-        <label>Conversion<input type="number" name="conversions" min="0" inputmode="numeric" placeholder="—"></label>
-      </div>
-      <div class="field"><label>Traffico in store</label>${chipRow("traffic", TRAFFIC, "", false)}</div>
-      ${demos.length ? `
-        <div class="field"><label>Demo fatte</label>${chipRow("demos", demos, [], true)}</div>
-        <div class="field"><label>La demo più efficace</label>
-          <select name="best_demo"><option value="">— nessuna —</option>
-            ${demos.map(d => `<option value="${esc(d)}">${esc(d)}</option>`).join("")}</select></div>` : ""}
-      <div class="field"><label>Frase rompighiaccio che ha funzionato</label>
-        <input type="text" name="icebreaker" placeholder="es. Hai già l'iPhone?">
-        ${phrases.length ? `<div class="chips" style="margin-top:6px">${phrases.map(p =>
-          `<button type="button" class="fchip" data-fill="${esc(p)}">${esc(p)}</button>`).join("")}</div>` : ""}</div>
-      <div class="field"><label>Cosa ha funzionato</label>
-        <textarea name="worked" rows="2" placeholder="es. partire da una funzione sola"></textarea></div>
-      <div class="field"><label>Cosa cambieresti</label>
-        <textarea name="improve" rows="2"></textarea></div>`,
-    async (fd) => {
-      const num = (k) => { const v = (fd.get(k) || "").trim(); return v === "" ? null : parseInt(v, 10); };
-      const txt = (k) => ((fd.get(k) || "").toString().trim() || null);
-      const row = {
-        project_id: pr.id, slot_id: s.id,
-        author_id: me.id, author_name: me.name,
-        in_list: num("in_list"), bags: num("bags"), conversions: num("conversions"),
-        traffic: txt("traffic"),
-        demos: JSON.parse(fd.get("demos") || "[]"),
-        best_demo: txt("best_demo"), icebreaker: txt("icebreaker"),
-        worked: txt("worked"), improve: txt("improve"),
-      };
-      const vuoto = row.in_list == null && row.bags == null && row.conversions == null &&
-        !row.demos.length && !row.traffic && !row.best_demo && !row.icebreaker && !row.worked && !row.improve;
-      if (vuoto) { toast("Scrivi almeno un numero o un'osservazione"); return false; }
-      const { error } = await db.from("debriefs").insert(row);
-      if (error) { toast("Errore nel salvataggio"); return false; }
-      await log(`ha fatto il debrief del turno ${pr.name} del ${fmtDateShort(s.date)}`);
-      toast("Debrief salvato");
-      openSlot.add(s.id);
-      await refresh();
-    },
-    (form) => {
-      wireChips(form);
-      form.querySelectorAll("[data-fill]").forEach(b => {
-        b.onclick = () => { form.querySelector("[name=icebreaker]").value = b.dataset.fill; };
-      });
-    });
-}
-
 // ── Spunti ──────────────────────────────────────────────────
 function renderProjectSpunti(main, pr, seg) {
+  const ids = new Set(slotsOf(pr).map(s => s.id));
   const dbs = projDebriefs(pr);
   const somma = (k) => dbs.reduce((a, d) => a + (d[k] || 0), 0);
+  const conDebrief = new Set(dbs.map(d => d.slot_id)).size;
 
-  const demoRows = itemsOf(pr, "demo").map(i => ({
-    label: i.label,
-    fatte: dbs.filter(d => (d.demos || []).includes(i.label)).length,
-    best: dbs.filter(d => d.best_demo === i.label).length,
-  })).sort((a, b) => (b.best - a.best) || (b.fatte - a.fatte) || a.label.localeCompare(b.label));
-  const maxDemo = Math.max(1, ...demoRows.map(r => Math.max(r.fatte, r.best)));
-  const demoHtml = demoRows.some(r => r.fatte || r.best)
-    ? `<div class="card" style="padding:4px 0">${demoRows.map(r => `
-        <div class="att-row">
-          <span class="att-name">${esc(r.label)}</span>
-          <span class="att-bar">
-            <i class="v" style="width:${r.best / maxDemo * 100}%"></i>
-            <i class="o" style="width:${Math.max(0, r.fatte - r.best) / maxDemo * 100}%"></i></span>
-          <span class="att-num">${r.fatte}× · ${r.best}★</span>
-        </div>`).join("")}</div>`
-    : `<div class="empty">Nessuna demo ancora registrata in un debrief.</div>`;
-
-  const frasi = {};
-  dbs.filter(d => d.icebreaker).forEach(d => {
-    const k = d.icebreaker.trim().toLowerCase();
-    const f = frasi[k] || (frasi[k] = { text: d.icebreaker.trim(), n: 0, chi: [] });
-    f.n++;
-    if (!f.chi.includes(d.author_name)) f.chi.push(d.author_name);
-  });
-  const frasiRows = Object.values(frasi).sort((a, b) => b.n - a.n);
-
-  const media = (g, k) => {
-    const v = g.filter(d => d[k] != null);
-    return v.length ? (v.reduce((a, d) => a + d[k], 0) / v.length).toFixed(1).replace(".0", "") : "—";
+  const punti = shiftPoints.filter(x => ids.has(x.slot_id));
+  const good = punti.filter(x => x.kind === "good").slice().reverse();
+  const bad = punti.filter(x => x.kind === "bad").slice().reverse();
+  const riga = (pt) => {
+    const s = slotOf(pt.slot_id);
+    return `<div class="pt-row big">
+      <span>${esc(pt.text)}
+        <em>${s ? esc(groupName(s)) + " · " + esc(fmtDateShort(s.date)) : ""}</em></span>
+    </div>`;
   };
-  const trRows = TRAFFIC.map(t => {
-    const g = dbs.filter(d => d.traffic === t);
-    return { t, n: g.length, lista: media(g, "in_list"), bag: media(g, "bags"), conv: media(g, "conversions") };
-  }).filter(r => r.n);
 
-  const note = dbs.filter(d => d.worked || d.improve).slice().reverse().slice(0, 8);
+  const conteggio = {};
+  dbs.forEach(d => (Array.isArray(d.demos) ? d.demos : []).forEach(n => conteggio[n] = (conteggio[n] || 0) + 1));
+  const demoRows = Object.entries(conteggio).sort((a, b) => b[1] - a[1]);
+  const maxDemo = Math.max(1, ...demoRows.map(r => r[1]));
+
+  // gli elenchi lunghi restano corti finché non li apri
+  const LIMITE = 10;
+  const elenco = (list, kind) => {
+    const visibili = tuttiPunti[kind] ? list : list.slice(0, LIMITE);
+    return `<div class="card" style="padding:6px 12px">${visibili.map(riga).join("")}</div>
+      ${list.length > LIMITE ? `<button class="ghost small" data-tutti="${kind}" style="margin:2px 2px 4px">${
+        tuttiPunti[kind] ? "Mostra meno" : `Vedi tutti e ${list.length}`}</button>` : ""}`;
+  };
 
   const spunti = insights.filter(i => i.project_id === pr.id)
     .sort((a, b) => (a.resolved - b.resolved) || (b.id - a.id));
 
   main.innerHTML = seg + `
     <div class="stats">
-      <div class="stat"><b>${dbs.length}</b><span>Debrief</span></div>
-      <div class="stat"><b>${somma("in_list")}</b><span>In lista</span></div>
-      <div class="stat"><b>${somma("bags")}</b><span>Bag</span></div>
+      <div class="stat"><b>${conDebrief}</b><span>Gruppi</span></div>
+      <div class="stat"><b>${somma("reached")}</b><span>Raggiunte</span></div>
       <div class="stat"><b>${somma("conversions")}</b><span>Conversion</span></div>
     </div>
 
-    <div class="area-head"><span>Le demo che convertono</span>
-      <span class="ac">volte · ★ migliore</span></div>
-    ${demoHtml}
+    <div class="area-head"><span>✅ Cosa funziona</span><span class="ac">${good.length}</span></div>
+    ${good.length ? elenco(good, "good") : `<div class="empty">Ancora niente: esce dai debrief.</div>`}
 
-    ${frasiRows.length ? `<div class="area-head"><span>Frasi che funzionano</span></div>
-      ${frasiRows.map(f => `<div class="t-row">
-        <span class="t-txt"><span class="t-name">“${esc(f.text)}”</span>
-          <span class="t-meta">${esc(f.chi.join(", "))}</span></span>
-        <span class="badge ${f.n > 1 ? "done" : "soft"}">${f.n}×</span>
-      </div>`).join("")}` : ""}
+    <div class="area-head"><span>❌ Da migliorare</span><span class="ac">${bad.length}</span></div>
+    ${bad.length ? elenco(bad, "bad") : ""}
 
-    ${trRows.length ? `<div class="area-head"><span>Traffico e risultati</span>
-        <span class="ac">media per turno</span></div>
-      ${trRows.map(r => `<div class="t-row">
-        <span class="t-txt"><span class="t-name">Traffico ${esc(r.t)}</span>
-          <span class="t-meta">${r.n} ${r.n === 1 ? "debrief" : "debrief"}</span></span>
-        <span class="sub">👥 ${r.lista} · 🛍 ${r.bag} · ✅ ${r.conv}</span>
-      </div>`).join("")}` : ""}
-
-    ${note.length ? `<div class="area-head"><span>Dai debrief</span></div>
-      <div class="card">${note.map(d => `
-        <div class="db-line" style="margin-bottom:8px">
-          ${d.worked ? `✔ <b>${esc(d.worked)}</b><br>` : ""}
-          ${d.improve ? `↻ ${esc(d.improve)}<br>` : ""}
-          <span class="sub">${esc(d.author_name)} · ${fmtTs(d.created_at)}</span>
+    ${demoRows.length ? `<div class="area-head"><span>Demo fatte</span><span class="ac">volte</span></div>
+      <div class="card" style="padding:4px 0">${demoRows.map(([nome, n]) => `
+        <div class="att-row">
+          <span class="att-name">${esc(nome)}</span>
+          <span class="att-bar"><i class="v" style="width:${n / maxDemo * 100}%"></i></span>
+          <span class="att-num">${n}×</span>
         </div>`).join("")}</div>` : ""}
 
-    <div class="section-head" style="margin-top:22px"><h2>Spunti</h2>
+    <div class="section-head" style="margin-top:22px"><h2>Spunti liberi</h2>
       <button class="small" id="add-insight">+ Spunto</button></div>
     ${spunti.length ? spunti.map(insightCard).join("")
-      : `<div class="empty">Ancora nessuno spunto.<br>Butta giù un'osservazione con “+ Spunto”.</div>`}`;
+      : `<div class="empty">Niente per ora.</div>`}`;
+
+  main.querySelectorAll("[data-tutti]").forEach(b => {
+    b.onclick = () => { tuttiPunti[b.dataset.tutti] = !tuttiPunti[b.dataset.tutti]; render(); };
+  });
 
   $("#add-insight").onclick = () => openDialog("Nuovo spunto", `
       <div class="field"><label>Che tipo è</label>${chipRow("kind", KINDS, "osservazione", false)}</div>
       <div class="field"><label>Lo spunto</label>
-        <textarea name="text" rows="3" required placeholder="es. con il cliente indeciso funziona partire dalla fotocamera"></textarea></div>`,
+        <textarea name="text" rows="3" required placeholder="es. col cliente indeciso funziona partire dalla fotocamera"></textarea></div>`,
     async (fd) => {
       const text = (fd.get("text") || "").trim();
       if (text.length < 3) { toast("Scrivi lo spunto"); return false; }
@@ -2155,9 +2383,8 @@ function renderProjectSpunti(main, pr, seg) {
   });
   main.querySelectorAll("[data-act=del-insight]").forEach(b => {
     b.onclick = async () => {
-      const i = insights.find(x => x.id === Number(b.dataset.id));
       if (!confirm("Eliminare questo spunto?")) return;
-      await db.from("insights").delete().eq("id", i.id);
+      await db.from("insights").delete().eq("id", Number(b.dataset.id));
       await refresh();
     };
   });
@@ -2199,7 +2426,7 @@ function openDialog(title, fieldsHtml, onSubmit, onOpen) {
     e.preventDefault();
     // chi gestisce il salvataggio può restituire false per tenere
     // aperto il foglio senza far perdere quello che è stato scritto
-    if (await onSubmit(new FormData(form)) === false) return;
+    if (onSubmit && await onSubmit(new FormData(form)) === false) return;
     dlg.close();
   };
   form.querySelector("#dlg-cancel").onclick = () => dlg.close();
