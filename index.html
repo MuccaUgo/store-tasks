@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0f1220">
-<meta name="app-version" content="11">
+<meta name="app-version" content="12">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -312,15 +312,34 @@
   .strip i.pre { background: none; }
   .strip i.aft { opacity: .45; }
   .fmetric { font-size: .74rem; color: var(--muted); white-space: nowrap; }
-  .feed { display: flex; flex-direction: column; }
-  .fitem { display: flex; gap: 12px; padding-bottom: 15px; position: relative; }
-  .fitem:not(:last-child)::before {
-    content: ""; position: absolute; left: 5px; top: 17px; bottom: 0; width: 2px; background: var(--line);
+  .backlink {
+    background: none; border: none; color: var(--accent); font-size: .95rem;
+    font-weight: 600; padding: 2px 0 12px; cursor: pointer; font-family: inherit;
   }
-  .fdot2 { width: 12px; height: 12px; border-radius: 99px; flex: none; margin-top: 4px; z-index: 2; }
-  .ftxt { flex: 1; min-width: 0; }
-  .fwk { font-size: .72rem; color: var(--muted); display: block; }
-  .fbody { font-size: .92rem; line-height: 1.5; white-space: pre-wrap; }
+  .feed { display: flex; flex-direction: column; }
+  .fitem {
+    display: flex; gap: 13px; align-items: flex-start; position: relative;
+    width: 100%; text-align: left; background: none; border: none;
+    padding: 0 0 18px; font-family: inherit; color: var(--text);
+    font-size: 1rem; font-weight: 400; cursor: pointer;
+  }
+  .fitem:not(:last-child)::before {
+    content: ""; position: absolute; left: 5px; top: 18px; bottom: 0; width: 2px; background: var(--line);
+  }
+  .fdot2 { width: 12px; height: 12px; border-radius: 99px; flex: none; margin-top: 5px; z-index: 2; }
+  .ftxt {
+    flex: 1; min-width: 0; background: var(--card); border: 1px solid var(--line);
+    border-radius: 14px; padding: 11px 13px;
+  }
+  .fwk {
+    display: block; font-size: .76rem; font-weight: 700; color: var(--accent);
+    letter-spacing: .01em; margin-bottom: 5px;
+  }
+  .fwk::first-letter { text-transform: uppercase; }
+  .fbody { display: block; font-size: .95rem; line-height: 1.5; white-space: pre-wrap; }
+  .fauth { display: block; font-size: .74rem; color: var(--muted); margin-top: 7px; }
+  .fchev { color: var(--muted); font-size: 1.1rem; align-self: center; flex: none; }
+  .fitem:disabled { opacity: 1; cursor: default; }
   .idea-row {
     display: flex; flex-direction: column; gap: 10px; background: var(--card);
     border: 1px solid var(--line); border-radius: 13px; padding: 12px 13px; margin-bottom: 8px;
@@ -457,6 +476,7 @@ let pSeg = "turni", openSlot = new Set(); // schede turno espanse
 let tuttiPunti = { good: false, bad: false }; // elenchi lunghi, aperti a richiesta
 let focusList = [], focusUpd = [], ideaList = [];
 let hasFocus = false;      // il tab Focus si attiva dopo migration-7.sql
+let hasUpdDate = false;    // data e correzione degli aggiornamenti: migration-10.sql
 let fSeg = "focus", openFocusId = null;
 
 const $ = (s) => document.querySelector(s);
@@ -631,14 +651,16 @@ function enterApp() {
 
 // ── Dati ────────────────────────────────────────────────────
 async function detectSchema() {
-  const [a, p, f] = await Promise.all([
+  const [a, p, f, q] = await Promise.all([
     db.from("downloads").select("audience").limit(1),
     db.from("projects").select("id").limit(1),
     db.from("focus").select("id").limit(1),
+    db.from("focus_updates").select("happened_on").limit(1),
   ]);
   hasAudience = !a.error;
   hasProjects = !p.error;
   hasFocus = !f.error;
+  hasUpdDate = !q.error;
 }
 
 async function loadAll() {
@@ -956,11 +978,15 @@ function renderDD(main) {
 // Un focus è una cosa che portiamo avanti nel tempo. Un aggiornamento
 // è un punto sulla scia: dove i punti smettono, il focus è fermo.
 const WEEK_MS = 604800000;
-const updOf = (fid) => focusUpd.filter(u => u.focus_id === fid);
+// Un aggiornamento si scrive spesso il giorno dopo: quello che conta
+// è quando è successo.
+const updDate = (u) => u.happened_on || u.created_at;
+const updOf = (fid) => focusUpd.filter(u => u.focus_id === fid)
+  .sort((a, b) => String(updDate(a)).localeCompare(String(updDate(b))) || a.id - b.id);
 const weeksSince = (iso) => Math.floor((Date.now() - new Date(iso).getTime()) / WEEK_MS);
 function silenceOf(f) {
   const u = updOf(f.id);
-  return weeksSince(u.length ? u[u.length - 1].created_at : f.created_at);
+  return weeksSince(u.length ? updDate(u[u.length - 1]) : f.created_at);
 }
 function focusState(f) {
   if (f.status === "concluso") return { k: "con", lab: "concluso" };
@@ -983,7 +1009,7 @@ function silenceText(f) {
 }
 // dieci settimane: 0 la più vecchia, 9 questa
 function stripHtml(f, color) {
-  const idx = updOf(f.id).map(u => 9 - weeksSince(u.created_at)).filter(i => i >= 0 && i <= 9);
+  const idx = updOf(f.id).map(u => 9 - weeksSince(updDate(u))).filter(i => i >= 0 && i <= 9);
   const first = idx.length ? Math.min(...idx) : 99;
   const last = idx.length ? Math.max(...idx) : -1;
   let out = "";
@@ -1065,18 +1091,27 @@ function renderFocusDetail(main) {
       </div>
     </div>
     <div class="sub" style="margin:14px 4px 8px">${ups.length} aggiornament${ups.length === 1 ? "o" : "i"} · ${esc(silenceText(f))}</div>
-    ${ups.length ? `<div class="feed">${ups.map(u => `
-      <div class="fitem">
+    ${ups.length ? `<div class="feed">${ups.map(u => {
+      const quando = updDate(u);
+      const annotato = u.happened_on && u.happened_on !== (u.created_at || "").slice(0, 10)
+        ? ` · annotato il ${fmtDateShort(u.created_at.slice(0, 10))}` : "";
+      return `<button type="button" class="fitem" ${hasUpdDate ? `data-upd="${u.id}"` : "disabled"}>
         <span class="fdot2" style="background:${FS_COLOR[st.k]}"></span>
         <span class="ftxt">
-          <span class="fwk">${esc(u.actor_name)} · ${fmtTs(u.created_at)}</span>
+          <span class="fwk">${esc(fmtDate(String(quando).slice(0, 10)))}</span>
           <span class="fbody">${esc(u.body)}</span>
+          <span class="fauth">${esc(u.actor_name)}${annotato}</span>
         </span>
-      </div>`).join("")}</div>`
+        ${hasUpdDate ? `<span class="fchev">›</span>` : ""}
+      </button>`;
+    }).join("")}</div>`
       : `<div class="empty">Ancora nessun aggiornamento.<br>Il primo racconta da dove si parte.</div>`}`;
 
   $("#f-back").onclick = () => { openFocusId = null; render(); };
-  $("#add-upd").onclick = () => openUpdForm(f);
+  $("#add-upd").onclick = () => openUpdForm(f, null);
+  main.querySelectorAll("[data-upd]").forEach(b => {
+    b.onclick = () => openUpdForm(f, focusUpd.find(u => u.id === Number(b.dataset.upd)));
+  });
   $("#edit-focus").onclick = () => openFocusForm(f);
 }
 
@@ -1130,28 +1165,43 @@ function renderIdee(main, seg) {
   });
 }
 
-function openUpdForm(f) {
-  openDialog("Aggiornamento", `
+function openUpdForm(f, u) {
+  openDialog(u ? "Modifica aggiornamento" : "Aggiornamento", `
     <p class="sub">${esc(f.name)}</p>
+    ${hasUpdDate ? `<div class="field"><label>Quando è successo</label>
+      <input type="date" name="quando" value="${esc(String(u ? updDate(u) : todayStr()).slice(0, 10))}"></div>` : ""}
     <div class="field"><label>Cosa è successo</label>
-      <textarea name="body" rows="4" placeholder="Due righe bastano."></textarea></div>
+      <textarea name="body" rows="4" placeholder="Due righe bastano.">${esc(u?.body || "")}</textarea></div>
     <div class="prompts">
       <button type="button" class="prompt" data-p="Fatto: ">Fatto</button>
       <button type="button" class="prompt" data-p="Imparato: ">Imparato</button>
       <button type="button" class="prompt" data-p="Prossimo passo: ">Prossimo passo</button>
     </div>
-    <div class="sub" style="margin-top:8px">Le tracce sono facoltative: servono solo se ti aiutano.</div>`,
+    <div class="sub" style="margin-top:8px">Le tracce sono facoltative: servono solo se ti aiutano.</div>
+    ${u ? `<div class="row" style="margin-top:14px">
+      <button type="button" class="danger small" id="dlg-del-upd">Elimina questo aggiornamento</button>
+    </div>` : ""}`,
     async (fd) => {
       const body = (fd.get("body") || "").trim();
-      if (body.length < 3) { toast("Scrivi qualcosa"); return; }
-      const { error } = await db.from("focus_updates").insert({
-        focus_id: f.id, body, actor_id: me.id, actor_name: me.name,
-      });
-      if (error) { toast("Errore nel salvataggio"); return; }
-      toast("Aggiunto alla scia");
+      if (body.length < 3) { toast("Scrivi qualcosa"); return false; }
+      const quando = hasUpdDate ? { happened_on: fd.get("quando") || todayStr() } : {};
+      const { error } = u
+        ? await db.from("focus_updates").update({ body, ...quando }).eq("id", u.id)
+        : await db.from("focus_updates").insert({
+            focus_id: f.id, body, ...quando, actor_id: me.id, actor_name: me.name,
+          });
+      if (error) { toast("Errore nel salvataggio"); return false; }
+      toast(u ? "Aggiornamento corretto" : "Aggiunto alla scia");
       await refresh();
     },
     (form) => {
+      const del = form.querySelector("#dlg-del-upd");
+      if (del) del.onclick = async () => {
+        if (!confirm("Eliminare questo aggiornamento dalla scia?")) return;
+        await db.from("focus_updates").delete().eq("id", u.id);
+        $("#dlg").close();
+        await refresh();
+      };
       form.querySelectorAll(".prompt").forEach(b => {
         b.onclick = () => {
           const ta = form.querySelector("[name=body]");
