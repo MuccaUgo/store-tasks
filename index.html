@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0f1220">
-<meta name="app-version" content="9">
+<meta name="app-version" content="10">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -559,28 +559,41 @@ async function versionePubblicata() {
   } catch { return ""; }   // offline: si riprova al giro dopo
 }
 
+async function svuotaCache() {
+  try {
+    if (window.caches) for (const k of await caches.keys()) await caches.delete(k);
+  } catch { /* niente cache da svuotare */ }
+}
+
+// L'indirizzo cambia a ogni giro: nessuna copia vecchia può rispondere.
+async function ricarica() {
+  await svuotaCache();
+  location.replace(location.pathname + "?v=" + Date.now());
+}
+
 async function controllaVersione(forza) {
   if (!forza && Date.now() - ultimoControllo < 60000) return false;
   ultimoControllo = Date.now();
   const v = await versionePubblicata();
   if (!v || v === APP_VERSION) return false;
   toast("Nuova versione, ricarico…");
-  try {
-    if (window.caches) for (const k of await caches.keys()) await caches.delete(k);
-  } catch { /* niente cache da svuotare */ }
-  // l'indirizzo cambia a ogni giro: nessuna copia vecchia può rispondere
-  setTimeout(() => location.replace(location.pathname + "?v=" + v + "-" + Date.now()), 800);
+  setTimeout(ricarica, 800);
   return true;
 }
 
+// Aggiorna vuol dire aggiorna: ricarica tutta l'app, non solo i dati.
+// (Con un foglio aperto il pulsante non è raggiungibile: il foglio è
+// modale e rende inerte il resto, quindi niente da salvaguardare.)
 $("#refresh-btn").addEventListener("click", async (e) => {
-  const b = e.currentTarget;
-  b.classList.add("spin");
-  await refresh();
-  if (await controllaVersione(true)) return;
-  toast("Aggiornato");
-  setTimeout(() => b.classList.remove("spin"), 700);
+  e.currentTarget.classList.add("spin");
+  toast("Aggiorno…");
+  await ricarica();
 });
+
+// l'app resta aperta tutto il pomeriggio: ogni tanto si guarda intorno
+setInterval(() => {
+  if (!document.hidden && !views.app.classList.contains("hidden")) controllaVersione(false);
+}, 600000);
 
 $("#whoami-chip").addEventListener("click", () => {
   if (confirm("Vuoi cambiare nome utente?")) {
