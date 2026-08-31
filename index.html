@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0f1220">
-<meta name="app-version" content="7">
+<meta name="app-version" content="8">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -448,7 +448,7 @@ const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 let people = [], downloads = [], logRows = [];
 let projects = [], slots = [], slotPeople = [], projItems = [], debriefs = [], insights = [], replies = [];
 let shiftPoints = [], briefs = [];
-let tab = "dd";
+let tab = localStorage.getItem("tab") || "dd";
 let me = JSON.parse(localStorage.getItem("whoami") || "null");
 let openDD = new Set(); // schede DD espanse
 let hasAudience = false; // il tag destinatari appare solo se la colonna esiste
@@ -545,29 +545,39 @@ $("#login-form").addEventListener("submit", async (e) => {
   await start();
 });
 
-// L'icona in testata ricarica i dati e, se nel frattempo è uscita una
-// versione nuova dell'app, ricarica anche la pagina: sul telefono la
-// vecchia resterebbe in cache per giorni.
+// Sul telefono la pagina vecchia resta in cache per giorni: se non
+// controllassimo, le modifiche non arriverebbero mai. Il controllo gira
+// all'avvio, al rientro in primo piano e col pulsante in testata.
 const APP_VERSION = document.querySelector('meta[name=app-version]')?.content || "";
+let ultimoControllo = 0;
 
 async function versionePubblicata() {
   try {
     const r = await fetch(location.pathname + "?v=" + Date.now(), { cache: "no-store" });
     const t = await r.text();
     return /<meta name="app-version" content="([^"]*)"/.exec(t)?.[1] || "";
-  } catch { return ""; }
+  } catch { return ""; }   // offline: si riprova al giro dopo
+}
+
+async function controllaVersione(forza) {
+  if (!forza && Date.now() - ultimoControllo < 60000) return false;
+  ultimoControllo = Date.now();
+  const v = await versionePubblicata();
+  if (!v || v === APP_VERSION) return false;
+  toast("Nuova versione, ricarico…");
+  try {
+    if (window.caches) for (const k of await caches.keys()) await caches.delete(k);
+  } catch { /* niente cache da svuotare */ }
+  // l'indirizzo cambia a ogni giro: nessuna copia vecchia può rispondere
+  setTimeout(() => location.replace(location.pathname + "?v=" + v + "-" + Date.now()), 800);
+  return true;
 }
 
 $("#refresh-btn").addEventListener("click", async (e) => {
   const b = e.currentTarget;
   b.classList.add("spin");
   await refresh();
-  const v = await versionePubblicata();
-  if (v && v !== APP_VERSION) {
-    toast("Nuova versione, ricarico…");
-    setTimeout(() => location.replace(location.pathname + "?v=" + v), 900);
-    return;
-  }
+  if (await controllaVersione(true)) return;
   toast("Aggiornato");
   setTimeout(() => b.classList.remove("spin"), 700);
 });
@@ -603,6 +613,7 @@ function enterApp() {
   show("app");
   render();
   subscribeRealtime();
+  controllaVersione(true);
 }
 
 // ── Dati ────────────────────────────────────────────────────
@@ -669,7 +680,10 @@ function subscribeRealtime() {
     .subscribe();
 }
 document.addEventListener("visibilitychange", async () => {
-  if (!document.hidden && !views.app.classList.contains("hidden")) { await loadAll(); render(); }
+  if (document.hidden || views.app.classList.contains("hidden")) return;
+  await loadAll();
+  render();
+  controllaVersione(false);
 });
 
 async function refresh() { await loadAll(); render(); }
@@ -700,6 +714,7 @@ function renderNav() {
   nav.querySelectorAll("button").forEach(b => {
     b.onclick = () => {
       tab = b.dataset.tab;
+      localStorage.setItem("tab", tab);
       openFocusId = null;
       render();
     };
