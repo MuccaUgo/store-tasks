@@ -1335,7 +1335,7 @@ function renderProjectTurni(main, pr, seg) {
       await saveCrew(data.id, fd);
       await log(`ha aggiunto un turno ${pr.name} del ${fmtDateShort(data.date)}`);
       await refresh();
-    }, wireSlotForm);
+    });
 
   main.querySelectorAll("[data-slot-toggle]").forEach(el => {
     el.onclick = () => {
@@ -1385,7 +1385,6 @@ function renderProjectTurni(main, pr, seg) {
           await refresh();
         },
         (form) => {
-          wireSlotForm(form);
           form.querySelector("#dlg-del-slot").onclick = async () => {
             if (!confirm(`Eliminare il turno di ${groupName(s)} del ${fmtDateShort(s.date)}?`)) return;
             await db.from("project_slots").delete().eq("id", s.id);
@@ -1643,18 +1642,6 @@ function openPointDialog(s, kind) {
 }
 
 // ── Turni: campi e salvataggio ──────────────────────────────
-function suggestNames(pr, role) {
-  const ids = new Set(slotsOf(pr).map(s => s.id));
-  const freq = {};
-  slotPeople.filter(x => ids.has(x.slot_id) && x.role === role)
-    .forEach(x => freq[x.person_name] = (freq[x.person_name] || 0) + 1);
-  const used = Object.keys(freq).sort((a, b) => freq[b] - freq[a]);
-  const extra = role === "Specialist"
-    ? itemsOf(pr, "specialist").sort((a, b) => (b.checked - a.checked) || (a.position - b.position)).map(i => i.label)
-    : people.filter(p => p.active).map(p => p.name);
-  return [...new Set([...used, ...extra])];
-}
-
 function slotFields(pr, s) {
   return `
     <div class="field"><label>Data *</label>
@@ -1665,30 +1652,12 @@ function slotFields(pr, s) {
       <div class="field" style="flex:1"><label>Alle</label>
         <input type="time" name="end_time" value="${s?.end_time || "18:00"}"></div>
     </div>
-    ${ROLES.map(r => {
-      const have = roleNames(s?.id, r);
-      const sug = suggestNames(pr, r).filter(n => !have.includes(n)).slice(0, 8);
-      return `<div class="field"><label>${r}</label>
-        <input type="text" name="role_${r}" value="${esc(have.join(", "))}" placeholder="Nomi separati da virgola">
-        ${sug.length ? `<div class="chips" style="margin-top:6px">${sug.map(n =>
-          `<button type="button" class="fchip" data-append="role_${r}" data-v="${esc(n)}">${esc(n)}</button>`).join("")}</div>` : ""}
-      </div>`;
-    }).join("")}
+    ${ROLES.map(r => `<div class="field"><label>${r}</label>
+      <input type="text" name="role_${r}" value="${esc(roleNames(s?.id, r).join(", "))}"
+        placeholder="Nomi separati da virgola" autocomplete="off">
+    </div>`).join("")}
     <div class="field"><label>Note</label>
       <input type="text" name="note" value="${esc(s?.note || "")}" placeholder="es. brief 16:00-16:15"></div>`;
-}
-
-function wireSlotForm(form) {
-  form.querySelectorAll("[data-append]").forEach(b => {
-    b.onclick = () => {
-      const inp = form.querySelector(`[name="${b.dataset.append}"]`);
-      const names = inp.value.split(",").map(x => x.trim()).filter(Boolean);
-      if (names.includes(b.dataset.v)) return;
-      names.push(b.dataset.v);
-      inp.value = names.join(", ");
-      b.setAttribute("aria-pressed", "true");
-    };
-  });
 }
 
 async function saveCrew(slotId, fd) {
