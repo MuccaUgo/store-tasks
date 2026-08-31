@@ -5,22 +5,22 @@ Web app mobile-first per gestire le attività dello store in team (~12 persone):
 - **DD (Daily Download)** — calendario dei prossimi giorni con argomento
   (Business/Support/Product/Creative/Fun); il team gestisce i **Product**:
   chi prepara, caricato sì/no, chi presenta, presentato sì/no
-- **Validation** — FWE (nuovi arrivati, senza accesso all'app): checklist di
-  competenze da validare (Competenze operative, Approccio, Demo, Business),
-  con firma di chi valida e data
-- **Progetti** — ogni progetto attivo è un tab a sé, accanto a Validation.
-  Il primo è **Pilot** (Live Group Demo Pilot). L'unità di lavoro è il
-  **gruppo** che copre un turno: in cima al tab ci sono **Brief** e
-  **Debrief**, e agiscono sul gruppo di oggi. Il debrief chiede cinque cose
-  sole — cosa è andato bene, cosa poteva andare meglio, le demo fatte, le
-  persone raggiunte, le conversion — e ogni ✅ e ❌ resta come punto del
-  turno, aggiungibile anche dopo. La vista **Spunti** raccoglie tutti i
-  punti della settimana, le demo più fatte e gli spunti liberi
-- **Team** — gestione persone e competenze
+- **Focus** — i focus di store con gli aggiornamenti nel tempo e il
+  serbatoio delle idee
+- **Progetti** — ogni progetto è un tab a sé. Il primo è **Pilot** (Live
+  Group Demo Pilot). L'unità di lavoro è il **gruppo** che copre un turno:
+  in cima al tab ci sono **Brief** e **Debrief**, e agiscono sul gruppo di
+  oggi. Il debrief chiede due numeri (connessioni e conversion), due liste
+  che si scrivono una riga alla volta (cose positive e sfide) e due campi
+  liberi (demo interattive più riuscite, frasi più riuscite). Le righe
+  restano come punti del turno, aggiungibili anche dopo. La vista
+  **Spunti** raccoglie tutto quanto, più gli spunti liberi
+- **Team** — chi usa l'app
 - **Storico** — registro di chi ha fatto cosa
 
-Dati iniziali: 10 utenti del team e 30 FWE (cognomi di prova), DD dei
-prossimi 14 giorni con argomenti casuali.
+La validazione degli FWE non è più gestita qui: il tab è stato tolto.
+Le tabelle (`fwe`, `competencies`, `fwe_events`) restano nel database, così
+il lavoro fatto non si perde e la sezione si può riaccendere.
 
 Frontend statico (GitHub Pages) + database e login su Supabase (piano gratuito).
 
