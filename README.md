@@ -9,11 +9,13 @@ Web app mobile-first per gestire le attività dello store in team (~12 persone):
   competenze da validare (Competenze operative, Approccio, Demo, Business),
   con firma di chi valida e data
 - **Progetti** — ogni progetto attivo è un tab a sé, accanto a Validation.
-  Il primo è **Pilot** (Live Group Demo Pilot): i turni con Specialist,
-  OnPoint, Keyrole e Coach; il **debrief** di fine turno (numeri, demo fatte,
-  frase rompighiaccio, cosa ha funzionato); la bacheca **Spunti** che ne
-  ricava le demo che convertono, le frasi che funzionano, traffico e
-  risultati, più le osservazioni e le domande aperte con le risposte
+  Il primo è **Pilot** (Live Group Demo Pilot). L'unità di lavoro è il
+  **gruppo** che copre un turno: in cima al tab ci sono **Brief** e
+  **Debrief**, e agiscono sul gruppo di oggi. Il debrief chiede cinque cose
+  sole — cosa è andato bene, cosa poteva andare meglio, le demo fatte, le
+  persone raggiunte, le conversion — e ogni ✅ e ❌ resta come punto del
+  turno, aggiungibile anche dopo. La vista **Spunti** raccoglie tutti i
+  punti della settimana, le demo più fatte e gli spunti liberi
 - **Team** — gestione persone e competenze
 - **Storico** — registro di chi ha fatto cosa
 
@@ -27,7 +29,7 @@ Frontend statico (GitHub Pages) + database e login su Supabase (piano gratuito).
 ### 1. Database
 Nel progetto Supabase → **SQL Editor** → incolla il contenuto di
 `supabase-setup.sql` → **Run**, poi le migrazioni in ordine
-(`migration-2.sql` … `migration-6.sql`) allo stesso modo.
+(`migration-2.sql` … `migration-8.sql`) allo stesso modo.
 
 Ogni migrazione si può rieseguire senza danni. Finché `migration-6.sql`
 non gira, i tab dei progetti semplicemente non compaiono: il resto
