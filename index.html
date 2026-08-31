@@ -6,6 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0f1220">
+<meta name="app-version" content="7">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -544,10 +545,29 @@ $("#login-form").addEventListener("submit", async (e) => {
   await start();
 });
 
+// L'icona in testata ricarica i dati e, se nel frattempo è uscita una
+// versione nuova dell'app, ricarica anche la pagina: sul telefono la
+// vecchia resterebbe in cache per giorni.
+const APP_VERSION = document.querySelector('meta[name=app-version]')?.content || "";
+
+async function versionePubblicata() {
+  try {
+    const r = await fetch(location.pathname + "?v=" + Date.now(), { cache: "no-store" });
+    const t = await r.text();
+    return /<meta name="app-version" content="([^"]*)"/.exec(t)?.[1] || "";
+  } catch { return ""; }
+}
+
 $("#refresh-btn").addEventListener("click", async (e) => {
   const b = e.currentTarget;
   b.classList.add("spin");
   await refresh();
+  const v = await versionePubblicata();
+  if (v && v !== APP_VERSION) {
+    toast("Nuova versione, ricarico…");
+    setTimeout(() => location.replace(location.pathname + "?v=" + v), 900);
+    return;
+  }
   toast("Aggiornato");
   setTimeout(() => b.classList.remove("spin"), 700);
 });
@@ -1360,10 +1380,6 @@ function renderProjectTurni(main, pr, seg) {
       await refresh();
     };
   });
-  main.querySelectorAll("[data-act=slot-ics]").forEach(b => {
-    const s = slotOf(b.dataset.id);
-    b.onclick = () => saveICS(slotToICS(pr, s), `${pr.name.toLowerCase()}-${s.date}.ics`);
-  });
   main.querySelectorAll("[data-act=edit-slot]").forEach(b => {
     b.onclick = () => {
       const s = slotOf(b.dataset.id);
@@ -1373,15 +1389,12 @@ function renderProjectTurni(main, pr, seg) {
         </div>`,
         async (fd) => {
           const { error } = await db.from("project_slots").update({
-            date: fd.get("date"),
-            start_time: fd.get("start_time") || null,
-            end_time: fd.get("end_time") || null,
             note: (fd.get("note") || "").trim() || null,
             updated_at: new Date().toISOString(),
           }).eq("id", s.id);
           if (error) { toast("Errore nel salvataggio"); return false; }
           await saveCrew(s.id, fd);
-          await log(`ha modificato il turno ${pr.name} del ${fmtDateShort(fd.get("date"))}`);
+          await log(`ha modificato il turno ${pr.name} del ${fmtDateShort(s.date)}`);
           await refresh();
         },
         (form) => {
@@ -1439,7 +1452,6 @@ function slotCard(pr, s) {
         <button class="ghost small" data-act="brief" data-id="${s.id}">📋 Brief</button>
         <button class="small" data-act="debrief" data-id="${s.id}">📝 Debrief</button>
         <span style="flex:1"></span>
-        <button class="ghost small" data-act="slot-ics" data-id="${s.id}">📅</button>
         <button class="ghost small" data-act="edit-slot" data-id="${s.id}">Modifica</button>
       </div>`}
   </div>`;
@@ -1642,16 +1654,18 @@ function openPointDialog(s, kind) {
 }
 
 // ── Turni: campi e salvataggio ──────────────────────────────
+// Nel turno già esistente si cambiano i contenuti: quando è, resta com'è.
 function slotFields(pr, s) {
   return `
+    ${s ? `<p class="sub">${esc(fmtDate(s.date))} · ${esc(slotHours(s))}</p>` : `
     <div class="field"><label>Data *</label>
-      <input type="date" name="date" value="${s?.date || todayStr()}" required></div>
+      <input type="date" name="date" value="${todayStr()}" required></div>
     <div class="row" style="gap:10px">
       <div class="field" style="flex:1"><label>Dalle</label>
-        <input type="time" name="start_time" value="${s?.start_time || "16:00"}"></div>
+        <input type="time" name="start_time" value="16:00"></div>
       <div class="field" style="flex:1"><label>Alle</label>
-        <input type="time" name="end_time" value="${s?.end_time || "18:00"}"></div>
-    </div>
+        <input type="time" name="end_time" value="18:00"></div>
+    </div>`}
     ${ROLES.map(r => `<div class="field"><label>${r}</label>
       <input type="text" name="role_${r}" value="${esc(roleNames(s?.id, r).join(", "))}"
         placeholder="Nomi separati da virgola" autocomplete="off">
@@ -1669,35 +1683,6 @@ async function saveCrew(slotId, fd) {
       person_id: people.find(p => p.name === nm)?.id || null, position: i,
     })));
   if (rows.length) await db.from("slot_people").insert(rows);
-}
-
-function slotToICS(pr, s) {
-  const day = s.date.replace(/-/g, "");
-  const hhmm = (v, fb) => (v || fb).replace(":", "") + "00";
-  const crew = ROLES.map(r => {
-    const n = roleNames(s.id, r);
-    return n.length ? `${r}: ${n.join(", ")}` : null;
-  }).filter(Boolean).join("\n");
-  const title = `${pr.full_name || pr.name}: ${groupName(s)}`;
-  return [
-    "BEGIN:VCALENDAR",
-    "VERSION:2.0",
-    "PRODID:-//Store Tasks//IT",
-    "BEGIN:VEVENT",
-    `UID:slot-${s.id}@store-tasks`,
-    `DTSTAMP:${icsStamp()}`,
-    `DTSTART:${day}T${hhmm(s.start_time, "16:00")}`,
-    `DTEND:${day}T${hhmm(s.end_time, "18:00")}`,
-    `SUMMARY:${icsEsc(title)}`,
-    crew || s.note ? `DESCRIPTION:${icsEsc([crew, s.note].filter(Boolean).join("\n"))}` : null,
-    "BEGIN:VALARM",
-    "ACTION:DISPLAY",
-    `DESCRIPTION:${icsEsc("Tra un'ora: " + title)}`,
-    "TRIGGER;RELATED=START:-PT1H",
-    "END:VALARM",
-    "END:VEVENT",
-    "END:VCALENDAR",
-  ].filter(Boolean).join("\r\n");
 }
 
 function chipRow(name, values, current, multi) {
