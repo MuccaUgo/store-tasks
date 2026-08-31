@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0f1220">
-<meta name="app-version" content="8">
+<meta name="app-version" content="9">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -1346,7 +1346,6 @@ function renderProjectTurni(main, pr, seg) {
   main.innerHTML = seg + `
     <div class="menu2">
       <button type="button" class="big" id="go-brief"><span>📋</span>Brief</button>
-      <button type="button" class="big" id="go-debrief"><span>📝</span>Debrief</button>
     </div>
     <div class="sub menu2-sub">${esc(sottotitolo)}</div>
 
@@ -1355,7 +1354,6 @@ function renderProjectTurni(main, pr, seg) {
     ${cal || `<div class="empty">Nessun turno ancora.<br>Aggiungine uno con “+ Turno”.</div>`}`;
 
   $("#go-brief").onclick = () => pickGroup(pr, "Brief di quale gruppo?", s => openBriefDialog(pr, s));
-  $("#go-debrief").onclick = () => pickGroup(pr, "Debrief di quale gruppo?", s => openDebriefDialog(pr, s));
 
   $("#add-slot").onclick = () => openDialog("Nuovo turno", slotFields(pr, null),
     async (fd) => {
@@ -1378,9 +1376,6 @@ function renderProjectTurni(main, pr, seg) {
       openSlot.has(id) ? openSlot.delete(id) : openSlot.add(id);
       render();
     };
-  });
-  main.querySelectorAll("[data-act=brief]").forEach(b => {
-    b.onclick = () => openBriefDialog(pr, slotOf(b.dataset.id));
   });
   main.querySelectorAll("[data-act=debrief]").forEach(b => {
     b.onclick = () => openDebriefDialog(pr, slotOf(b.dataset.id));
@@ -1464,7 +1459,6 @@ function slotCard(pr, s) {
       ${pointBlock(s, "good", good)}
       ${pointBlock(s, "bad", bad)}
       <div class="row" style="margin-top:14px">
-        <button class="ghost small" data-act="brief" data-id="${s.id}">📋 Brief</button>
         <button class="small" data-act="debrief" data-id="${s.id}">📝 Debrief</button>
         <span style="flex:1"></span>
         <button class="ghost small" data-act="edit-slot" data-id="${s.id}">Modifica</button>
@@ -1732,6 +1726,23 @@ function wireChips(form) {
   });
 }
 
+// Sul telefono apre il foglio di condivisione; sul computer copia negli
+// appunti; se anche quello non si può, il testo si mostra da copiare a mano.
+async function condividiTesto(titolo, testo) {
+  if (navigator.share) {
+    try { await navigator.share({ title: titolo, text: testo }); return; }
+    catch (e) { if (e.name === "AbortError") return; }
+  }
+  try {
+    await navigator.clipboard.writeText(testo);
+    toast("Riepilogo copiato");
+    return;
+  } catch { /* niente appunti: sotto lo mostriamo */ }
+  openDialog(titolo, `<div class="field">
+      <textarea rows="12" readonly style="font-size:.82rem">${esc(testo)}</textarea></div>`,
+    null, (form) => { form.querySelector("button[type=submit]").style.display = "none"; });
+}
+
 // ── Spunti ──────────────────────────────────────────────────
 function renderProjectSpunti(main, pr, seg) {
   const ids = new Set(slotsOf(pr).map(s => s.id));
@@ -1771,12 +1782,32 @@ function renderProjectSpunti(main, pr, seg) {
   const spunti = insights.filter(i => i.project_id === pr.id)
     .sort((a, b) => (a.resolved - b.resolved) || (b.id - a.id));
 
+  // Il riepilogo da mandare al team: le stesse cose che si leggono qui,
+  // in un testo che si incolla ovunque.
+  const elencoTesto = (titolo, righe) => righe.length
+    ? `\n${titolo}\n` + righe.map(x => {
+        const t = slotOf(x.slot_id);
+        return `• ${x.text}${t ? ` (${groupName(t)}, ${fmtDateShort(t.date)})` : ""}`;
+      }).join("\n") + "\n"
+    : "";
+  const testo = [
+    `${pr.full_name || pr.name}${projPeriod(pr) ? " · " + projPeriod(pr) : ""}`,
+    `${conDebrief} gruppi con debrief · ${somma("reached")} connessioni · ${somma("conversions")} conversion`,
+    elencoTesto("✅ COSE POSITIVE", good),
+    elencoTesto("⚠️ SFIDE", bad),
+    elencoTesto("💡 DEMO PIÙ RIUSCITE", demoTop),
+    elencoTesto("🗣 FRASI PIÙ RIUSCITE", frasiTop),
+    spunti.length ? `\nSPUNTI\n` + spunti.map(i =>
+      `• [${i.kind}] ${i.text}${repliesOf(i.id).map(r => `\n   ↳ ${r.author_name}: ${r.text}`).join("")}`).join("\n") : "",
+  ].filter(Boolean).join("\n");
+
   main.innerHTML = seg + `
     <div class="stats">
       <div class="stat"><b>${conDebrief}</b><span>Gruppi</span></div>
       <div class="stat"><b>${somma("reached")}</b><span>Connessioni</span></div>
       <div class="stat"><b>${somma("conversions")}</b><span>Conversion</span></div>
     </div>
+    <button class="ghost" id="condividi" style="width:100%;margin-bottom:6px">📤 Condividi il riepilogo</button>
 
     <div class="area-head"><span>✅ Cose positive</span><span class="ac">${good.length}</span></div>
     ${good.length ? elenco(good, "good") : `<div class="empty">Ancora niente: esce dai debrief.</div>`}
@@ -1794,6 +1825,8 @@ function renderProjectSpunti(main, pr, seg) {
       <button class="small" id="add-insight">+ Spunto</button></div>
     ${spunti.length ? spunti.map(insightCard).join("")
       : `<div class="empty">Niente per ora.</div>`}`;
+
+  $("#condividi").onclick = () => condividiTesto(`${pr.full_name || pr.name} · riepilogo`, testo);
 
   main.querySelectorAll("[data-tutti]").forEach(b => {
     b.onclick = () => { tuttiPunti[b.dataset.tutti] = !tuttiPunti[b.dataset.tutti]; render(); };
