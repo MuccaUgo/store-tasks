@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0f1220">
-<meta name="app-version" content="16">
+<meta name="app-version" content="17">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -1422,18 +1422,33 @@ function renderProject(main, pr) {
 function renderProjectTurni(main, pr, seg) {
   const list = slotsOf(pr), today = todayStr();
   const oggi = list.filter(s => s.date === today);
-  const nTodo = list.filter(s => s.date < today && !debriefsOf(s.id).length).length;
 
-  const groups = [];
-  list.forEach(s => {
-    const g = groups[groups.length - 1];
-    if (g && g.date === s.date) g.items.push(s);
-    else groups.push({ date: s.date, items: [s] });
-  });
-  const cal = groups.map(g => `
-    <div class="date-head ${g.date === today ? "today" : ""}">
-      ${g.date === today ? "Oggi · " : ""}${fmtDate(g.date)}</div>
-    ${g.items.map(s => slotCard(pr, s)).join("")}`).join("");
+  // L'elenco comincia da oggi: i giorni già debriefati si raccolgono in
+  // fondo, mentre un turno passato senza debrief resta in mezzo agli
+  // altri, perché è ancora da fare.
+  const finito = (s) => s.date < today && compilato(s.id);
+  const correnti = list.filter(s => !finito(s));
+  const archivio = list.filter(finito).reverse();
+  const nTodo = list.filter(s => s.date < today && !compilato(s.id)).length;
+
+  const perGiorno = (elenco) => {
+    const groups = [];
+    elenco.forEach(s => {
+      const g = groups[groups.length - 1];
+      if (g && g.date === s.date) g.items.push(s);
+      else groups.push({ date: s.date, items: [s] });
+    });
+    return groups.map(g => `
+      <div class="date-head ${g.date === today ? "today" : ""}">
+        ${g.date === today ? "Oggi · " : ""}${fmtDate(g.date)}</div>
+      ${g.items.map(s => slotCard(pr, s)).join("")}`).join("");
+  };
+
+  const cal = perGiorno(correnti);
+  const passati = archivio.length ? `
+    <details class="past"><summary>Turni già debriefati (${archivio.length}) ▾</summary>
+      ${perGiorno(archivio)}
+    </details>` : "";
 
   const sottotitolo = oggi.length
     ? `Oggi: ${oggi.map(groupName).join(" · ")}`
@@ -1448,7 +1463,10 @@ function renderProjectTurni(main, pr, seg) {
 
     <div class="section-head" style="margin-top:20px"><h2>Turni</h2>
       <button class="small ghost" id="add-slot">+ Turno</button></div>
-    ${cal || `<div class="empty">Nessun turno ancora.<br>Aggiungine uno con “+ Turno”.</div>`}`;
+    ${cal || `<div class="empty">${archivio.length
+      ? "Da oggi in avanti non c'è nessun turno.<br>Aggiungine uno con “+ Turno”."
+      : "Nessun turno ancora.<br>Aggiungine uno con “+ Turno”."}</div>`}
+    ${passati}`;
 
   $("#go-brief").onclick = () => pickGroup(pr, "Brief di quale gruppo?", s => openBriefDialog(pr, s));
 
