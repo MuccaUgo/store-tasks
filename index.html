@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0f1220">
-<meta name="app-version" content="21">
+<meta name="app-version" content="22">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -1029,7 +1029,9 @@ const updDate = (u) => u.happened_on || u.created_at;
 const giornoISO = (g) => new Date(g + "T12:00:00").toISOString();
 const updOf = (fid) => focusUpd.filter(u => u.focus_id === fid)
   .sort((a, b) => String(updDate(a)).localeCompare(String(updDate(b))) || a.id - b.id);
-const weeksSince = (iso) => Math.floor((Date.now() - new Date(iso).getTime()) / WEEK_MS);
+// Un aggiornamento scritto oggi porta la data di oggi a mezzogiorno: prima
+// di mezzogiorno la differenza è negativa, e non esiste il silenzio negativo.
+const weeksSince = (iso) => Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / WEEK_MS));
 // Un punto sulla scia può essere un aggiornamento, una proposta o una
 // decisione. Senza migration-11 esiste solo il primo tipo.
 const kindOf = (u) => (hasProposte && u.kind) || "agg";
@@ -1360,6 +1362,9 @@ function openUpdForm(f, u) {
       <input type="date" name="quando" value="${esc(String(u ? updDate(u) : todayStr()).slice(0, 10))}"></div>
     <div class="field"><label>Cosa è successo</label>
       <textarea name="body" rows="3" placeholder="Due righe bastano.">${esc(u?.body || "")}</textarea></div>
+    ${u && hasProposte ? `<div class="row" style="margin-top:12px">
+      <button type="button" class="ghost small" id="dlg-to-prop">↑ Rendila una proposta da votare</button>
+    </div>` : ""}
     ${u ? `<div class="row-del">
       <button type="button" class="danger small" id="dlg-del-upd">🗑 Elimina questo aggiornamento</button>
     </div>` : `
@@ -1396,6 +1401,20 @@ function openUpdForm(f, u) {
       await refresh();
     },
     (form) => {
+      const toProp = form.querySelector("#dlg-to-prop");
+      // capita di scrivere come aggiornamento una cosa che invece va decisa:
+      // diventa proposta senza doverla riscrivere
+      if (toProp) toProp.onclick = async () => {
+        const body = (form.querySelector("[name=body]").value || "").trim();
+        if (body.length < 3) { toast("Scrivi qualcosa"); return; }
+        const { error } = await db.from("focus_updates")
+          .update({ body, kind: "proposta" }).eq("id", u.id);
+        if (error) { toast("Errore nel salvataggio"); return; }
+        await log(`ha aperto la proposta “${body.slice(0, 60)}” su ${f.name}`);
+        $("#dlg").close();
+        toast("Ora si può votare");
+        await refresh();
+      };
       const del = form.querySelector("#dlg-del-upd");
       if (del) del.onclick = async () => {
         if (!confirm("Eliminare questo aggiornamento dalla scia?")) return;
