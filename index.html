@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0f1220">
-<meta name="app-version" content="13">
+<meta name="app-version" content="14">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -190,18 +190,27 @@
   .section-head { display: flex; justify-content: space-between; align-items: center; margin: 6px 2px 12px; }
   .section-head h2 { font-size: 1.05rem; letter-spacing: -.01em; }
   dialog {
-    border: none; border-radius: 20px; background: var(--card); color: var(--text);
-    width: min(92vw, 420px); padding: 18px;
-    max-height: 86dvh; overflow-y: auto;
+    border: none; border-radius: 22px 22px 0 0; background: var(--card); color: var(--text);
+    width: 100%; max-width: 480px;
+    margin: auto auto 0;
+    padding: 16px 18px calc(18px + env(safe-area-inset-bottom));
+    max-height: 88dvh; overflow-y: auto;
     box-shadow: var(--shadow);
   }
+  dialog[open] { animation: sheet-up .22s ease-out; }
+  @keyframes sheet-up { from { transform: translateY(18px); } to { transform: none; } }
+  dialog::backdrop { animation: fade-in .22s ease-out; }
+  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
   dialog::backdrop {
     background: rgba(10, 12, 25, .35);
     -webkit-backdrop-filter: blur(6px);
     backdrop-filter: blur(6px);
   }
   dialog h3 { margin-bottom: 4px; }
-  .dialog-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+  .dialog-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+  .dialog-actions button { min-width: 96px; }
+  .row-del { margin-top: 14px; }
+  .row-del button { padding: 8px 0; font-size: .86rem; }
   #toast {
     position: fixed; left: 50%; transform: translateX(-50%);
     bottom: calc(96px + env(safe-area-inset-bottom));
@@ -1171,16 +1180,16 @@ function openUpdForm(f, u) {
     <div class="field"><label>Quando è successo</label>
       <input type="date" name="quando" value="${esc(String(u ? updDate(u) : todayStr()).slice(0, 10))}"></div>
     <div class="field"><label>Cosa è successo</label>
-      <textarea name="body" rows="4" placeholder="Due righe bastano.">${esc(u?.body || "")}</textarea></div>
+      <textarea name="body" rows="3" placeholder="Due righe bastano.">${esc(u?.body || "")}</textarea></div>
+    ${u ? `<div class="row-del">
+      <button type="button" class="danger small" id="dlg-del-upd">🗑 Elimina questo aggiornamento</button>
+    </div>` : `
     <div class="prompts">
       <button type="button" class="prompt" data-p="Fatto: ">Fatto</button>
       <button type="button" class="prompt" data-p="Imparato: ">Imparato</button>
       <button type="button" class="prompt" data-p="Prossimo passo: ">Prossimo passo</button>
     </div>
-    <div class="sub" style="margin-top:8px">Le tracce sono facoltative: servono solo se ti aiutano.</div>
-    ${u ? `<div class="row" style="margin-top:14px">
-      <button type="button" class="danger small" id="dlg-del-upd">Elimina questo aggiornamento</button>
-    </div>` : ""}`,
+    <div class="sub" style="margin-top:8px">Le tracce sono facoltative: servono solo se ti aiutano.</div>`}`,
     async (fd) => {
       const body = (fd.get("body") || "").trim();
       if (body.length < 3) { toast("Scrivi qualcosa"); return false; }
