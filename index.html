@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0f1220">
-<meta name="app-version" content="17">
+<meta name="app-version" content="18">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -1423,9 +1423,10 @@ function renderProjectTurni(main, pr, seg) {
   const list = slotsOf(pr), today = todayStr();
   const oggi = list.filter(s => s.date === today);
 
-  // L'elenco comincia da oggi: i giorni già debriefati si raccolgono in
-  // fondo, mentre un turno passato senza debrief resta in mezzo agli
-  // altri, perché è ancora da fare.
+  // L'elenco comincia da oggi e i giorni già debriefati scendono in
+  // fondo, sempre in vista: si correggono con un tocco, senza aprire
+  // niente. Un turno passato senza debrief resta in mezzo agli altri,
+  // perché è ancora da fare.
   const finito = (s) => s.date < today && compilato(s.id);
   const correnti = list.filter(s => !finito(s));
   const archivio = list.filter(finito).reverse();
@@ -1446,9 +1447,9 @@ function renderProjectTurni(main, pr, seg) {
 
   const cal = perGiorno(correnti);
   const passati = archivio.length ? `
-    <details class="past"><summary>Turni già debriefati (${archivio.length}) ▾</summary>
-      ${perGiorno(archivio)}
-    </details>` : "";
+    <div class="area-head" style="margin-top:26px">
+      <span>Turni già debriefati</span><span class="ac">${archivio.length}</span></div>
+    ${perGiorno(archivio)}` : "";
 
   const sottotitolo = oggi.length
     ? `Oggi: ${oggi.map(groupName).join(" · ")}`
