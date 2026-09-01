@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0f1220">
-<meta name="app-version" content="20">
+<meta name="app-version" content="21">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -372,7 +372,7 @@
   .vote[aria-pressed="true"] { border-color: transparent; font-weight: 700; }
   .vote.up[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
   .vote.down[aria-pressed="true"] { background: rgba(211, 63, 73, .14); color: var(--danger); }
-  .vote:disabled { opacity: .6; cursor: default; }
+  .tally { font-size: .92rem; margin-top: 11px; }
   .voters { font-size: .74rem; color: var(--muted); margin-top: 8px; line-height: 1.5; }
   .creply { display: flex; gap: 8px; margin-top: 10px; }
   .creply input { flex: 1; min-width: 0; }
@@ -1198,12 +1198,16 @@ function votiHtml(u, chiuso) {
   const su = v.filter(x => x.value === 1), giu = v.filter(x => x.value === -1);
   const mio = v.find(x => x.actor_name === me?.name)?.value || 0;
   const nomi = (arr) => arr.map(x => x.actor_name).join(", ");
-  return `<div class="votes">
+  // A decisione presa il conteggio resta, ma come fatto: niente bottoni
+  // che sembrano premibili e non fanno niente.
+  return `${chiuso
+    ? (su.length || giu.length ? `<div class="tally">👍 ${su.length} · 👎 ${giu.length}</div>` : "")
+    : `<div class="votes">
       <button type="button" class="vote up" data-vote="${u.id}" data-val="1"
-        aria-pressed="${mio === 1}" ${chiuso ? "disabled" : ""}>👍 ${su.length}</button>
+        aria-pressed="${mio === 1}">👍 ${su.length}</button>
       <button type="button" class="vote down" data-vote="${u.id}" data-val="-1"
-        aria-pressed="${mio === -1}" ${chiuso ? "disabled" : ""}>👎 ${giu.length}</button>
-    </div>
+        aria-pressed="${mio === -1}">👎 ${giu.length}</button>
+    </div>`}
     ${su.length || giu.length ? `<div class="voters">${
       su.length ? `👍 ${esc(nomi(su))}` : ""}${su.length && giu.length ? "<br>" : ""}${
       giu.length ? `👎 ${esc(nomi(giu))}` : ""}</div>` : ""}`;
