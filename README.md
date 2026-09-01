@@ -5,8 +5,7 @@ Web app mobile-first per gestire le attività dello store in team (~12 persone):
 - **DD (Daily Download)** — calendario dei prossimi giorni con argomento
   (Business/Support/Product/Creative/Fun); il team gestisce i **Product**:
   chi prepara, caricato sì/no, chi presenta, presentato sì/no
-- **Focus** — i focus di store con gli aggiornamenti nel tempo e il
-  serbatoio delle idee
+- **Focus** — i focus di store con gli aggiornamenti nel tempo
 - **Progetti** — ogni progetto è un tab a sé. Il primo è **Pilot** (Live
   Group Demo Pilot). L'unità di lavoro è il **gruppo** che copre un turno:
   in cima al tab ci sono **Brief** e **Debrief**, e agiscono sul gruppo di
