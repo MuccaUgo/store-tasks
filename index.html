@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0f1220">
-<meta name="app-version" content="18">
+<meta name="app-version" content="19">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -350,16 +350,6 @@
   .fauth { display: block; font-size: .74rem; color: var(--muted); margin-top: 7px; }
   .fchev { color: var(--muted); font-size: 1.1rem; align-self: center; flex: none; }
   .fitem:disabled { opacity: 1; cursor: default; }
-  .idea-row {
-    display: flex; flex-direction: column; gap: 10px; background: var(--card);
-    border: 1px solid var(--line); border-radius: 13px; padding: 12px 13px; margin-bottom: 8px;
-  }
-  .idea-row .ib { font-size: .93rem; line-height: 1.4; }
-  .idea-row .im { font-size: .72rem; color: var(--muted); display: block; margin-top: 3px; }
-  .idea-acts { display: flex; gap: 8px; }
-  .idea-acts button { flex: 1; min-height: 44px; padding: 10px 12px; font-size: .86rem; }
-  .quickadd { display: flex; gap: 8px; margin-bottom: 12px; }
-  .quickadd input { flex: 1; }
   .prompts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
   .prompt {
     border: 1px dashed var(--line); background: none; color: var(--muted);
@@ -489,10 +479,10 @@ let hasAudience = false; // il tag destinatari appare solo se la colonna esiste
 let hasProjects = false;   // i tab dei progetti compaiono dopo migration-6.sql
 let pSeg = "turni", openSlot = new Set(); // schede turno espanse
 let tuttiPunti = { good: false, bad: false, demo: false, phrase: false };
-let focusList = [], focusUpd = [], ideaList = [];
+let focusList = [], focusUpd = [];
 let hasFocus = false;      // il tab Focus si attiva dopo migration-7.sql
 let hasUpdDate = false;    // data e correzione degli aggiornamenti: migration-10.sql
-let fSeg = "focus", openFocusId = null;
+let openFocusId = null;
 
 const $ = (s) => document.querySelector(s);
 const views = { login: $("#view-login"), whoami: $("#view-whoami"), app: $("#view-app") };
@@ -698,7 +688,6 @@ async function loadAll() {
   if (hasFocus) q.push(
     ["focus", db.from("focus").select("*").order("created_at")],
     ["fupd", db.from("focus_updates").select("*").order("created_at")],
-    ["ideas", db.from("ideas").select("*").order("created_at", { ascending: false })],
   );
   const res = await Promise.all(q.map(x => x[1]));
   const d = {};
@@ -711,7 +700,7 @@ async function loadAll() {
     shiftPoints = d.points; briefs = d.briefs;
   }
   if (hasFocus) {
-    focusList = d.focus; focusUpd = d.fupd; ideaList = d.ideas;
+    focusList = d.focus; focusUpd = d.fupd;
   }
 }
 
@@ -794,7 +783,6 @@ function render() {
   else renderLog(main);
 
   main.querySelectorAll("[data-pseg]").forEach(b => b.onclick = () => { pSeg = b.dataset.pseg; render(); });
-  main.querySelectorAll("[data-fseg]").forEach(b => b.onclick = () => { fSeg = b.dataset.fseg; openFocusId = null; render(); });
 }
 
 // ── DD (Daily Download) ─────────────────────────────────────
@@ -1056,19 +1044,11 @@ function renderFocus(main) {
   }
   if (openFocusId) return renderFocusDetail(main);
 
-  const nIdee = ideaList.filter(i => !i.archived && !i.promoted_focus_id).length;
-  const seg = `
-    <div class="seg" role="group" aria-label="Sezione">
-      <button type="button" data-fseg="focus" aria-pressed="${fSeg === "focus"}">Focus · ${focusList.length}</button>
-      <button type="button" data-fseg="idee" aria-pressed="${fSeg === "idee"}">Idee · ${nIdee}</button>
-    </div>`;
-  if (fSeg === "idee") return renderIdee(main, seg);
-
   const list = focusSorted();
   const nFermi = list.filter(f => focusState(f).k === "fer").length;
   const nAttivi = list.filter(f => focusState(f).k === "att").length;
 
-  main.innerHTML = seg + `
+  main.innerHTML = `
     <div class="section-head"><h2>Cosa stiamo portando avanti</h2>
       <button class="small" id="add-focus">+ Nuovo</button></div>
     ${list.length ? `<div class="sub" style="margin:0 4px 12px">${nAttivi} in movimento${nFermi ? ` · ${nFermi} fermi da oltre un mese` : ""}</div>` : ""}
@@ -1083,7 +1063,7 @@ function renderFocus(main) {
         <span class="strip-row">${stripHtml(f, FS_COLOR[st.k])}
           <span class="fmetric">${esc(silenceText(f))}</span></span>
       </button>`;
-    }).join("") : `<div class="empty">Nessun focus ancora.<br>Aggiungine uno, oppure parti da un'idea.</div>`}`;
+    }).join("") : `<div class="empty">Nessun focus ancora.<br>Aggiungine uno con “+ Nuovo”.</div>`}`;
 
   $("#add-focus").onclick = () => openFocusForm(null);
   main.querySelectorAll("[data-focus]").forEach(b => {
@@ -1135,56 +1115,6 @@ function renderFocusDetail(main) {
     b.onclick = () => openUpdForm(f, focusUpd.find(u => u.id === Number(b.dataset.upd)));
   });
   $("#edit-focus").onclick = () => openFocusForm(f);
-}
-
-function renderIdee(main, seg) {
-  const live = ideaList.filter(i => !i.archived && !i.promoted_focus_id);
-  main.innerHTML = seg + `
-    <div class="section-head"><h2>Serbatoio</h2></div>
-    <div class="sub" style="margin:0 4px 12px">Due parole bastano. Alcune diventeranno focus, la maggior parte no.</div>
-    <div class="quickadd">
-      <input type="text" id="idea-in" placeholder="Es. il caddy in C3 non lo usa nessuno">
-      <button class="small" id="idea-add">Aggiungi</button>
-    </div>
-    ${live.length ? live.map(i => `
-      <div class="idea-row">
-        <span class="ib">${esc(i.body)}
-          <span class="im">${esc(i.actor_name || "—")} · ${fmtTs(i.created_at)}</span></span>
-        <span class="idea-acts">
-          <button class="ghost" data-promote="${i.id}">Diventa un focus</button>
-          <button class="danger" data-arch="${i.id}">Archivia</button>
-        </span>
-      </div>`).join("") : `<div class="empty">Serbatoio vuoto.<br>Scrivi la prima idea qui sopra.</div>`}`;
-
-  const addIdea = async () => {
-    const v = $("#idea-in").value.trim();
-    if (v.length < 2) return;
-    const { error } = await db.from("ideas").insert({ body: v, actor_name: me.name });
-    if (error) { toast("Errore nel salvataggio"); return; }
-    $("#idea-in").value = "";
-    await refresh();
-  };
-  $("#idea-add").onclick = addIdea;
-  $("#idea-in").onkeydown = (e) => { if (e.key === "Enter") addIdea(); };
-
-  main.querySelectorAll("[data-promote]").forEach(b => {
-    b.onclick = async () => {
-      const i = ideaList.find(x => x.id === b.dataset.promote);
-      const { data, error } = await db.from("focus").insert({ name: i.body }).select().single();
-      if (error) { toast("Errore nel salvataggio"); return; }
-      await db.from("ideas").update({ promoted_focus_id: data.id }).eq("id", i.id);
-      await log(`ha aperto il focus “${i.body}” da un'idea`);
-      toast("Diventata un focus");
-      fSeg = "focus"; openFocusId = data.id;
-      await refresh();
-    };
-  });
-  main.querySelectorAll("[data-arch]").forEach(b => {
-    b.onclick = async () => {
-      await db.from("ideas").update({ archived: true }).eq("id", b.dataset.arch);
-      await refresh();
-    };
-  });
 }
 
 function openUpdForm(f, u) {
