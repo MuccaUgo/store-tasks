@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0f1220">
-<meta name="app-version" content="15">
+<meta name="app-version" content="16">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -114,6 +114,7 @@
   }
   .badge.done { background: var(--ok-soft); color: var(--ok); }
   .dd-summary { cursor: pointer; }
+  .card.fatto { background: var(--bg); box-shadow: none; }
   .role-tag {
     font-size: .7rem; font-weight: 700; padding: 3px 9px; border-radius: 999px;
     text-transform: uppercase; letter-spacing: .04em; cursor: pointer; border: none;
@@ -1536,6 +1537,7 @@ function renderProjectTurni(main, pr, seg) {
 
 function slotCard(pr, s) {
   const st = slotState(s);
+  const archiviato = s.date < todayStr() && compilato(s.id);
   const point = roleNames(s.id, "Point");
   const sotto = [slotHours(s), point.length ? `Point ${point.join(", ")}` : null]
     .filter(Boolean).join(" · ");
@@ -1549,7 +1551,7 @@ function slotCard(pr, s) {
          <span class="pt-count conv">🛍 ${n.conv ?? "–"} conversion</span>
        </div>` : "";
 
-  return `<div class="card">
+  return `<div class="card${archiviato ? " fatto" : ""}">
     <div class="row spread dd-summary slot-head" data-slot-toggle="${s.id}">
       <div style="min-width:0">
         <h3>${esc(groupName(s))}</h3>
