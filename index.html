@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0f1220">
-<meta name="app-version" content="19">
+<meta name="app-version" content="20">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -350,6 +350,32 @@
   .fauth { display: block; font-size: .74rem; color: var(--muted); margin-top: 7px; }
   .fchev { color: var(--muted); font-size: 1.1rem; align-self: center; flex: none; }
   .fitem:disabled { opacity: 1; cursor: default; }
+  /* proposte e decisioni */
+  .pcard {
+    background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--accent);
+    border-radius: 15px; padding: 13px 14px; margin-bottom: 10px;
+  }
+  .pcard.dec { border-left-color: var(--ok); }
+  .kind.prop { background: var(--accent-soft); color: var(--accent); }
+  .kind.dec { background: var(--ok-soft); color: var(--ok); }
+  .pbody { font-size: .95rem; line-height: 1.5; white-space: pre-wrap; margin-top: 9px; }
+  .pesito {
+    margin-top: 10px; padding: 9px 11px; border-radius: 11px; background: var(--ok-soft);
+    font-size: .9rem; line-height: 1.45;
+  }
+  .votes { display: flex; gap: 8px; margin-top: 11px; }
+  .vote {
+    flex: 1; min-height: 44px; border-radius: 12px; border: 1px solid var(--line);
+    background: var(--card); color: var(--text); font-family: inherit; font-size: .92rem;
+    cursor: pointer;
+  }
+  .vote[aria-pressed="true"] { border-color: transparent; font-weight: 700; }
+  .vote.up[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+  .vote.down[aria-pressed="true"] { background: rgba(211, 63, 73, .14); color: var(--danger); }
+  .vote:disabled { opacity: .6; cursor: default; }
+  .voters { font-size: .74rem; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+  .creply { display: flex; gap: 8px; margin-top: 10px; }
+  .creply input { flex: 1; min-width: 0; }
   .prompts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
   .prompt {
     border: 1px dashed var(--line); background: none; color: var(--muted);
@@ -479,9 +505,10 @@ let hasAudience = false; // il tag destinatari appare solo se la colonna esiste
 let hasProjects = false;   // i tab dei progetti compaiono dopo migration-6.sql
 let pSeg = "turni", openSlot = new Set(); // schede turno espanse
 let tuttiPunti = { good: false, bad: false, demo: false, phrase: false };
-let focusList = [], focusUpd = [];
+let focusList = [], focusUpd = [], focusVotes = [], focusComments = [];
 let hasFocus = false;      // il tab Focus si attiva dopo migration-7.sql
 let hasUpdDate = false;    // data e correzione degli aggiornamenti: migration-10.sql
+let hasProposte = false;   // proposte, voti e decisioni: migration-11.sql
 let openFocusId = null;
 
 const $ = (s) => document.querySelector(s);
@@ -656,16 +683,18 @@ function enterApp() {
 
 // ── Dati ────────────────────────────────────────────────────
 async function detectSchema() {
-  const [a, p, f, q] = await Promise.all([
+  const [a, p, f, q, k] = await Promise.all([
     db.from("downloads").select("audience").limit(1),
     db.from("projects").select("id").limit(1),
     db.from("focus").select("id").limit(1),
     db.from("focus_updates").select("happened_on").limit(1),
+    db.from("focus_updates").select("kind").limit(1),
   ]);
   hasAudience = !a.error;
   hasProjects = !p.error;
   hasFocus = !f.error;
   hasUpdDate = !q.error;
+  hasProposte = !k.error;
 }
 
 async function loadAll() {
@@ -689,6 +718,10 @@ async function loadAll() {
     ["focus", db.from("focus").select("*").order("created_at")],
     ["fupd", db.from("focus_updates").select("*").order("created_at")],
   );
+  if (hasFocus && hasProposte) q.push(
+    ["fvotes", db.from("focus_votes").select("*").order("id")],
+    ["fcomm", db.from("focus_comments").select("*").order("id")],
+  );
   const res = await Promise.all(q.map(x => x[1]));
   const d = {};
   q.forEach((x, i) => d[x[0]] = res[i].data || []);
@@ -701,6 +734,7 @@ async function loadAll() {
   }
   if (hasFocus) {
     focusList = d.focus; focusUpd = d.fupd;
+    if (hasProposte) { focusVotes = d.fvotes; focusComments = d.fcomm; }
   }
 }
 
@@ -996,6 +1030,14 @@ const giornoISO = (g) => new Date(g + "T12:00:00").toISOString();
 const updOf = (fid) => focusUpd.filter(u => u.focus_id === fid)
   .sort((a, b) => String(updDate(a)).localeCompare(String(updDate(b))) || a.id - b.id);
 const weeksSince = (iso) => Math.floor((Date.now() - new Date(iso).getTime()) / WEEK_MS);
+// Un punto sulla scia può essere un aggiornamento, una proposta o una
+// decisione. Senza migration-11 esiste solo il primo tipo.
+const kindOf = (u) => (hasProposte && u.kind) || "agg";
+const votesOf = (uid) => focusVotes.filter(v => v.update_id === uid);
+const commentsOf = (uid) => focusComments.filter(c => c.update_id === uid).sort((a, b) => a.id - b.id);
+const proposteAperte = (fid) => updOf(fid).filter(u => kindOf(u) === "proposta");
+const giorniDa = (iso) => Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+const apertaDa = (g) => g <= 0 ? "aperta oggi" : g === 1 ? "aperta da 1 giorno" : `aperta da ${g} giorni`;
 function silenceOf(f) {
   const u = updOf(f.id);
   return weeksSince(u.length ? updDate(u[u.length - 1]) : f.created_at);
@@ -1054,6 +1096,7 @@ function renderFocus(main) {
     ${list.length ? `<div class="sub" style="margin:0 4px 12px">${nAttivi} in movimento${nFermi ? ` · ${nFermi} fermi da oltre un mese` : ""}</div>` : ""}
     ${list.length ? list.map(f => {
       const st = focusState(f);
+      const nd = proposteAperte(f.id).length;
       return `<button type="button" class="f-card2" data-focus="${f.id}">
         <span class="row spread" style="width:100%;align-items:flex-start;gap:10px">
           <span class="f-name2">${esc(f.name)}</span>
@@ -1061,7 +1104,7 @@ function renderFocus(main) {
         </span>
         ${f.goal ? `<span class="sub">${esc(f.goal)}</span>` : ""}
         <span class="strip-row">${stripHtml(f, FS_COLOR[st.k])}
-          <span class="fmetric">${esc(silenceText(f))}</span></span>
+          <span class="fmetric">${nd ? `${nd} da decidere` : esc(silenceText(f))}</span></span>
       </button>`;
     }).join("") : `<div class="empty">Nessun focus ancora.<br>Aggiungine uno con “+ Nuovo”.</div>`}`;
 
@@ -1075,7 +1118,10 @@ function renderFocusDetail(main) {
   const f = focusList.find(x => x.id === openFocusId);
   if (!f) { openFocusId = null; return render(); }
   const st = focusState(f);
-  const ups = updOf(f.id).slice().reverse();
+  const tutti = updOf(f.id).slice().reverse();
+  const aperte = tutti.filter(u => kindOf(u) === "proposta");
+  const decise = tutti.filter(u => kindOf(u) === "decisione");
+  const ups = tutti.filter(u => kindOf(u) === "agg");
   const owner = people.find(p => p.id === f.owner_id);
 
   main.innerHTML = `
@@ -1091,10 +1137,19 @@ function renderFocusDetail(main) {
       ${f.outcome ? `<div class="sub" style="margin-top:8px;color:var(--text)">${esc(f.outcome)}</div>` : ""}
       <div class="row" style="margin-top:12px;gap:8px">
         <button class="small" id="add-upd">+ Aggiornamento</button>
+        ${hasProposte ? `<button class="ghost small" id="add-prop">+ Proposta</button>` : ""}
         <button class="ghost small" id="edit-focus">Modifica</button>
       </div>
     </div>
-    <div class="sub" style="margin:14px 4px 8px">${ups.length} aggiornament${ups.length === 1 ? "o" : "i"} · ${esc(silenceText(f))}</div>
+    ${aperte.length ? `
+      <div class="area-head" style="margin-top:22px">
+        <span>Da decidere</span><span class="ac">${aperte.length}</span></div>
+      ${aperte.map(propostaCard).join("")}` : ""}
+    ${decise.length ? `
+      <div class="area-head" style="margin-top:22px">
+        <span>Decisioni prese</span><span class="ac">${decise.length}</span></div>
+      ${decise.map(decisioneCard).join("")}` : ""}
+    <div class="sub" style="margin:22px 4px 8px">${ups.length} aggiornament${ups.length === 1 ? "o" : "i"} · ${esc(silenceText(f))}</div>
     ${ups.length ? `<div class="feed">${ups.map(u => {
       const quando = updDate(u);
       return `<button type="button" class="fitem" data-upd="${u.id}">
@@ -1111,12 +1166,189 @@ function renderFocusDetail(main) {
 
   $("#f-back").onclick = () => { openFocusId = null; render(); };
   $("#add-upd").onclick = () => openUpdForm(f, null);
+  if ($("#add-prop")) $("#add-prop").onclick = () => openPropForm(f, null);
+  $("#edit-focus").onclick = () => openFocusForm(f);
   main.querySelectorAll("[data-upd]").forEach(b => {
     b.onclick = () => openUpdForm(f, focusUpd.find(u => u.id === Number(b.dataset.upd)));
   });
-  $("#edit-focus").onclick = () => openFocusForm(f);
+  const riga = (id) => focusUpd.find(u => String(u.id) === String(id));
+  main.querySelectorAll("[data-editp]").forEach(b => {
+    b.onclick = () => openPropForm(f, riga(b.dataset.editp));
+  });
+  main.querySelectorAll("[data-decidi]").forEach(b => {
+    b.onclick = () => openDecisioneForm(f, riga(b.dataset.decidi));
+  });
+  main.querySelectorAll("[data-riapri]").forEach(b => {
+    b.onclick = () => riapriProposta(riga(b.dataset.riapri));
+  });
+  main.querySelectorAll("[data-vote]").forEach(b => {
+    b.onclick = () => vota(riga(b.dataset.vote), Number(b.dataset.val));
+  });
+  main.querySelectorAll("[data-cadd]").forEach(b => {
+    b.onclick = () => commenta(riga(b.dataset.cadd));
+  });
+  main.querySelectorAll("[data-cin]").forEach(i => {
+    i.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); commenta(riga(i.dataset.cin)); } };
+  });
 }
 
+// Una proposta si vota col nome: si vede subito chi manca all'appello.
+function votiHtml(u, chiuso) {
+  const v = votesOf(u.id);
+  const su = v.filter(x => x.value === 1), giu = v.filter(x => x.value === -1);
+  const mio = v.find(x => x.actor_name === me?.name)?.value || 0;
+  const nomi = (arr) => arr.map(x => x.actor_name).join(", ");
+  return `<div class="votes">
+      <button type="button" class="vote up" data-vote="${u.id}" data-val="1"
+        aria-pressed="${mio === 1}" ${chiuso ? "disabled" : ""}>👍 ${su.length}</button>
+      <button type="button" class="vote down" data-vote="${u.id}" data-val="-1"
+        aria-pressed="${mio === -1}" ${chiuso ? "disabled" : ""}>👎 ${giu.length}</button>
+    </div>
+    ${su.length || giu.length ? `<div class="voters">${
+      su.length ? `👍 ${esc(nomi(su))}` : ""}${su.length && giu.length ? "<br>" : ""}${
+      giu.length ? `👎 ${esc(nomi(giu))}` : ""}</div>` : ""}`;
+}
+
+function commentiHtml(u) {
+  const cs = commentsOf(u.id);
+  return `${cs.map(c => `<div class="reply"><b>${esc(c.actor_name)}</b>
+      <span class="sub">· ${fmtTs(c.created_at)}</span><br>${esc(c.body)}</div>`).join("")}
+    <div class="creply">
+      <input type="text" data-cin="${u.id}" placeholder="Scrivi un commento" autocomplete="off">
+      <button class="ghost small" data-cadd="${u.id}">Invia</button>
+    </div>`;
+}
+
+function propostaCard(u) {
+  return `<div class="pcard prop">
+    <div class="row spread" style="align-items:flex-start;gap:10px">
+      <span class="kind prop">Proposta</span>
+      <span class="sub">${esc(u.actor_name)} · ${apertaDa(giorniDa(u.created_at))}</span>
+    </div>
+    <div class="pbody">${esc(u.body)}</div>
+    ${votiHtml(u, false)}
+    ${commentiHtml(u)}
+    <div class="row" style="margin-top:12px;gap:8px">
+      <button class="small" data-decidi="${u.id}">Decidi</button>
+      <button class="ghost small" data-editp="${u.id}">Modifica</button>
+    </div>
+  </div>`;
+}
+
+function decisioneCard(u) {
+  return `<div class="pcard dec">
+    <div class="row spread" style="align-items:flex-start;gap:10px">
+      <span class="kind dec">Decisione</span>
+      <span class="sub">${esc(u.decided_by || u.actor_name)}${
+        u.decided_at ? ` · ${fmtDate(String(u.decided_at).slice(0, 10))}` : ""}</span>
+    </div>
+    <div class="pbody">${esc(u.body)}</div>
+    ${u.outcome ? `<div class="pesito">${esc(u.outcome)}</div>` : ""}
+    ${votiHtml(u, true)}
+    ${commentiHtml(u)}
+    <div class="row" style="margin-top:12px;gap:8px">
+      <button class="ghost small" data-riapri="${u.id}">↩︎ Riporta a proposta</button>
+    </div>
+  </div>`;
+}
+
+// Un voto si cambia e si ritira: ributtandoci sopra lo stesso pollice sparisce.
+async function vota(u, val) {
+  if (!u) return;
+  const mio = votesOf(u.id).find(v => v.actor_name === me.name);
+  let error = null;
+  if (mio && mio.value === val) ({ error } = await db.from("focus_votes").delete().eq("id", mio.id));
+  else if (mio) ({ error } = await db.from("focus_votes").update({ value: val }).eq("id", mio.id));
+  else ({ error } = await db.from("focus_votes").insert({
+    update_id: u.id, actor_id: me.id, actor_name: me.name, value: val,
+  }));
+  if (error) { toast("Errore nel salvataggio"); return; }
+  await refresh();
+}
+
+async function commenta(u) {
+  if (!u) return;
+  const input = $(`[data-cin="${u.id}"]`);
+  const body = (input?.value || "").trim();
+  if (body.length < 2) { toast("Scrivi il commento"); return; }
+  const { error } = await db.from("focus_comments").insert({
+    update_id: u.id, body, actor_id: me.id, actor_name: me.name,
+  });
+  if (error) { toast("Errore nel salvataggio"); return; }
+  input.value = "";
+  await refresh();
+}
+
+function openPropForm(f, u) {
+  openDialog(u ? "Modifica proposta" : "Proposta", `
+    <p class="sub">${esc(f.name)}</p>
+    <div class="field"><label>Cosa proponi</label>
+      <textarea name="body" rows="3" placeholder="Es. spostiamo il tavolo Mac vicino all'ingresso per due settimane.">${esc(u?.body || "")}</textarea></div>
+    ${u ? `<div class="row-del">
+      <button type="button" class="danger small" id="dlg-del-prop">🗑 Elimina questa proposta</button>
+    </div>` : `<div class="sub" style="margin-top:8px">Si vota col nome, e chiunque può commentarla.</div>`}`,
+    async (fd) => {
+      const body = (fd.get("body") || "").trim();
+      if (body.length < 3) { toast("Scrivi la proposta"); return false; }
+      if (u) {
+        const { error } = await db.from("focus_updates").update({ body }).eq("id", u.id);
+        if (error) { toast("Errore nel salvataggio"); return false; }
+        toast("Proposta corretta");
+      } else {
+        const { error } = await db.from("focus_updates").insert({
+          focus_id: f.id, body, kind: "proposta", actor_id: me.id, actor_name: me.name,
+        });
+        if (error) { toast("Errore nel salvataggio"); return false; }
+        await log(`ha proposto “${body.slice(0, 60)}” su ${f.name}`);
+        toast("Proposta aperta");
+      }
+      await refresh();
+    },
+    (form) => {
+      const del = form.querySelector("#dlg-del-prop");
+      if (del) del.onclick = async () => {
+        if (!confirm("Eliminare la proposta con i suoi voti e commenti?")) return;
+        await db.from("focus_updates").delete().eq("id", u.id);
+        $("#dlg").close();
+        await refresh();
+      };
+    });
+}
+
+// Nessun quorum: decide chi se la sente, quando è il momento.
+function openDecisioneForm(f, u) {
+  if (!u) return;
+  const v = votesOf(u.id);
+  const su = v.filter(x => x.value === 1).length, giu = v.filter(x => x.value === -1).length;
+  openDialog("Decidi", `
+    <p class="sub">${esc(u.body)}</p>
+    <div class="sub" style="margin-top:6px">👍 ${su} · 👎 ${giu}</div>
+    <div class="field" style="margin-top:12px"><label>Cosa abbiamo deciso</label>
+      <textarea name="outcome" rows="3" placeholder="Es. si parte lunedì, riguardiamo tra due settimane."></textarea></div>
+    <div class="sub">Facoltativo. La proposta si chiude comunque, e si può riaprire.</div>`,
+    async (fd) => {
+      const outcome = (fd.get("outcome") || "").trim();
+      const { error } = await db.from("focus_updates").update({
+        kind: "decisione", outcome: outcome || null,
+        decided_at: new Date().toISOString(), decided_by: me.name,
+      }).eq("id", u.id);
+      if (error) { toast("Errore nel salvataggio"); return false; }
+      await log(`ha deciso “${u.body.slice(0, 60)}” su ${f.name}`);
+      toast("Decisione presa");
+      await refresh();
+    });
+}
+
+async function riapriProposta(u) {
+  if (!u) return;
+  if (!confirm("Riportare questa decisione a proposta? Voti e commenti restano.")) return;
+  const { error } = await db.from("focus_updates").update({
+    kind: "proposta", outcome: null, decided_at: null, decided_by: null,
+  }).eq("id", u.id);
+  if (error) { toast("Errore nel salvataggio"); return; }
+  toast("Torna fra le proposte");
+  await refresh();
+}
 function openUpdForm(f, u) {
   openDialog(u ? "Modifica aggiornamento" : "Aggiornamento", `
     <p class="sub">${esc(f.name)}</p>
@@ -1144,9 +1376,18 @@ function openUpdForm(f, u) {
         actor_id: u ? u.actor_id : me.id,
         actor_name: u ? u.actor_name : me.name,
       };
-      const { error } = await db.from("focus_updates").insert(riga);
-      if (error) { toast("Errore nel salvataggio"); return false; }
-      if (u) await db.from("focus_updates").delete().eq("id", u.id);
+      // Con migration-11 la riga si corregge sul posto: l'identità resta,
+      // e con lei voti e commenti se un giorno diventa proposta.
+      if (u && hasProposte) {
+        const { error } = await db.from("focus_updates").update({
+          body, created_at: giornoISO(giorno), ...(hasUpdDate ? { happened_on: giorno } : {}),
+        }).eq("id", u.id);
+        if (error) { toast("Errore nel salvataggio"); return false; }
+      } else {
+        const { error } = await db.from("focus_updates").insert(riga);
+        if (error) { toast("Errore nel salvataggio"); return false; }
+        if (u) await db.from("focus_updates").delete().eq("id", u.id);
+      }
       toast(u ? "Aggiornamento corretto" : "Aggiunto alla scia");
       await refresh();
     },
