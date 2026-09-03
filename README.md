@@ -4,7 +4,9 @@ Web app mobile-first per gestire le attività dello store in team (~12 persone):
 
 - **DD (Daily Download)** — calendario dei prossimi giorni con argomento
   (Business/Support/Product/Creative/Fun); il team gestisce i **Product**:
-  chi prepara, caricato sì/no, chi presenta, presentato sì/no
+  chi prepara, chi lo facilita — con una seconda persona facoltativa, che
+  si aggiunge col **+** — e caricato sì/no. Sotto ogni DD si possono
+  lasciare **commenti**
 - **Focus** — i focus di store con gli aggiornamenti nel tempo. Dentro un
   focus si può aprire una **proposta**: si vota col nome (👍/👎, il voto si
   cambia e si ritira) e si commenta. Non serve un quorum: chiunque la chiude
@@ -32,12 +34,14 @@ Frontend statico (GitHub Pages) + database e login su Supabase (piano gratuito).
 ### 1. Database
 Nel progetto Supabase → **SQL Editor** → incolla il contenuto di
 `supabase-setup.sql` → **Run**, poi le migrazioni in ordine
-(`migration-2.sql` … `migration-11.sql`) allo stesso modo.
+(`migration-2.sql` … `migration-13.sql`) allo stesso modo.
 
 Ogni migrazione si può rieseguire senza danni. L'app si accorge da sola di
 cosa manca e nasconde solo quel pezzo: finché `migration-6.sql` non gira i
 tab dei progetti non compaiono, finché non gira `migration-11.sql` nel Focus
-non c'è il bottone «+ Proposta». Il resto funziona come prima.
+non c'è il bottone «+ Proposta», e senza `migration-12.sql` e
+`migration-13.sql` il DD resta senza seconda persona e senza commenti.
+Il resto funziona come prima.
 `migration-10.sql` è facoltativa.
 
 ### 2. Utente condiviso
