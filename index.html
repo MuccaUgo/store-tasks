@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0f1220">
-<meta name="app-version" content="22">
+<meta name="app-version" content="23">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -374,6 +374,7 @@
   .vote.down[aria-pressed="true"] { background: rgba(211, 63, 73, .14); color: var(--danger); }
   .tally { font-size: .92rem; margin-top: 11px; }
   .voters { font-size: .74rem; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+  .dd-comm { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 4px; }
   .creply { display: flex; gap: 8px; margin-top: 10px; }
   .creply input { flex: 1; min-width: 0; }
   .prompts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
@@ -500,12 +501,16 @@ let projects = [], slots = [], slotPeople = [], projItems = [], debriefs = [], i
 let shiftPoints = [], briefs = [];
 let tab = localStorage.getItem("tab") || "dd";
 let me = JSON.parse(localStorage.getItem("whoami") || "null");
-let openDD = new Set(); // schede DD espanse
+let openDD = new Set();     // schede DD espanse
+let ddSecondo = new Set();  // schede dove il secondo posto è stato aperto col +
 let hasAudience = false; // il tag destinatari appare solo se la colonna esiste
+let hasSecondo = false;  // la seconda persona che facilita: migration-12.sql
+let hasDDComm = false;   // i commenti sotto un DD: migration-13.sql
 let hasProjects = false;   // i tab dei progetti compaiono dopo migration-6.sql
 let pSeg = "turni", openSlot = new Set(); // schede turno espanse
 let tuttiPunti = { good: false, bad: false, demo: false, phrase: false };
 let focusList = [], focusUpd = [], focusVotes = [], focusComments = [];
+let ddComments = [];
 let hasFocus = false;      // il tab Focus si attiva dopo migration-7.sql
 let hasUpdDate = false;    // data e correzione degli aggiornamenti: migration-10.sql
 let hasProposte = false;   // proposte, voti e decisioni: migration-11.sql
@@ -537,6 +542,13 @@ const icsEsc = (s) => (s ?? "").toString()
   .replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
 const icsStamp = () => new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
 
+// Chi facilita può essere in due: i nomi si leggono come li direbbe una persona
+const chiFacilita = (d) => {
+  const nomi = [d.presenter_id, hasSecondo ? d.presenter2_id : null]
+    .filter(Boolean).map(personName);
+  return nomi.length ? nomi.join(" e ") : null;
+};
+
 // Evento .ics per aggiungere il DD al proprio calendario (promemoria ore 9:00)
 function ddToICS(d) {
   const day = d.date.replace(/-/g, "");
@@ -546,7 +558,7 @@ function ddToICS(d) {
   const details = [
     hasAudience ? `Destinatari: ${audienceLabel(d.audience)}` : null,
     d.preparer_id ? `Prepara: ${personName(d.preparer_id)}` : null,
-    d.presenter_id ? `Facilita: ${personName(d.presenter_id)}` : null,
+    chiFacilita(d) ? `Facilita: ${chiFacilita(d)}` : null,
     d.manager ? `Manager presente: ${d.manager}` : null,
     d.notes ? `Note: ${d.notes}` : null,
   ].filter(Boolean).join("\n");
@@ -683,14 +695,18 @@ function enterApp() {
 
 // ── Dati ────────────────────────────────────────────────────
 async function detectSchema() {
-  const [a, p, f, q, k] = await Promise.all([
+  const [a, s2, dc, p, f, q, k] = await Promise.all([
     db.from("downloads").select("audience").limit(1),
+    db.from("downloads").select("presenter2_id").limit(1),
+    db.from("dd_comments").select("id").limit(1),
     db.from("projects").select("id").limit(1),
     db.from("focus").select("id").limit(1),
     db.from("focus_updates").select("happened_on").limit(1),
     db.from("focus_updates").select("kind").limit(1),
   ]);
   hasAudience = !a.error;
+  hasSecondo = !s2.error;
+  hasDDComm = !dc.error;
   hasProjects = !p.error;
   hasFocus = !f.error;
   hasUpdDate = !q.error;
@@ -703,6 +719,7 @@ async function loadAll() {
     ["downloads", db.from("downloads").select("*").order("date")],
     ["log", db.from("activity_log").select("*").order("id", { ascending: false }).limit(80)],
   ];
+  if (hasDDComm) q.push(["ddcomm", db.from("dd_comments").select("*").order("id")]);
   if (hasProjects) q.push(
     ["projects", db.from("projects").select("*").order("position")],
     ["slots", db.from("project_slots").select("*").order("date").order("start_time")],
@@ -727,6 +744,7 @@ async function loadAll() {
   q.forEach((x, i) => d[x[0]] = res[i].data || []);
 
   people = d.people; downloads = d.downloads; logRows = d.log;
+  if (hasDDComm) ddComments = d.ddcomm;
   if (hasProjects) {
     projects = d.projects; slots = d.slots; slotPeople = d.crew; projItems = d.items;
     debriefs = d.debriefs; insights = d.insights; replies = d.replies;
@@ -820,19 +838,22 @@ function render() {
 }
 
 // ── DD (Daily Download) ─────────────────────────────────────
-function personSelect(selected, cls, id) {
-  const opts = people.filter(p => p.active || p.id === selected)
+function personSelect(selected, cls, id, escludi) {
+  const opts = people.filter(p => (p.active || p.id === selected) && (!escludi || p.id !== escludi || p.id === selected))
     .map(p => `<option value="${p.id}" ${p.id === selected ? "selected" : ""}>${esc(p.name)}</option>`).join("");
   return `<select class="${cls}" data-id="${id}">
     <option value="">— nessuno —</option>${opts}</select>`;
 }
+
+const ddCommOf = (id) => ddComments.filter(c => c.download_id === id).sort((a, b) => a.id - b.id);
 
 function ddCard(d) {
   const done = d.uploaded;
   const expanded = openDD.has(d.id);
   const summary = [
     d.preparer_id ? `Prepara: ${personName(d.preparer_id)}` : null,
-    d.presenter_id ? `Facilita: ${personName(d.presenter_id)}` : null,
+    chiFacilita(d) ? `Facilita: ${chiFacilita(d)}` : null,
+    ddCommOf(d.id).length ? `💬 ${ddCommOf(d.id).length}` : null,
   ].filter(Boolean).join(" · ") || "tocca per i dettagli";
   return `<div class="card" data-id="${d.id}">
     <div class="row spread dd-summary" data-dd-toggle="${d.id}">
@@ -849,8 +870,19 @@ function ddCard(d) {
     ${!expanded ? "" : `
     <div class="field"><label>Chi lo prepara</label>${personSelect(d.preparer_id, "sel-preparer", d.id)}</div>
     <div class="field"><label>Chi lo facilita</label>${personSelect(d.presenter_id, "sel-presenter", d.id)}</div>
+    ${!hasSecondo ? "" : (d.presenter2_id || ddSecondo.has(d.id)
+      ? `<div class="field"><label>Insieme a</label>${personSelect(d.presenter2_id, "sel-presenter2", d.id, d.presenter_id)}</div>`
+      : `<button type="button" class="ghost small" data-act="add-second" data-id="${d.id}">+ Una seconda persona</button>`)}
     ${d.manager ? `<div class="manager-line">👤 Manager presente: <strong>${esc(d.manager)}</strong></div>` : ""}
     ${d.notes ? `<div class="manager-line">📝 ${esc(d.notes)}</div>` : ""}
+    ${!hasDDComm ? "" : `<div class="dd-comm">
+      ${ddCommOf(d.id).map(c => `<div class="reply"><b>${esc(c.actor_name)}</b>
+        <span class="sub">· ${fmtTs(c.created_at)}</span><br>${esc(c.body)}</div>`).join("")}
+      <div class="creply">
+        <input type="text" data-ddcin="${d.id}" placeholder="Scrivi un commento" autocomplete="off">
+        <button class="ghost small" data-ddcadd="${d.id}">Invia</button>
+      </div>
+    </div>`}
     <div class="row" style="margin-top:12px">
       <button class="toggle ${d.uploaded ? "on" : ""}" data-act="uploaded" data-id="${d.id}">
         ${d.uploaded ? "✓ Caricato" : "Da caricare"}</button>
@@ -883,6 +915,12 @@ function ddFormFields(d) {
         ${people.filter(p => p.active || p.id === d?.presenter_id).map(p =>
           `<option value="${p.id}" ${p.id === d?.presenter_id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}
       </select></div>
+    ${!hasSecondo ? "" : `
+    <div class="field"><label>Insieme a (facoltativo)</label>
+      <select name="presenter2_id"><option value="">— nessuno —</option>
+        ${people.filter(p => (p.active || p.id === d?.presenter2_id) && p.id !== d?.presenter_id).map(p =>
+          `<option value="${p.id}" ${p.id === d?.presenter2_id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}
+      </select></div>`}
     <div class="field"><label>Manager presente</label>
       <input type="text" name="manager" value="${esc(d?.manager || "")}" placeholder="es. Verdi"></div>
     <div class="field"><label>Note / altri partecipanti</label>
@@ -929,6 +967,7 @@ function renderDD(main) {
         ...(hasAudience ? { audience: fd.get("audience") } : {}),
         preparer_id: fd.get("preparer_id") || null,
         presenter_id: fd.get("presenter_id") || null,
+        ...(hasSecondo ? { presenter2_id: fd.get("presenter2_id") || null } : {}),
         manager: fd.get("manager").trim() || null,
         notes: fd.get("notes").trim() || null,
       };
@@ -952,6 +991,7 @@ function renderDD(main) {
             ...(hasAudience ? { audience: fd.get("audience") } : {}),
             preparer_id: fd.get("preparer_id") || null,
             presenter_id: fd.get("presenter_id") || null,
+            ...(hasSecondo ? { presenter2_id: fd.get("presenter2_id") || null } : {}),
             manager: fd.get("manager").trim() || null,
             notes: fd.get("notes").trim() || null,
             updated_at: new Date().toISOString(),
@@ -973,15 +1013,37 @@ function renderDD(main) {
     };
   });
 
-  main.querySelectorAll(".sel-preparer, .sel-presenter").forEach(sel => {
+  main.querySelectorAll(".sel-preparer, .sel-presenter, .sel-presenter2").forEach(sel => {
     sel.onchange = async () => {
-      const field = sel.classList.contains("sel-preparer") ? "preparer_id" : "presenter_id";
+      const field = sel.classList.contains("sel-preparer") ? "preparer_id"
+        : sel.classList.contains("sel-presenter2") ? "presenter2_id" : "presenter_id";
       const d = downloads.find(x => x.id === sel.dataset.id);
       const val = sel.value || null;
       await db.from("downloads").update({ [field]: val, updated_at: new Date().toISOString() }).eq("id", d.id);
       await log(`ha assegnato ${field === "preparer_id" ? "la preparazione" : "la facilitazione"} di “${ddLabel(d)}” a ${val ? personName(val) : "nessuno"}`);
+      if (field === "presenter2_id" && !val) ddSecondo.delete(d.id);
       await refresh();
     };
+  });
+  main.querySelectorAll("[data-act=add-second]").forEach(b => {
+    b.onclick = () => { ddSecondo.add(b.dataset.id); render(); };
+  });
+  const inviaDDComm = async (id) => {
+    const input = $(`[data-ddcin="${id}"]`);
+    const body = (input?.value || "").trim();
+    if (body.length < 2) { toast("Scrivi il commento"); return; }
+    const { error } = await db.from("dd_comments").insert({
+      download_id: id, body, actor_id: me.id, actor_name: me.name,
+    });
+    if (error) { toast("Errore nel salvataggio"); return; }
+    input.value = "";
+    await refresh();
+  };
+  main.querySelectorAll("[data-ddcadd]").forEach(b => {
+    b.onclick = () => inviaDDComm(b.dataset.ddcadd);
+  });
+  main.querySelectorAll("[data-ddcin]").forEach(i => {
+    i.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); inviaDDComm(i.dataset.ddcin); } };
   });
   main.querySelectorAll("[data-dd-toggle]").forEach(el => {
     el.onclick = () => {
