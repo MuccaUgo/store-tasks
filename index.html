@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0f1220">
-<meta name="app-version" content="23">
+<meta name="app-version" content="24">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -374,6 +374,14 @@
   .vote.down[aria-pressed="true"] { background: rgba(211, 63, 73, .14); color: var(--danger); }
   .tally { font-size: .92rem; margin-top: 11px; }
   .voters { font-size: .74rem; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+  .qr-card { text-align: center; }
+  .qr-card .sub { margin: 6px auto 14px; max-width: 30ch; }
+  /* il codice resta scuro su chiaro anche col tema scuro: serve il contrasto */
+  .qr {
+    width: 200px; max-width: 62%; height: auto; display: block; margin: 0 auto;
+    background: #fff; border-radius: 10px; padding: 8px; box-sizing: content-box;
+  }
+  .qr-url { font-size: .8rem; color: var(--muted); margin-top: 10px; word-break: break-all; }
   .dd-comm { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 4px; }
   .creply { display: flex; gap: 8px; margin-top: 10px; }
   .creply input { flex: 1; min-width: 0; }
@@ -1600,11 +1608,47 @@ function renderTeam(main) {
 }
 
 // ── Storico ─────────────────────────────────────────────────
+// L'indirizzo dell'app non cambia mai: il codice QR è disegnato una volta
+// sola e vive dentro la pagina, senza librerie né immagini da scaricare.
+const APP_URL = "https://muccaugo.github.io/store-tasks/";
+const QR_LATO = 33;
+const QR_PATH = "M2 2h7v1h-7zM11 2h1v1h-1zM13 2h1v1h-1zM15 2h3v1h-3zM20 2h2v1h-2zM24 2h7v1h-7zM2 3h1v1h-1zM8 3h1v1h-1zM10 3h1v1h-1zM12 3h1v1h-1zM17 3h2v1h-2zM21 3h2v1h-2zM24 3h1v1h-1zM30 3h1v1h-1zM2 4h1v1h-1zM4 4h3v1h-3zM8 4h1v1h-1zM13 4h2v1h-2zM17 4h2v1h-2zM20 4h1v1h-1zM24 4h1v1h-1zM26 4h3v1h-3zM30 4h1v1h-1zM2 5h1v1h-1zM4 5h3v1h-3zM8 5h1v1h-1zM12 5h1v1h-1zM14 5h1v1h-1zM16 5h3v1h-3zM21 5h2v1h-2zM24 5h1v1h-1zM26 5h3v1h-3zM30 5h1v1h-1zM2 6h1v1h-1zM4 6h3v1h-3zM8 6h1v1h-1zM10 6h2v1h-2zM13 6h1v1h-1zM17 6h1v1h-1zM19 6h3v1h-3zM24 6h1v1h-1zM26 6h3v1h-3zM30 6h1v1h-1zM2 7h1v1h-1zM8 7h1v1h-1zM11 7h3v1h-3zM17 7h2v1h-2zM20 7h2v1h-2zM24 7h1v1h-1zM30 7h1v1h-1zM2 8h7v1h-7zM10 8h1v1h-1zM12 8h1v1h-1zM14 8h1v1h-1zM16 8h1v1h-1zM18 8h1v1h-1zM20 8h1v1h-1zM22 8h1v1h-1zM24 8h7v1h-7zM13 9h1v1h-1zM15 9h3v1h-3zM19 9h1v1h-1zM21 9h1v1h-1zM2 10h1v1h-1zM4 10h1v1h-1zM6 10h1v1h-1zM8 10h1v1h-1zM11 10h2v1h-2zM14 10h3v1h-3zM18 10h2v1h-2zM21 10h2v1h-2zM26 10h1v1h-1zM29 10h1v1h-1zM4 11h1v1h-1zM6 11h1v1h-1zM10 11h4v1h-4zM18 11h1v1h-1zM22 11h3v1h-3zM27 11h1v1h-1zM30 11h1v1h-1zM4 12h1v1h-1zM6 12h3v1h-3zM10 12h1v1h-1zM13 12h1v1h-1zM15 12h1v1h-1zM18 12h1v1h-1zM20 12h1v1h-1zM22 12h1v1h-1zM24 12h2v1h-2zM28 12h3v1h-3zM2 13h1v1h-1zM5 13h1v1h-1zM9 13h1v1h-1zM12 13h1v1h-1zM15 13h8v1h-8zM25 13h1v1h-1zM29 13h1v1h-1zM3 14h3v1h-3zM7 14h3v1h-3zM12 14h1v1h-1zM14 14h1v1h-1zM16 14h1v1h-1zM19 14h1v1h-1zM23 14h2v1h-2zM27 14h1v1h-1zM29 14h2v1h-2zM2 15h2v1h-2zM7 15h1v1h-1zM9 15h2v1h-2zM12 15h2v1h-2zM15 15h1v1h-1zM18 15h1v1h-1zM22 15h1v1h-1zM24 15h1v1h-1zM27 15h1v1h-1zM30 15h1v1h-1zM4 16h6v1h-6zM12 16h3v1h-3zM16 16h1v1h-1zM19 16h1v1h-1zM23 16h3v1h-3zM27 16h1v1h-1zM29 16h2v1h-2zM5 17h2v1h-2zM10 17h1v1h-1zM12 17h1v1h-1zM14 17h2v1h-2zM17 17h5v1h-5zM25 17h1v1h-1zM27 17h1v1h-1zM29 17h1v1h-1zM3 18h4v1h-4zM8 18h1v1h-1zM10 18h1v1h-1zM12 18h1v1h-1zM14 18h1v1h-1zM16 18h9v1h-9zM27 18h1v1h-1zM29 18h2v1h-2zM3 19h1v1h-1zM5 19h2v1h-2zM12 19h3v1h-3zM22 19h3v1h-3zM27 19h2v1h-2zM30 19h1v1h-1zM2 20h1v1h-1zM4 20h2v1h-2zM8 20h1v1h-1zM10 20h2v1h-2zM14 20h2v1h-2zM19 20h1v1h-1zM23 20h4v1h-4zM29 20h2v1h-2zM3 21h1v1h-1zM5 21h2v1h-2zM9 21h1v1h-1zM11 21h1v1h-1zM13 21h1v1h-1zM17 21h4v1h-4zM22 21h1v1h-1zM24 21h1v1h-1zM27 21h1v1h-1zM29 21h1v1h-1zM2 22h1v1h-1zM4 22h1v1h-1zM7 22h2v1h-2zM10 22h1v1h-1zM12 22h2v1h-2zM18 22h2v1h-2zM22 22h5v1h-5zM10 23h3v1h-3zM14 23h2v1h-2zM18 23h5v1h-5zM26 23h1v1h-1zM28 23h3v1h-3zM2 24h7v1h-7zM12 24h1v1h-1zM16 24h1v1h-1zM18 24h5v1h-5zM24 24h1v1h-1zM26 24h2v1h-2zM29 24h2v1h-2zM2 25h1v1h-1zM8 25h1v1h-1zM12 25h1v1h-1zM14 25h3v1h-3zM19 25h2v1h-2zM22 25h1v1h-1zM26 25h2v1h-2zM30 25h1v1h-1zM2 26h1v1h-1zM4 26h3v1h-3zM8 26h1v1h-1zM10 26h1v1h-1zM13 26h1v1h-1zM16 26h1v1h-1zM19 26h1v1h-1zM22 26h5v1h-5zM29 26h2v1h-2zM2 27h1v1h-1zM4 27h3v1h-3zM8 27h1v1h-1zM14 27h3v1h-3zM18 27h5v1h-5zM26 27h1v1h-1zM28 27h3v1h-3zM2 28h1v1h-1zM4 28h3v1h-3zM8 28h1v1h-1zM10 28h1v1h-1zM12 28h1v1h-1zM15 28h1v1h-1zM21 28h1v1h-1zM25 28h3v1h-3zM30 28h1v1h-1zM2 29h1v1h-1zM8 29h1v1h-1zM11 29h1v1h-1zM13 29h4v1h-4zM18 29h2v1h-2zM21 29h2v1h-2zM24 29h1v1h-1zM29 29h1v1h-1zM2 30h7v1h-7zM10 30h1v1h-1zM15 30h5v1h-5zM22 30h2v1h-2zM25 30h1v1h-1zM29 30h2v1h-2z";
+
 function renderLog(main) {
   const rows = logRows.map(r => `
     <div class="log-item"><strong>${esc(r.actor)}</strong> ${esc(r.action)}
       <div class="sub">${fmtTs(r.created_at)}</div></div>`).join("");
-  main.innerHTML = `<div class="card">${rows || `<div class="empty">Ancora nessuna attività.</div>`}</div>`;
+  main.innerHTML = `
+    <div class="card qr-card">
+      <h3>Porta l'app a qualcun altro</h3>
+      <div class="sub">Fagli inquadrare il codice: si apre in Safari, e da lì
+        “Aggiungi a Home” la mette accanto alle altre app.</div>
+      <svg class="qr" viewBox="0 0 ${QR_LATO} ${QR_LATO}" role="img"
+           aria-label="Codice QR di ${esc(APP_URL)}">
+        <rect width="${QR_LATO}" height="${QR_LATO}" fill="#fff"></rect>
+        <path d="${QR_PATH}" fill="#000"></path>
+      </svg>
+      <div class="qr-url">muccaugo.github.io/store-tasks</div>
+      <div class="row" style="justify-content:center;margin-top:12px">
+        <button class="small" id="qr-share">Condividi il link</button>
+        <button class="ghost small" id="qr-copy">Copia</button>
+      </div>
+    </div>
+    <div class="card">${rows || `<div class="empty">Ancora nessuna attività.</div>`}</div>`;
+
+  $("#qr-share").onclick = async () => {
+    if (navigator.share) {
+      try { await navigator.share({ title: "Store Tasks", url: APP_URL }); return; }
+      catch (e) { if (e.name === "AbortError") return; }
+    }
+    copiaLink();
+  };
+  $("#qr-copy").onclick = () => copiaLink();
+}
+
+async function copiaLink() {
+  try { await navigator.clipboard.writeText(APP_URL); toast("Link copiato"); }
+  catch { toast(APP_URL); }
 }
 
 // ── Progetti ────────────────────────────────────────────────

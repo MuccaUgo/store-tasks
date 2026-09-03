@@ -21,7 +21,8 @@ Web app mobile-first per gestire le attività dello store in team (~12 persone):
   restano come punti del turno, aggiungibili anche dopo. La vista
   **Spunti** raccoglie tutto quanto, più gli spunti liberi
 - **Team** — chi usa l'app
-- **Storico** — registro di chi ha fatto cosa
+- **Storico** — registro di chi ha fatto cosa, con il **codice QR**
+  dell'app da far inquadrare a chi la deve installare
 
 La validazione degli FWE non è più gestita qui: il tab è stato tolto.
 Le tabelle (`fwe`, `competencies`, `fwe_events`) restano nel database, così
