@@ -46,8 +46,10 @@ Ogni giorno si apre col **Brief**: 3 gettoni da mettere tra strategia
 servizi, ma più stress) e **celebration** (più motivazione, meno stress).
 Ognuno nel team ha motivazione (velocità), stress (esperienza del cliente)
 e competenza (errori e attach); con troppo stress il giorno dopo si è in
-malattia. Alcuni clienti lasciano un commento da 1 a 5: 5 vale +1, 4 vale 0,
-da 3 a 1 vale −1, e l'NPS è la somma diviso il numero di commenti. Il Today at Apple per ora è sfondo: chi guarda a
+malattia. Il team parte poco competente e cresce col tempo. Alcuni clienti
+lasciano un commento da 1 a 5: 5 vale +1, 4 vale 0, da 3 a 1 vale −1, e
+l'NPS è la somma diviso il numero di commenti, per 100 (un team formato
+sta intorno a 80, come la media di Piazza Liberty). Il Today at Apple per ora è sfondo: chi guarda a
 volte si ferma lì. A fine giornata c'è il debrief.
 È un file solo, senza dipendenze: si apre com'è, anche da GitHub Pages
 (`…/gioco/`). Non tocca il database.

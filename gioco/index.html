@@ -10,6 +10,7 @@
 <title>Store Liberty</title>
 <style>
   :root {
+    color-scheme: dark;
     --bg: #1b1b22;
     --panel: #26262f;
     --line: #3a3a46;
@@ -80,7 +81,7 @@
   @media (max-width: 760px) {
     .app { grid-template-columns: minmax(0, 1fr); grid-template-areas: "hud" "stage" "side";
       padding: 8px max(12px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); gap: 10px; }
-    .hud { position: sticky; top: 0; z-index: 5; padding: 10px 12px; margin-top: env(safe-area-inset-top);
+    .hud { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; padding: 10px 12px; margin-top: env(safe-area-inset-top);
       box-shadow: 0 6px 12px rgba(0,0,0,.35); }
     .clock { font-size: 20px; }
     .btns button { flex: 1; min-height: 44px; padding: 0; }
@@ -359,10 +360,11 @@ const RATE = { 10: 6, 11: 9, 12: 12, 13: 12, 14: 9, 15: 10, 16: 12, 17: 16, 18: 
 let game;
 
 // Il team resta da un giorno all'altro: motivazione, stress e competenza (0–100)
+// Si parte con un team poco competente, che cresce col tempo
 const PROFILES = {
-  Sara: [70, 30, 75], Francesca: [60, 45, 80], Anna: [55, 30, 60], Valentina: [80, 25, 45],
-  Simone: [50, 40, 65], Luca: [85, 20, 40], Giulia: [65, 35, 80], Marco: [40, 30, 85],
-  Elena: [60, 70, 70], Paolo: [70, 40, 75], Chiara: [55, 55, 85], Davide: [75, 30, 65],
+  Sara: [70, 30, 45], Francesca: [60, 45, 40], Anna: [55, 30, 30], Valentina: [80, 25, 20],
+  Simone: [50, 40, 35], Luca: [85, 20, 20], Giulia: [65, 35, 40], Marco: [40, 30, 50],
+  Elena: [60, 70, 40], Paolo: [70, 40, 40], Chiara: [55, 55, 50], Davide: [75, 30, 30],
 };
 const TEAM = {};
 for (const [name, [mot, stress, comp]] of Object.entries(PROFILES)) TEAM[name] = { mot, stress, comp };
@@ -374,7 +376,7 @@ function overnight(focus = { op: 0 }) {
     if (t.stress > 70 && Math.random() < (t.stress - 70) / 60) t.sick = true;
     t.stress *= 0.7;
     t.mot += (60 - t.mot) * 0.15;
-    t.comp = clamp(t.comp - 0.4 + 0.5 * focus.op);
+    t.comp = clamp(t.comp - 0.2 + 1.0 * focus.op * (1 - t.comp / 120));
   }
 }
 
@@ -558,7 +560,7 @@ function spawnCustomer(kind, extra = {}) {
     x: DOOR.x + rand(-30, 30), y: DOOR.y, path: [], state: 'inLine', t: 0,
     look: { skin: pick(SKIN), hair: pick(HAIR), shirt: pick(SHIRTS), pants: pick(PANTS) },
     facing: 'down', walk: 0, bubble: null, staff: null, slot: null, wait: 0, lineIdx: -1,
-    exp: rand(58, 70), waited: 0, servedBy: null,
+    exp: rand(64, 76), waited: 0, servedBy: null,
     product: kind === 'buy' ? pick(['iphone', 'iphone', 'iphone', 'ipad', 'watch', 'mac', 'mac']) : null,
     ...extra,
   };
@@ -655,9 +657,9 @@ function serve(s, c, weight = 1) {
   const k = care(s) * weight;
   c.exp += k;
   if (k < 0) c.rushed = true;
-  bump(s, 'comp', 0.03);
+  bump(s, 'comp', 0.08 * (1 - s.stats.comp / 120));
   if (Math.random() < errorChance(s) * weight) {
-    c.exp -= 30; c.error = true;
+    c.exp -= 22; c.error = true;
     say(s, 'oops', 2);
     bump(s, 'mot', -3); bump(s, 'stress', 3);
     game.stats.errors++;
@@ -672,7 +674,7 @@ function survey(c) {
   if (c.outcome === 'lost') c.exp = Math.min(c.exp, 30);
   if (Math.random() > (c.outcome === 'lost' ? 0.45 : 0.3)) return;
   const e = c.exp;
-  const score = e >= 80 ? 5 : e >= 65 ? 4 : e >= 50 ? 3 : e >= 35 ? 2 : 1;
+  const score = e >= 72 ? 5 : e >= 58 ? 4 : e >= 45 ? 3 : e >= 32 ? 2 : 1;
   const value = score === 5 ? 1 : score === 4 ? 0 : -1;
   const n = c.servedBy ? c.servedBy.name : null;
   let text;
@@ -692,7 +694,7 @@ function survey(c) {
   }
 }
 const nps = () => game.reviews.length ? game.reviews.reduce((a, r) => a + r.value, 0) / game.reviews.length : null;
-const fmtNps = v => v === null ? '–' : (v > 0 ? '+' : '') + v.toFixed(2).replace('.', ',');
+const fmtNps = v => v === null ? '–' : String(Math.round(v * 100));
 
 function releaseSlot(c) {
   if (c.slot) { c.slot.taken = null; c.slot = null; }
