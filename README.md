@@ -30,6 +30,30 @@ il lavoro fatto non si perde e la sezione si può riaccendere.
 
 Frontend statico (GitHub Pages) + database e login su Supabase (piano gratuito).
 
+### PLGame, il gioco (prototipo)
+In `plgame/index.html` c'è la simulazione in pixel art dello store di
+Piazza Liberty, vista dall'alto. Chi entra dalla porta in alto a destra si
+mette in fila dal **Point** e dice cosa cerca: acquisto (tavoli iPhone,
+iPad/Watch, Mac, dove poi arriva uno Specialist), assistenza (il secondo
+Point, sopra il primo tavolo del Genius Bar, fa il check-in e accompagna al
+posto), accessori (alle pareti, con uno Specialist per lato; chi sa già
+cosa vuole paga alla cassa Express in B1) o solo un'occhiata. I tavoli si
+chiamano A1–A5, B1–B5, C1–C5 contando da destra, e D2–D4 per il Genius Bar
+(i nomi non sono scritti, si vedono toccando il tavolo).
+
+Ogni giorno si apre col **Brief**: 3 gettoni da mettere tra strategia
+**operativa** (meno errori, formazione), **vendita** (più accessori e
+servizi, ma più stress) e **celebration** (più motivazione, meno stress).
+Ognuno nel team ha motivazione (velocità), stress (esperienza del cliente)
+e competenza (errori e attach); con troppo stress il giorno dopo si è in
+malattia. Il team parte poco competente e cresce col tempo. Alcuni clienti
+lasciano un commento da 1 a 5: 5 vale +1, 4 vale 0, da 3 a 1 vale −1, e
+l'NPS è la somma diviso il numero di commenti, per 100 (un team formato
+sta intorno a 80, come la media di Piazza Liberty). Il Today at Apple per ora è sfondo: chi guarda a
+volte si ferma lì. A fine giornata c'è il debrief.
+È un file solo, senza dipendenze: si apre com'è, anche da GitHub Pages
+(`…/plgame/`). Non tocca il database.
+
 ## Setup (una volta sola)
 
 ### 1. Database
