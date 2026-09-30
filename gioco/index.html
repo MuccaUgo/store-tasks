@@ -3,6 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1b1b22">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
 <title>Store Liberty</title>
 <style>
   :root {
@@ -16,21 +20,27 @@
     --bad: #e05a47;
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; background: var(--bg); color: var(--text);
+  html, body { margin: 0; background: var(--bg); color: var(--text); -webkit-text-size-adjust: 100%;
     font: 14px/1.4 ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
-  .app { display: flex; gap: 16px; padding: 16px; justify-content: center; align-items: flex-start; }
-  .stage { position: relative; flex: 0 0 auto; }
+  .app { display: grid; grid-template-columns: auto 320px; grid-template-areas: "stage hud" "stage side";
+    gap: 12px 16px; padding: 16px; justify-content: center; align-items: start; align-content: start; }
+  .hud { grid-area: hud; }
+  .stage { grid-area: stage; position: relative; }
+  .side { grid-area: side; width: 320px; display: flex; flex-direction: column; gap: 12px; }
+  .scroller { border: 2px solid var(--line); border-radius: 4px; background: #000; }
   canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges;
-    height: calc(100vh - 32px); max-height: 1140px; width: auto; aspect-ratio: 288 / 380;
-    border: 2px solid var(--line); border-radius: 4px; background: #000; cursor: pointer; }
-  .side { width: 320px; display: flex; flex-direction: column; gap: 12px; }
+    height: calc(100vh - 36px); max-height: 1140px; width: auto; aspect-ratio: 288 / 380;
+    cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   .box { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px; }
+  .hudTop { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
   .clock { font-size: 22px; font-weight: 700; letter-spacing: 1px; }
   .sub { color: var(--muted); font-size: 12px; }
-  .btns { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  .btns { display: flex; gap: 6px; margin-top: 10px; }
   button { font: inherit; background: #33333f; color: var(--text); border: 1px solid var(--line);
-    border-radius: 4px; padding: 6px 10px; cursor: pointer; }
+    border-radius: 6px; padding: 6px 10px; cursor: pointer; min-height: 36px;
+    touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   button.on { background: var(--accent); border-color: var(--accent); }
+  #zoom, .mini, .tip { display: none; }
   .stats { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; }
   .stats b { text-align: right; }
   h3 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
@@ -41,22 +51,57 @@
   .sw { width: 12px; height: 12px; border-radius: 2px; }
   .info:empty::before { content: "Tocca una persona o un tavolo"; color: var(--muted); font-size: 12px; }
   .overlay { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
-    background: rgba(10,10,14,.7); }
+    background: rgba(10,10,14,.7); z-index: 3; }
   .overlay.show { display: flex; }
-  .card { background: var(--panel); border: 2px solid var(--line); border-radius: 6px; padding: 18px 20px; width: min(320px, 90%); }
+  .card { background: var(--panel); border: 2px solid var(--line); border-radius: 6px; padding: 18px 20px; width: min(320px, 92%);
+    max-height: 96%; overflow: auto; }
   .card h2 { margin: 0 0 4px; font-size: 18px; }
   .card .stats { margin: 12px 0 16px; }
+  .card button { width: 100%; min-height: 44px; }
+
+  /* Telefono: barra fissa in alto, store a tutta larghezza, zoom con trascinamento */
   @media (max-width: 760px) {
-    .app { flex-direction: column; align-items: stretch; padding: 16px; }
-    canvas { width: 100%; height: auto; }
+    .app { grid-template-columns: minmax(0, 1fr); grid-template-areas: "hud" "stage" "side";
+      padding: 8px max(12px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); gap: 10px; }
+    .hud { position: sticky; top: 0; z-index: 5; padding: 10px 12px; margin-top: env(safe-area-inset-top);
+      box-shadow: 0 6px 12px rgba(0,0,0,.35); }
+    .clock { font-size: 20px; }
+    .btns button { flex: 1; min-height: 44px; padding: 0; }
+    #zoom { display: block; min-height: 44px; }
+    .mini { display: block; margin-top: 8px; font-size: 12px; color: var(--muted); }
+    .mini b { color: var(--text); }
+    .scroller { width: 100%; aspect-ratio: 288 / 380; overflow: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+    canvas { width: 100%; height: auto; max-height: none; }
+    .scroller.zoomed canvas { width: 260%; }
+    .tip { position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 2; pointer-events: none;
+      background: rgba(38,38,47,.94); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; font-size: 13px; }
+    .tip:not(:empty) { display: block; }
     .side { width: 100%; }
   }
 </style>
 </head>
 <body>
 <div class="app">
+  <div class="box hud">
+    <div class="hudTop">
+      <div>
+        <div class="clock" id="clock">10:00</div>
+        <div class="sub" id="date"></div>
+      </div>
+      <button id="zoom" aria-pressed="false">Zoom +</button>
+    </div>
+    <div class="btns" id="speed">
+      <button data-s="0" aria-label="Pausa">❚❚</button>
+      <button data-s="1" class="on">1×</button>
+      <button data-s="2">2×</button>
+      <button data-s="4">4×</button>
+      <button data-s="8">8×</button>
+    </div>
+    <div class="mini" id="mini"></div>
+  </div>
   <div class="stage">
-    <canvas id="game" width="288" height="380"></canvas>
+    <div class="scroller" id="scroller"><canvas id="game" width="288" height="380"></canvas></div>
+    <div class="tip" id="tip"></div>
     <div class="overlay" id="debrief">
       <div class="card">
         <h2>Debrief di giornata</h2>
@@ -67,17 +112,6 @@
     </div>
   </div>
   <div class="side">
-    <div class="box">
-      <div class="clock" id="clock">10:00</div>
-      <div class="sub" id="date"></div>
-      <div class="btns" id="speed">
-        <button data-s="0">❚❚</button>
-        <button data-s="1" class="on">1×</button>
-        <button data-s="2">2×</button>
-        <button data-s="4">4×</button>
-        <button data-s="8">8×</button>
-      </div>
-    </div>
     <div class="box">
       <h3>Oggi</h3>
       <div class="stats" id="stats"></div>
@@ -497,6 +531,7 @@ function updateCustomer(c, dt) {
       c.t -= dt;
       if (c.t <= 0) {
         const p = c.point; c.point = null;
+        if (p.post !== EXPRESS) p.served++;
         if (p.post === POINT_GB) { say(p, 'check', 1); checkIn(p, c); }
         else if (p.post === EXPRESS) {
           say(p, 'check', 1); say(c, 'check', 1); p.state = 'idle'; p.customer = null; p.served++;
@@ -1043,8 +1078,15 @@ function updatePanel() {
     ['Fermi al Today', s.today],
     ['Persi', s.lost],
   ]);
+  document.getElementById('mini').innerHTML =
+    `Dentro <b>${inStore}</b> · Vend. <b>${s.sold}</b> · Acc. <b>${s.express + s.wallSales + s.accessories}</b> · Genius <b>${s.genius}</b> · Persi <b>${s.lost}</b>`;
   document.getElementById('log').innerHTML = game.log.slice(0, 10).map(l => `<div><span>${fmt(l.t)}</span>${l.msg}</div>`).join('');
   const e = game.selected, info = document.getElementById('info');
+  updateInfo(e, info);
+  document.getElementById('tip').innerHTML = info.innerHTML;
+}
+
+function updateInfo(e, info) {
   if (e && e.isTable) {
     const t = e.table;
     const here = game.customers.filter(c => (c.slot && c.slot.table === t) || (c.bar && c.bar.table === t)).length;
@@ -1065,7 +1107,7 @@ function updatePanel() {
 canvas.addEventListener('click', ev => {
   const r = canvas.getBoundingClientRect();
   const wx = (ev.clientX - r.left) / r.width * WORLD_W, wy = (ev.clientY - r.top) / r.height * WORLD_H;
-  let best = null, bd = 60;
+  let best = null, bd = Math.max(60, 24 / r.width * WORLD_W);
   for (const e of [...game.staff, ...game.customers]) {
     const d = Math.hypot(e.x - wx, e.y - 20 - wy);
     if (d < bd) { bd = d; best = e; }
@@ -1076,6 +1118,20 @@ canvas.addEventListener('click', ev => {
   }
   game.selected = best;
   updatePanel();
+});
+
+// Zoom (telefono): lo store diventa più grande e si sposta trascinando
+const scroller = document.getElementById('scroller');
+document.getElementById('zoom').addEventListener('click', ev => {
+  const on = scroller.classList.toggle('zoomed');
+  ev.currentTarget.textContent = on ? 'Zoom −' : 'Zoom +';
+  ev.currentTarget.setAttribute('aria-pressed', on);
+  ev.currentTarget.classList.toggle('on', on);
+  if (!on) return;
+  const e = game.selected;
+  const target = e ? (e.isTable ? { x: e.table.x + e.table.w / 2, y: e.table.y + e.table.h / 2 } : e) : { x: WORLD_W / 2, y: 300 };
+  scroller.scrollLeft = target.x / WORLD_W * canvas.clientWidth - scroller.clientWidth / 2;
+  scroller.scrollTop = target.y / WORLD_H * canvas.clientHeight - scroller.clientHeight / 2;
 });
 
 document.getElementById('speed').addEventListener('click', ev => {
