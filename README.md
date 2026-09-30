@@ -30,7 +30,7 @@ il lavoro fatto non si perde e la sezione si può riaccendere.
 
 Frontend statico (GitHub Pages) + database e login su Supabase (piano gratuito).
 
-### Il gioco (prototipo)
+### PLGame, il gioco (prototipo)
 In `gioco/index.html` c'è la simulazione in pixel art dello store di
 Piazza Liberty, vista dall'alto. Chi entra dalla porta in alto a destra si
 mette in fila dal **Point** e dice cosa cerca: acquisto (tavoli iPhone,
