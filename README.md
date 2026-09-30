@@ -30,6 +30,14 @@ il lavoro fatto non si perde e la sezione si può riaccendere.
 
 Frontend statico (GitHub Pages) + database e login su Supabase (piano gratuito).
 
+### Il gioco (prototipo)
+In `gioco/index.html` c'è la simulazione in pixel art dello store di
+Piazza Liberty, vista dall'alto: i clienti entrano dalla porta in alto a
+destra per comprare (tavoli iPhone, iPad/Watch, Mac), per il Genius Bar o
+per il Today at Apple, e il team li segue. A fine giornata c'è il debrief.
+È un file solo, senza dipendenze: si apre com'è, anche da GitHub Pages
+(`…/gioco/`). Non tocca il database.
+
 ## Setup (una volta sola)
 
 ### 1. Database

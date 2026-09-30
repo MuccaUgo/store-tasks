@@ -1,0 +1,926 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Store Liberty</title>
+<style>
+  :root {
+    --bg: #1b1b22;
+    --panel: #26262f;
+    --line: #3a3a46;
+    --text: #ecebe6;
+    --muted: #9a99a3;
+    --accent: #2a6ad8;
+    --good: #57c05e;
+    --bad: #e05a47;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.4 ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  .app { display: flex; gap: 16px; padding: 16px; justify-content: center; align-items: flex-start; }
+  .stage { position: relative; flex: 0 0 auto; }
+  canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges;
+    height: calc(100vh - 32px); max-height: 1140px; width: auto; aspect-ratio: 288 / 380;
+    border: 2px solid var(--line); border-radius: 4px; background: #000; cursor: pointer; }
+  .side { width: 320px; display: flex; flex-direction: column; gap: 12px; }
+  .box { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px; }
+  .clock { font-size: 22px; font-weight: 700; letter-spacing: 1px; }
+  .sub { color: var(--muted); font-size: 12px; }
+  .btns { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  button { font: inherit; background: #33333f; color: var(--text); border: 1px solid var(--line);
+    border-radius: 4px; padding: 6px 10px; cursor: pointer; }
+  button.on { background: var(--accent); border-color: var(--accent); }
+  .stats { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; }
+  .stats b { text-align: right; }
+  h3 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+  .log { max-height: 220px; overflow: hidden; font-size: 12px; }
+  .log div { padding: 2px 0; border-bottom: 1px dashed #33333d; }
+  .log span { color: var(--muted); margin-right: 6px; }
+  .legend { display: grid; grid-template-columns: 14px 1fr; gap: 4px 8px; font-size: 12px; align-items: center; }
+  .sw { width: 12px; height: 12px; border-radius: 2px; }
+  .info:empty::before { content: "Tocca una persona nello store"; color: var(--muted); font-size: 12px; }
+  .overlay { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(10,10,14,.7); }
+  .overlay.show { display: flex; }
+  .card { background: var(--panel); border: 2px solid var(--line); border-radius: 6px; padding: 18px 20px; width: min(320px, 90%); }
+  .card h2 { margin: 0 0 4px; font-size: 18px; }
+  .card .stats { margin: 12px 0 16px; }
+  @media (max-width: 760px) {
+    .app { flex-direction: column; align-items: stretch; padding: 16px; }
+    canvas { width: 100%; height: auto; }
+    .side { width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="stage">
+    <canvas id="game" width="288" height="380"></canvas>
+    <div class="overlay" id="debrief">
+      <div class="card">
+        <h2>Debrief di giornata</h2>
+        <div class="sub" id="dbDate"></div>
+        <div class="stats" id="dbStats"></div>
+        <button class="on" id="nextDay">Apri il giorno dopo</button>
+      </div>
+    </div>
+  </div>
+  <div class="side">
+    <div class="box">
+      <div class="clock" id="clock">10:00</div>
+      <div class="sub" id="date"></div>
+      <div class="btns" id="speed">
+        <button data-s="0">❚❚</button>
+        <button data-s="1" class="on">1×</button>
+        <button data-s="2">2×</button>
+        <button data-s="4">4×</button>
+        <button data-s="8">8×</button>
+      </div>
+    </div>
+    <div class="box">
+      <h3>Oggi</h3>
+      <div class="stats" id="stats"></div>
+    </div>
+    <div class="box">
+      <h3>Selezione</h3>
+      <div class="info" id="info"></div>
+    </div>
+    <div class="box">
+      <h3>Cosa succede</h3>
+      <div class="log" id="log"></div>
+    </div>
+    <div class="box">
+      <h3>Legenda</h3>
+      <div class="legend">
+        <div class="sw" style="background:#2a6ad8"></div><div>Team (maglia blu)</div>
+        <div class="sw" style="background:#e05a47"></div><div>Clienti (colori vari)</div>
+        <div class="sw" style="background:#c9955c"></div><div>Tavoli: iPhone · iPad/Watch · Mac · Genius Bar</div>
+        <div class="sw" style="background:#8a8f99"></div><div>Pareti accessori</div>
+        <div class="sw" style="background:#57c05e"></div><div>Alberi</div>
+        <div class="sw" style="background:#1d1d24;border:1px solid #555"></div><div>Schermo Today at Apple</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ─────────────────────────────────────────────────────────────
+// Motore: canvas 2D a bassa risoluzione, ingrandito "pixelated".
+// Tutta la logica lavora in unità della planimetria (1440×1900),
+// il disegno divide per SCALE: 1 pixel a schermo = 5 unità.
+// Il tempo di gioco è in minuti: a 1× un minuto dura 2 secondi.
+// ─────────────────────────────────────────────────────────────
+const SCALE = 5;
+const WORLD_W = 1440, WORLD_H = 1900;
+const REAL_SEC_PER_MIN = 2;
+const WALK = 300;               // unità per minuto di gioco
+const OPEN = 10 * 60, LAST_ENTRY = 19 * 60 + 45, CLOSE = 20 * 60;
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+
+const rand = (a, b) => a + Math.random() * (b - a);
+const randi = (a, b) => Math.floor(rand(a, b + 1));
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const fmt = m => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(Math.floor(m % 60)).padStart(2, '0');
+
+// ─────────────────────────────────────────────────────────────
+// Planimetria (Piazza Liberty), dalle misure del disegno
+// ─────────────────────────────────────────────────────────────
+const DOOR = { x: 1250, y: 10 };
+const GREET = { x: 1250, y: 150 };
+const WALLS = [
+  { x: 63, y: 96, w: 42, h: 1652 },
+  { x: 1310, y: 96, w: 42, h: 1652 },
+];
+const COLS = [209, 431, 664, 883, 1101];
+const ROWS = [96, 463, 797];
+const ROW_PRODUCTS = [
+  ['iphone', 'iphone', 'iphone', 'iphone', 'iphone'],
+  ['ipad', 'ipad', 'ipad', 'watch', 'watch'],
+  ['mac', 'mac', 'mac', 'mac', 'mac'],
+];
+const PRODUCT_NAME = { iphone: 'iPhone', ipad: 'iPad', watch: 'Apple Watch', mac: 'Mac' };
+
+const TABLES = [];
+ROWS.forEach((y, r) => COLS.forEach((x, c) =>
+  TABLES.push({ x, y, w: 88, h: 227, product: ROW_PRODUCTS[r][c], kind: 'product' })));
+const SUPPORT = [438, 671, 889].map(x => ({ x, y: 1132, w: 88, h: 228, kind: 'support' }));
+const TREES = [];
+[1178, 1351, 1532, 1712].forEach(y => { TREES.push({ x: 275, y, r: 67 }); TREES.push({ x: 1144, y, r: 67 }); });
+const STOOLS = [
+  [526, 1470], [758, 1480], [618, 1533], [851, 1542], [466, 1569], [699, 1578],
+  [561, 1614], [794, 1624], [673, 1677], [473, 1686], [906, 1686],
+].map(([x, y]) => ({ x: x + 26, y: y + 31, taken: null }));
+const SCREEN = { x: 405, y: 1810, w: 588, h: 36 };
+const STAGE = { x: 700, y: 1795 };
+
+// Posti attorno ai tavoli prodotto: cliente accanto al tavolo, dipendente sotto di lui
+const SLOTS = [];
+TABLES.forEach(t => {
+  for (const side of [-1, 1]) {
+    for (const oy of [55, 150]) {
+      const x = side < 0 ? t.x - 24 : t.x + t.w + 24;
+      SLOTS.push({ table: t, x, y: t.y + oy, sx: x, sy: t.y + oy + 34, taken: null });
+    }
+  }
+});
+// Genius Bar: cliente a sinistra del tavolo, Genius a destra
+const BAR = [];
+SUPPORT.forEach(t => {
+  for (const oy of [60, 165]) {
+    BAR.push({ table: t, x: t.x - 20, y: t.y + oy, gx: t.x + t.w + 20, gy: t.y + oy, taken: null, genius: null });
+  }
+});
+// Attesa Genius: corridoi tra alberi e Genius Bar
+const QUEUE = [];
+for (let y = 1150; y <= 1400; y += 50) { QUEUE.push({ x: 370, y, taken: null }); QUEUE.push({ x: 1050, y, taken: null }); }
+// Chi arriva tardi al Today at Apple resta in piedi dietro
+const STANDING = [];
+for (let x = 470; x <= 930; x += 50) STANDING.push({ x, y: 1420, taken: null });
+
+// ─────────────────────────────────────────────────────────────
+// Griglia e A* (celle da 20 unità, ostacoli gonfiati)
+// ─────────────────────────────────────────────────────────────
+const CELL = 20;
+const GW = Math.ceil(WORLD_W / CELL), GH = Math.ceil(WORLD_H / CELL);
+const blocked = new Uint8Array(GW * GH);
+function blockRect(x, y, w, h, pad) {
+  const x0 = Math.max(0, Math.floor((x - pad) / CELL)), x1 = Math.min(GW - 1, Math.floor((x + w + pad) / CELL));
+  const y0 = Math.max(0, Math.floor((y - pad) / CELL)), y1 = Math.min(GH - 1, Math.floor((y + h + pad) / CELL));
+  for (let gy = y0; gy <= y1; gy++) for (let gx = x0; gx <= x1; gx++) blocked[gy * GW + gx] = 1;
+}
+function buildGrid() {
+  // fuori dallo store
+  blockRect(0, 0, 105, WORLD_H, 0);
+  blockRect(1310, 0, WORLD_W - 1310, WORLD_H, 0);
+  blockRect(0, 0, 1180, 60, 0);          // parete in alto, porta a destra
+  blockRect(0, 1880, WORLD_W, 20, 0);
+  WALLS.forEach(w => blockRect(w.x, w.y, w.w, w.h, 8));
+  TABLES.concat(SUPPORT).forEach(t => blockRect(t.x, t.y, t.w, t.h, 8));
+  TREES.forEach(t => blockRect(t.x - t.r, t.y - t.r, t.r * 2, t.r * 2, 0));
+  blockRect(SCREEN.x, SCREEN.y, SCREEN.w, SCREEN.h, 4);
+}
+buildGrid();
+const cellOf = p => ({ gx: Math.min(GW - 1, Math.max(0, Math.floor(p.x / CELL))), gy: Math.min(GH - 1, Math.max(0, Math.floor(p.y / CELL))) });
+const isFree = (gx, gy) => gx >= 0 && gy >= 0 && gx < GW && gy < GH && !blocked[gy * GW + gx];
+function nearestFree(c) {
+  if (isFree(c.gx, c.gy)) return c;
+  for (let r = 1; r < 10; r++)
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++)
+      if (isFree(c.gx + dx, c.gy + dy)) return { gx: c.gx + dx, gy: c.gy + dy };
+  return c;
+}
+function lineFree(a, b) {
+  const steps = Math.ceil(dist(a, b) / (CELL / 2));
+  for (let i = 1; i < steps; i++) {
+    const x = a.x + (b.x - a.x) * i / steps, y = a.y + (b.y - a.y) * i / steps;
+    if (!isFree(Math.floor(x / CELL), Math.floor(y / CELL))) return false;
+  }
+  return true;
+}
+function findPath(from, to) {
+  const s = nearestFree(cellOf(from)), g = nearestFree(cellOf(to));
+  const N = GW * GH, gScore = new Float32Array(N).fill(Infinity), came = new Int32Array(N).fill(-1);
+  const closed = new Uint8Array(N);
+  const si = s.gy * GW + s.gx, gi = g.gy * GW + g.gx;
+  const h = i => { const x = i % GW, y = (i / GW) | 0; const dx = Math.abs(x - g.gx), dy = Math.abs(y - g.gy); return Math.max(dx, dy) + 0.414 * Math.min(dx, dy); };
+  const open = [si]; gScore[si] = 0;
+  const f = new Float32Array(N).fill(Infinity); f[si] = h(si);
+  while (open.length) {
+    let bi = 0;
+    for (let i = 1; i < open.length; i++) if (f[open[i]] < f[open[bi]]) bi = i;
+    const cur = open[bi]; open[bi] = open[open.length - 1]; open.pop();
+    if (cur === gi) break;
+    if (closed[cur]) continue;
+    closed[cur] = 1;
+    const cx = cur % GW, cy = (cur / GW) | 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      if (!dx && !dy) continue;
+      const nx = cx + dx, ny = cy + dy;
+      if (!isFree(nx, ny)) continue;
+      if (dx && dy && (!isFree(cx + dx, cy) || !isFree(cx, cy + dy))) continue;
+      const ni = ny * GW + nx, ng = gScore[cur] + (dx && dy ? 1.414 : 1);
+      if (ng < gScore[ni]) { gScore[ni] = ng; came[ni] = cur; f[ni] = ng + h(ni); open.push(ni); }
+    }
+  }
+  const cells = [];
+  for (let i = gi; i !== -1 && i !== si; i = came[i]) cells.push({ x: (i % GW) * CELL + CELL / 2, y: ((i / GW) | 0) * CELL + CELL / 2 });
+  cells.reverse();
+  cells.push({ x: to.x, y: to.y });
+  // accorcia la strada dove c'è linea libera
+  const out = [];
+  let anchor = from, i = 0;
+  while (i < cells.length) {
+    let j = cells.length - 1;
+    while (j > i && !lineFree(anchor, cells[j])) j--;
+    out.push(cells[j]); anchor = cells[j]; i = j + 1;
+  }
+  return out;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Stato della giornata
+// ─────────────────────────────────────────────────────────────
+const SKIN = ['#f1c7a3', '#e0ac85', '#b97c52', '#7a4b2e'];
+const HAIR = ['#2b1d14', '#6b4226', '#d8b25a', '#141414', '#b8b8b8', '#8b3a1a'];
+const SHIRTS = ['#e05a47', '#f2b134', '#6ab04c', '#9b59b6', '#e67e22', '#95a5a6', '#34495e', '#c0392b', '#1abc9c', '#f5f5f0'];
+const PANTS = ['#2c3e50', '#3b3b44', '#5a4a3a', '#1f2a44'];
+const STAFF_SHIRT = '#2a6ad8';
+
+const WEEKDAYS = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
+const SESSION_TITLES = ['Foto con iPhone', 'Disegno su iPad', 'Musica con GarageBand', 'Video con iPhone', 'Primi passi su Mac'];
+// Gennaio: poca gente. Arrivi l'ora, per ora del giorno.
+const RATE = { 10: 6, 11: 9, 12: 12, 13: 12, 14: 9, 15: 10, 16: 12, 17: 16, 18: 18, 19: 10 };
+
+let game;
+
+function newDay(dayOfMonth) {
+  const date = new Date(2027, 0, dayOfMonth);
+  const weekend = date.getDay() === 0 || date.getDay() === 6;
+  STOOLS.forEach(s => s.taken = null);
+  SLOTS.forEach(s => s.taken = null);
+  BAR.forEach(s => { s.taken = null; s.genius = null; });
+  QUEUE.forEach(s => s.taken = null);
+  STANDING.forEach(s => s.taken = null);
+  game = {
+    day: dayOfMonth, date, weekend,
+    time: OPEN - 2, speed: game ? game.speed : 1,
+    customers: [], staff: [], nextId: 1,
+    spawnAcc: 0, selected: null, over: false,
+    log: [],
+    sessions: [
+      { start: 11 * 60, title: pick(SESSION_TITLES) },
+      { start: 14 * 60 + 30, title: pick(SESSION_TITLES) },
+      { start: 17 * 60 + 30, title: pick(SESSION_TITLES) },
+    ].map(s => ({ ...s, end: s.start + 45, seats: weekend ? randi(6, 11) : randi(3, 7), spawned: 0, state: 'planned' })),
+    stats: { entered: 0, buyers: 0, sold: 0, accessories: 0, lost: 0, browsed: 0, genius: 0, today: 0, waitSum: 0, waitN: 0 },
+  };
+  makeStaff();
+  log(`Si apre: ${WEEKDAYS[date.getDay()]} ${dayOfMonth} gennaio`);
+}
+
+function makeStaff() {
+  const people = [
+    { name: 'Sara', role: 'greeter', home: { x: 1250, y: 210 } },
+    { name: 'Luca', role: 'specialist', zone: 'iphone', home: { x: 360, y: 400 } },
+    { name: 'Giulia', role: 'specialist', zone: 'iphone', home: { x: 1030, y: 400 } },
+    { name: 'Marco', role: 'specialist', zone: 'ipad', home: { x: 580, y: 740 } },
+    { name: 'Elena', role: 'specialist', zone: 'mac', home: { x: 800, y: 1080 } },
+    { name: 'Paolo', role: 'genius', home: { x: 546, y: 1192 } },
+    { name: 'Chiara', role: 'genius', home: { x: 779, y: 1192 } },
+    { name: 'Davide', role: 'creative', home: { x: 1030, y: 1460 } },
+  ];
+  game.staff = people.map((p, i) => ({
+    id: 'S' + i, ...p, isStaff: true,
+    x: p.home.x, y: p.home.y, path: [], state: 'idle', t: rand(2, 6),
+    look: { skin: pick(SKIN), hair: pick(HAIR), shirt: STAFF_SHIRT, pants: '#23232b' },
+    facing: 'down', walk: 0, bubble: null, customer: null, served: 0,
+  }));
+}
+
+function log(msg) {
+  game.log.unshift({ t: game.time, msg });
+  game.log.length = Math.min(game.log.length, 30);
+}
+
+// ─────────────────────────────────────────────────────────────
+// Entità: movimento e fumetti
+// ─────────────────────────────────────────────────────────────
+function goTo(e, target) { e.path = findPath(e, target); e.dest = target; }
+function moveAlong(e, dt) {
+  let budget = WALK * (e.isStaff ? 1.15 : 1) * dt;
+  let moved = false;
+  while (budget > 0 && e.path.length) {
+    const p = e.path[0], d = dist(e, p);
+    if (d <= budget) { e.x = p.x; e.y = p.y; budget -= d; e.path.shift(); }
+    else {
+      const dx = (p.x - e.x) / d, dy = (p.y - e.y) / d;
+      e.x += dx * budget; e.y += dy * budget; budget = 0;
+      e.facing = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+    }
+    moved = true;
+  }
+  if (moved) e.walk += dt * 8;
+  return e.path.length === 0;
+}
+function say(e, icon, mins = 1.5) { e.bubble = { icon, until: game.time + mins }; }
+function face(e, target) {
+  const dx = target.x - e.x, dy = target.y - e.y;
+  e.facing = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+}
+
+// ─────────────────────────────────────────────────────────────
+// Clienti
+// ─────────────────────────────────────────────────────────────
+function spawnCustomer(kind, extra = {}) {
+  const c = {
+    id: game.nextId++, kind, isStaff: false,
+    x: DOOR.x + rand(-30, 30), y: DOOR.y, path: [], state: 'entering', t: 0,
+    look: { skin: pick(SKIN), hair: pick(HAIR), shirt: pick(SHIRTS), pants: pick(PANTS) },
+    facing: 'down', walk: 0, bubble: null, staff: null, slot: null, wait: 0,
+    product: kind === 'buy' ? pick(['iphone', 'iphone', 'iphone', 'ipad', 'watch', 'mac', 'mac']) : null,
+    ...extra,
+  };
+  game.customers.push(c);
+  game.stats.entered++;
+  if (kind === 'buy') game.stats.buyers++;
+  goTo(c, { x: GREET.x + rand(-20, 20), y: GREET.y });
+  return c;
+}
+
+function describe(c) {
+  if (c.kind === 'buy') return `cliente per ${PRODUCT_NAME[c.product]}`;
+  if (c.kind === 'genius') return 'cliente per il Genius Bar';
+  return 'cliente per Today at Apple';
+}
+
+function proceed(c) {
+  if (c.kind === 'buy') {
+    const free = SLOTS.filter(s => !s.taken && s.table.product === c.product);
+    const slot = free.length ? pick(free) : null;
+    if (!slot) { say(c, 'dots'); leave(c, 'browsed'); return; }
+    slot.taken = c; c.slot = slot;
+    c.state = 'toTable'; goTo(c, slot);
+  } else if (c.kind === 'genius') {
+    const q = QUEUE.find(s => !s.taken);
+    if (!q) { leave(c, 'lost'); return; }
+    q.taken = c; c.slot = q; c.state = 'toQueue'; goTo(c, q);
+  } else {
+    const seat = STOOLS.find(s => !s.taken) || STANDING.find(s => !s.taken);
+    if (!seat) { leave(c, 'browsed'); return; }
+    seat.taken = c; c.slot = seat; c.state = 'toSession'; goTo(c, seat);
+  }
+}
+
+function releaseSlot(c) {
+  if (c.slot) { c.slot.taken = null; c.slot = null; }
+  if (c.bar) { c.bar.taken = null; c.bar = null; }
+}
+
+function leave(c, outcome) {
+  releaseSlot(c);
+  c.outcome = outcome;
+  const s = game.stats;
+  if (outcome === 'lost') { s.lost++; say(c, 'cross', 3); log(`Un ${describe(c)} se ne va: nessuno l'ha seguito`); }
+  else if (outcome === 'browsed') { s.browsed++; if (!c.bubble) say(c, 'meh', 2); }
+  else say(c, 'heart', 3);
+  if (c.staff) { c.staff.customer = null; c.staff = null; }
+  c.state = 'leaving';
+  goTo(c, { x: DOOR.x + rand(-30, 30), y: DOOR.y - 20 });
+}
+
+function updateCustomer(c, dt) {
+  const arrived = moveAlong(c, dt);
+  switch (c.state) {
+    case 'entering':
+      if (arrived) {
+        const greeter = game.staff.find(s => s.role === 'greeter');
+        if (greeter.state === 'idle' && dist(greeter, c) < 180) {
+          greeter.state = 'greeting'; greeter.t = 1; greeter.customer = c;
+          face(greeter, c); face(c, greeter);
+          say(greeter, 'hi', 1); say(c, c.kind === 'buy' ? c.product : c.kind === 'genius' ? 'wrench' : 'star', 1);
+          c.state = 'greeted'; c.t = 1;
+        } else proceed(c);
+      }
+      break;
+    case 'greeted':
+      c.t -= dt;
+      if (c.t <= 0) proceed(c);
+      break;
+    case 'toTable':
+      if (arrived) { c.state = 'waiting'; c.patience = rand(5, 12); c.wait = 0; c.facing = c.slot.x < c.slot.table.x ? 'right' : 'left'; say(c, 'question', 2); }
+      break;
+    case 'waiting':
+      c.wait += dt; c.patience -= dt;
+      if (c.patience <= 0) leave(c, 'lost');
+      else if (!c.bubble && Math.random() < dt * 0.25) say(c, 'question', 1.5);
+      break;
+    case 'toQueue':
+      if (arrived) { c.state = 'queued'; c.wait = 0; say(c, 'wrench', 2); }
+      break;
+    case 'queued':
+      c.wait += dt;
+      if (c.wait > 35) { log('Un cliente Genius se ne va dopo 35 minuti di attesa'); leave(c, 'lost'); }
+      break;
+    case 'toBar':
+      if (arrived) { c.state = 'atBar'; c.facing = 'right'; }
+      break;
+    case 'toSession':
+      if (arrived) { c.state = 'seated'; c.facing = 'down'; }
+      break;
+  }
+  if (c.state === 'leaving' && arrived) c.gone = true;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Team
+// ─────────────────────────────────────────────────────────────
+const canSell = s => s.role === 'specialist' || (s.role === 'creative' && !sessionSoon(20));
+function sessionSoon(mins) {
+  return game.sessions.some(x => x.state !== 'done' && x.start - game.time < mins && game.time < x.end);
+}
+
+function wander(s) {
+  const zoneTables = s.zone ? TABLES.filter(t => t.product === s.zone || (s.zone === 'ipad' && t.product === 'watch')) : null;
+  if (s.role === 'specialist' && zoneTables) {
+    const t = pick(zoneTables);
+    goTo(s, { x: t.x + (Math.random() < 0.5 ? -40 : t.w + 40), y: t.y + t.h + 40 });
+  } else goTo(s, { x: s.home.x + rand(-40, 40), y: s.home.y + rand(-20, 20) });
+}
+
+function dispatch() {
+  // vendita: chi aspetta da più tempo viene servito per primo, dal più vicino libero
+  const waiting = game.customers.filter(c => c.state === 'waiting' && !c.staff).sort((a, b) => b.wait - a.wait);
+  for (const c of waiting) {
+    const free = game.staff.filter(s => canSell(s) && s.state === 'idle' || canSell(s) && s.state === 'wander');
+    if (!free.length) break;
+    free.sort((a, b) => dist(a, c) - dist(b, c));
+    const s = free[0];
+    s.customer = c; c.staff = s; s.state = 'toCustomer';
+    goTo(s, { x: c.slot.sx, y: c.slot.sy });
+    game.stats.waitSum += c.wait; game.stats.waitN++;
+  }
+  // Genius Bar: coda in ordine d'arrivo
+  const queued = game.customers.filter(c => c.state === 'queued').sort((a, b) => b.wait - a.wait);
+  for (const c of queued) {
+    const g = game.staff.find(s => s.role === 'genius' && (s.state === 'idle' || s.state === 'wander'));
+    const bar = BAR.find(b => !b.taken);
+    if (!g || !bar) break;
+    releaseSlot(c);
+    bar.taken = c; bar.genius = g; c.bar = bar; c.staff = g; g.customer = c;
+    c.state = 'toBar'; goTo(c, bar);
+    g.state = 'toBar'; goTo(g, { x: bar.gx, y: bar.gy });
+    say(g, 'hi', 1);
+  }
+}
+
+function updateStaff(s, dt) {
+  const arrived = moveAlong(s, dt);
+  const c = s.customer;
+  switch (s.state) {
+    case 'idle':
+      s.t -= dt;
+      if (s.t <= 0) { s.state = 'wander'; wander(s); }
+      break;
+    case 'wander':
+      if (arrived) { s.state = 'idle'; s.t = rand(3, 9); }
+      break;
+    case 'greeting':
+      s.t -= dt;
+      if (s.t <= 0) { s.customer = null; s.state = 'idle'; s.t = rand(1, 3); goTo(s, s.home); }
+      break;
+    case 'toCustomer':
+      if (!c || c.state !== 'waiting') { s.customer = null; s.state = 'idle'; s.t = 1; break; }
+      if (arrived) {
+        s.state = 'probe'; s.t = rand(2, 4); c.state = 'served';
+        face(s, c); say(s, 'question', s.t); say(c, 'dots', s.t);
+        log(`${s.name} accoglie un ${describe(c)} e fa domande`);
+      }
+      break;
+    case 'probe':
+      s.t -= dt;
+      if (s.t <= 0) { s.state = 'demo'; s.t = rand(4, 9); say(s, c.product, s.t); say(c, 'dots', s.t); }
+      break;
+    case 'demo':
+      s.t -= dt;
+      if (s.t <= 0) {
+        // Più ha aspettato, meno compra
+        const p = 0.55 - Math.min(0.3, c.wait * 0.03);
+        if (Math.random() < p) {
+          s.state = 'checkout'; s.t = rand(2, 4); c.bought = true;
+          say(s, 'check', s.t); say(c, 'check', s.t);
+        } else {
+          log(`Il cliente di ${s.name} ci pensa ancora`);
+          finishSale(s, c, false);
+        }
+      }
+      break;
+    case 'checkout':
+      s.t -= dt;
+      if (s.t <= 0) {
+        if (!c.accTried && Math.random() < 0.4) {
+          c.accTried = true; s.t = rand(1.5, 3); say(s, 'bag', s.t);
+          c.accessory = Math.random() < 0.6;
+        } else finishSale(s, c, true);
+      }
+      break;
+    case 'toBar':
+      if (arrived && c && c.state === 'atBar') {
+        s.state = 'repair'; s.t = rand(15, 30); s.facing = 'left';
+        say(s, 'wrench', 3); say(c, 'dots', 3);
+        log(`${s.name} prende un cliente al Genius Bar`);
+      }
+      break;
+    case 'repair':
+      s.t -= dt;
+      if (Math.random() < dt * 0.15) say(s, pick(['wrench', 'dots', 'question']), 1.5);
+      if (s.t <= 0) {
+        game.stats.genius++; s.served++;
+        const bar = c.bar;
+        if (bar) bar.genius = null;
+        log(`${s.name} risolve al Genius Bar`);
+        leave(c, 'fixed');
+        s.state = 'idle'; s.t = rand(1, 3); goTo(s, s.home);
+      }
+      break;
+    case 'toStage':
+      if (arrived) { s.state = 'onStage'; s.facing = 'up'; }
+      break;
+    case 'presenting':
+      if (Math.random() < dt * 0.3) say(s, pick(['star', 'iphone', 'ipad', 'hi']), 1.5);
+      break;
+  }
+}
+
+function finishSale(s, c, bought) {
+  const st = game.stats;
+  s.served++;
+  if (bought) {
+    st.sold++;
+    if (c.accessory) st.accessories++;
+    log(`${s.name} vende ${PRODUCT_NAME[c.product]}${c.accessory ? ' + accessorio' : ''}`);
+    leave(c, 'bought');
+  } else leave(c, 'browsed');
+  s.customer = null; s.state = 'idle'; s.t = rand(1, 3);
+}
+
+// ─────────────────────────────────────────────────────────────
+// Today at Apple
+// ─────────────────────────────────────────────────────────────
+function updateSessions() {
+  const creative = game.staff.find(s => s.role === 'creative');
+  for (const ses of game.sessions) {
+    const t = game.time;
+    if (ses.state === 'planned' && t >= ses.start - 25) {
+      ses.state = 'arriving';
+      log(`Today at Apple alle ${fmt(ses.start)}: «${ses.title}»`);
+    }
+    if (ses.state === 'arriving') {
+      // i partecipanti arrivano sparsi tra -25 e +5 minuti
+      const due = Math.floor(ses.seats * Math.min(1, (t - (ses.start - 25)) / 30));
+      while (ses.spawned < due) { ses.spawned++; spawnCustomer('today', { session: ses }); }
+      if (t >= ses.start - 8 && creative.state !== 'toStage' && creative.state !== 'onStage' && !creative.customer) {
+        creative.state = 'toStage'; goTo(creative, STAGE);
+      }
+      if (t >= ses.start && (creative.state === 'onStage' || creative.state === 'toStage')) {
+        ses.state = 'live'; creative.state = 'presenting'; creative.facing = 'up';
+        game.stats.today += game.customers.filter(c => c.session === ses && !c.gone).length;
+        log(`${creative.name} inizia «${ses.title}»`);
+      }
+    }
+    if (ses.state === 'live' && t >= ses.end) {
+      ses.state = 'done';
+      game.customers.filter(c => c.session === ses && c.state !== 'leaving').forEach(c => leave(c, 'session'));
+      creative.state = 'idle'; creative.t = rand(2, 4); goTo(creative, creative.home);
+      log(`Fine sessione: ${creative.name} saluta i partecipanti`);
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Arrivi e ciclo della giornata
+// ─────────────────────────────────────────────────────────────
+function spawnArrivals(dt) {
+  if (game.time < OPEN || game.time >= LAST_ENTRY) return;
+  const perHour = (RATE[Math.floor(game.time / 60)] || 6) * (game.weekend ? 1.8 : 1);
+  game.spawnAcc += perHour / 60 * dt;
+  while (game.spawnAcc >= 1) {
+    game.spawnAcc -= 1 + rand(-0.4, 0.4);
+    spawnCustomer(Math.random() < 0.65 ? 'buy' : 'genius');
+  }
+}
+
+function step(dt) {
+  if (game.over) return;
+  const before = game.time;
+  game.time += dt;
+  if (before < OPEN && game.time >= OPEN) log('Porte aperte');
+  spawnArrivals(dt);
+  updateSessions();
+  dispatch();
+  game.customers.forEach(c => updateCustomer(c, dt));
+  game.staff.forEach(s => updateStaff(s, dt));
+  game.customers = game.customers.filter(c => !c.gone);
+  [...game.customers, ...game.staff].forEach(e => { if (e.bubble && game.time > e.bubble.until) e.bubble = null; });
+
+  if (before < CLOSE && game.time >= CLOSE) {
+    log('Chiusura: si finisce con chi è dentro');
+    game.customers.filter(c => c.state === 'waiting' || c.state === 'queued').forEach(c => leave(c, 'browsed'));
+  }
+  if (game.time >= CLOSE && game.customers.length === 0) endDay();
+}
+
+function endDay() {
+  game.over = true;
+  const s = game.stats;
+  document.getElementById('dbDate').textContent = `${WEEKDAYS[game.date.getDay()]} ${game.day} gennaio`;
+  document.getElementById('dbStats').innerHTML = rows([
+    ['Clienti entrati', s.entered],
+    ['Vendite', s.sold],
+    ['Conversion', s.buyers ? Math.round(s.sold / s.buyers * 100) + '%' : '–'],
+    ['Con accessorio', s.accessories],
+    ['Risolti al Genius Bar', s.genius],
+    ['Today at Apple', s.today + ' persone'],
+    ['Persi senza essere seguiti', s.lost],
+    ['Attesa media', s.waitN ? (s.waitSum / s.waitN).toFixed(1) + ' min' : '–'],
+  ]);
+  document.getElementById('debrief').classList.add('show');
+}
+
+// ─────────────────────────────────────────────────────────────
+// Disegno
+// ─────────────────────────────────────────────────────────────
+const px = v => Math.round(v / SCALE);
+function rect(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); }
+function wrect(x, y, w, h, c) { rect(px(x), px(y), Math.max(1, px(x + w) - px(x)), Math.max(1, px(y + h) - px(y)), c); }
+
+const ICON_COLORS = { k: '#1d1d24', r: '#e0453a', g: '#3aa655', y: '#f2b134', b: '#4aa3ff', w: '#ffffff', p: '#e36bb5' };
+const ICONS = {
+  question: ['.kkk.', '....k', '..kk.', '.....', '..k..'],
+  dots:     ['.....', '.....', 'k.k.k', '.....', '.....'],
+  heart:    ['.r.r.', 'rrrrr', 'rrrrr', '.rrr.', '..r..'],
+  cross:    ['r...r', '.r.r.', '..r..', '.r.r.', 'r...r'],
+  meh:      ['.....', 'kk.kk', '.....', 'kkkkk', '.....'],
+  check:    ['....g', '...gg', 'g.gg.', 'ggg..', '.g...'],
+  bag:      ['.k.k.', '.k.k.', 'yyyyy', 'yyyyy', 'yyyyy'],
+  wrench:   ['k.k..', 'kkk..', '.kk..', '..kk.', '...kk'],
+  star:     ['..y..', '.yyy.', 'yyyyy', '.yyy.', 'y...y'],
+  hi:       ['y.y.y', 'y.y.y', 'yyyyy', 'yyyyy', '.yyy.'],
+  iphone:   ['.kkk.', '.kbk.', '.kbk.', '.kbk.', '.kkk.'],
+  ipad:     ['kkkkk', 'kbbbk', 'kbbbk', 'kbbbk', 'kkkkk'],
+  watch:    ['.kkk.', 'kpppk', 'kpppk', 'kpppk', '.kkk.'],
+  mac:      ['kkkkk', 'kbbbk', 'kbbbk', 'kkkkk', 'k...k'],
+};
+function drawIcon(name, x, y) {
+  const rows = ICONS[name]; if (!rows) return;
+  rows.forEach((r, j) => [...r].forEach((ch, i) => { if (ch !== '.') rect(x + i, y + j, 1, 1, ICON_COLORS[ch]); }));
+}
+
+// Omino 5×8 visto da sopra/di tre quarti
+function drawPerson(e) {
+  const x = px(e.x) - 2, seated = e.state === 'seated';
+  const y = px(e.y) - 8 + (seated ? 2 : 0);
+  const L = e.look, moving = e.path.length > 0, frame = moving ? Math.floor(e.walk) % 2 : -1;
+  rect(x, y + 7 + (seated ? -2 : 0), 5, 1, 'rgba(0,0,0,0.18)');           // ombra
+  rect(x + 1, y, 3, 1, L.hair);
+  rect(x, y + 1, 5, 1, L.hair);
+  if (e.facing === 'up') rect(x, y + 2, 5, 1, L.hair);
+  else if (e.facing === 'left') { rect(x, y + 2, 3, 1, L.skin); rect(x + 3, y + 2, 2, 1, L.hair); }
+  else if (e.facing === 'right') { rect(x, y + 2, 2, 1, L.hair); rect(x + 2, y + 2, 3, 1, L.skin); }
+  else { rect(x, y + 2, 1, 1, L.hair); rect(x + 1, y + 2, 3, 1, L.skin); rect(x + 4, y + 2, 1, 1, L.hair); }
+  rect(x + 1, y + 3, 3, 1, L.skin);
+  rect(x, y + 4, 5, 2, L.shirt);
+  // braccia che oscillano camminando
+  const armL = frame === 0 ? 1 : 0, armR = frame === 1 ? 1 : 0;
+  rect(x, y + 5 - armL, 1, 1, L.skin); rect(x + 4, y + 5 - armR, 1, 1, L.skin);
+  if (!seated) {
+    rect(x + 1, y + 6, 3, 1, L.pants);
+    if (frame === -1) { rect(x + 1, y + 7, 1, 1, L.pants); rect(x + 3, y + 7, 1, 1, L.pants); }
+    else rect(x + (frame ? 3 : 1), y + 7, 1, 1, L.pants);
+  }
+  if (e.isStaff) rect(x + 2, y + 4, 1, 1, '#ffffff');                      // badge
+  if (game.selected === e) {
+    rect(x - 1, y - 3, 7, 1, '#ffe14d');
+    rect(x + 2, y - 2, 1, 1, '#ffe14d');
+  }
+  if (e.bubble) {
+    const bx = x - 1, by = y - 10;
+    rect(bx, by, 7, 7, '#1d1d24');
+    rect(bx + 1, by + 1, 5, 5, '#ffffff');
+    rect(bx + 3, by + 7, 1, 1, '#1d1d24');
+    drawIcon(e.bubble.icon, bx + 1, by + 1);
+  }
+}
+
+function drawTable(t) {
+  const x = px(t.x), y = px(t.y), w = px(t.x + t.w) - x, h = px(t.y + t.h) - y;
+  rect(x + 1, y + 1, w, h, 'rgba(0,0,0,0.2)');
+  rect(x, y, w, h, '#c9955c');
+  rect(x, y, w, 1, '#dcaa6e');
+  rect(x, y + h - 1, w, 1, '#a8773f');
+  if (t.kind === 'support') {
+    rect(x + 3, y + 3, w - 6, 1, '#a8773f');
+    for (let i = 0; i < 2; i++) { rect(x + 3, y + 10 + i * 21, 5, 4, '#bfc3c9'); rect(x + 4, y + 11 + i * 21, 3, 2, '#1d1d24'); }
+    return;
+  }
+  const p = t.product;
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 2; c++) {
+    const ix = x + 3 + c * 8, iy = y + 4 + r * 10;
+    if (p === 'iphone') { rect(ix + 1, iy, 3, 5, '#1d1d24'); rect(ix + 2, iy + 1, 1, 3, pick4(r, c)); }
+    else if (p === 'ipad') { rect(ix, iy, 6, 7, '#1d1d24'); rect(ix + 1, iy + 1, 4, 5, pick4(r, c)); }
+    else if (p === 'watch') { rect(ix + 1, iy + 1, 3, 3, '#1d1d24'); rect(ix + 2, iy + 2, 1, 1, '#e36bb5'); rect(ix + 2, iy, 1, 5, '#555'); }
+    else { rect(ix, iy, 6, 4, '#bfc3c9'); rect(ix + 1, iy + 1, 4, 2, pick4(r, c)); rect(ix - 1, iy + 4, 8, 2, '#9ea3aa'); }
+  }
+}
+const SCREEN_COLORS = ['#4aa3ff', '#6ad0c7', '#f2b134', '#e36bb5', '#8e7cf0'];
+const pick4 = (r, c) => SCREEN_COLORS[(r * 2 + c) % SCREEN_COLORS.length];
+
+function drawWall(w) {
+  const x = px(w.x), y = px(w.y), ww = px(w.x + w.w) - x, h = px(w.y + w.h) - y;
+  rect(x, y, ww, h, '#8a8f99');
+  rect(x, y, ww, 1, '#a4a9b2');
+  const cols = ['#e05a47', '#f5f5f0', '#4aa3ff', '#1d1d24', '#f2b134', '#6ab04c', '#e36bb5'];
+  for (let j = 3; j < h - 3; j += 4) for (let i = 1; i < ww - 1; i += 3) rect(x + i, y + j, 2, 2, cols[(i * 7 + j * 3) % cols.length]);
+}
+
+function drawTree(t) {
+  const cx = px(t.x), cy = px(t.y), r = Math.round(t.r / SCALE);
+  for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    const d = dx * dx + dy * dy;
+    if (d > r * r) continue;
+    let c = '#3f9e4d';
+    if (d > (r - 2) * (r - 2)) c = '#2e7a3a';
+    else if ((dx * 3 + dy * 5 + 40) % 7 === 0) c = '#57c05e';
+    else if (dx < -2 && dy < -2 && d < (r - 5) * (r - 5)) c = '#57c05e';
+    rect(cx + dx, cy + dy, 1, 1, c);
+  }
+}
+
+let floorCache = null;
+function drawFloor() {
+  if (!floorCache) {
+    floorCache = document.createElement('canvas');
+    floorCache.width = canvas.width; floorCache.height = canvas.height;
+    const f = floorCache.getContext('2d');
+    f.fillStyle = '#23232b'; f.fillRect(0, 0, canvas.width, canvas.height);
+    f.fillStyle = '#e6e1d6'; f.fillRect(px(105), px(60), px(1310) - px(105), px(1880) - px(60));
+    f.fillStyle = '#ddd7ca';
+    for (let y = px(60); y < px(1880); y += 12) f.fillRect(px(105), y, px(1310) - px(105), 1);
+    for (let x = px(105); x < px(1310); x += 24) f.fillRect(x, px(60), 1, px(1880) - px(60));
+    // porta in alto a destra
+    f.fillStyle = '#e6e1d6'; f.fillRect(px(1189), 0, px(1305) - px(1189), px(60));
+    f.fillStyle = '#9fd0f5'; f.fillRect(px(1189), px(52), px(1305) - px(1189), 1);
+    f.fillStyle = '#e6e1d6';
+  }
+  ctx.drawImage(floorCache, 0, 0);
+}
+
+function drawScreen() {
+  const s = SCREEN, x = px(s.x), y = px(s.y), w = px(s.x + s.w) - x, h = px(s.y + s.h) - y;
+  rect(x - 1, y - 1, w + 2, h + 2, '#0c0c10');
+  const live = game.sessions.some(z => z.state === 'live');
+  if (!live) { rect(x, y, w, h, '#1d1d24'); rect(x + w / 2 - 2, y + 2, 4, 3, '#3a3a46'); return; }
+  const t = Math.floor(game.time * 4);
+  for (let i = 0; i < w; i += 4) rect(x + i, y, 4, h, SCREEN_COLORS[(Math.floor(i / 4) + t) % SCREEN_COLORS.length]);
+}
+
+function drawStool(s) {
+  const x = px(s.x) - 5, y = px(s.y) - 6;
+  rect(x + 1, y + 1, 11, 12, 'rgba(0,0,0,0.15)');
+  rect(x, y, 11, 12, '#c9955c');
+  rect(x, y, 11, 1, '#dcaa6e');
+  rect(x, y + 11, 11, 1, '#a8773f');
+}
+
+function render() {
+  drawFloor();
+  WALLS.forEach(drawWall);
+  TABLES.forEach(drawTable);
+  SUPPORT.forEach(drawTable);
+  STOOLS.forEach(drawStool);
+  drawScreen();
+  // persone e alberi ordinati per profondità
+  const drawables = [
+    ...TREES.map(t => ({ y: t.y, draw: () => drawTree(t) })),
+    ...game.customers.map(c => ({ y: c.y, draw: () => drawPerson(c) })),
+    ...game.staff.map(s => ({ y: s.y, draw: () => drawPerson(s) })),
+  ].sort((a, b) => a.y - b.y);
+  drawables.forEach(d => d.draw());
+  // fuori orario si abbassano le luci
+  if (game.time < OPEN || game.time > CLOSE) rect(0, 0, canvas.width, canvas.height, 'rgba(10,10,30,0.25)');
+}
+
+// ─────────────────────────────────────────────────────────────
+// Pannello laterale
+// ─────────────────────────────────────────────────────────────
+const rows = list => list.map(([k, v]) => `<span>${k}</span><b>${v}</b>`).join('');
+const STATE_LABEL = {
+  entering: 'entra', greeted: 'accolto all\'ingresso', toTable: 'va al tavolo', waiting: 'aspetta qualcuno',
+  served: 'viene seguito', toQueue: 'va in attesa', queued: 'in coda per il Genius Bar', toBar: 'va al Genius Bar',
+  atBar: 'al Genius Bar', toSession: 'va al Today at Apple', seated: 'segue la sessione', leaving: 'esce',
+  idle: 'libero', wander: 'gira nella sua zona', greeting: 'accoglie', toCustomer: 'va da un cliente',
+  probe: 'fa domande', demo: 'fa la demo', checkout: 'chiude la vendita', repair: 'ripara',
+  toStage: 'va allo schermo', onStage: 'prepara la sessione', presenting: 'tiene la sessione',
+};
+const ROLE_LABEL = { greeter: 'Accoglienza', specialist: 'Specialist', genius: 'Genius', creative: 'Creative' };
+
+let lastPanel = 0;
+function updatePanel() {
+  document.getElementById('clock').textContent = fmt(Math.max(OPEN - 2, game.time));
+  const open = game.time >= OPEN && game.time < CLOSE;
+  document.getElementById('date').textContent =
+    `${WEEKDAYS[game.date.getDay()]} ${game.day} gennaio · ${open ? 'aperto' : game.time < OPEN ? 'in apertura' : 'chiuso'}`;
+  const s = game.stats, inStore = game.customers.length;
+  const waiting = game.customers.filter(c => c.state === 'waiting').length;
+  const queue = game.customers.filter(c => c.state === 'queued').length;
+  document.getElementById('stats').innerHTML = rows([
+    ['Clienti nello store', inStore],
+    ['Aspettano qualcuno', waiting],
+    ['In coda Genius', queue],
+    ['Entrati oggi', s.entered],
+    ['Vendite', s.sold + (s.accessories ? ` <small>(+${s.accessories} acc.)</small>` : '')],
+    ['Genius risolti', s.genius],
+    ['Today at Apple', s.today],
+    ['Persi', s.lost],
+  ]);
+  document.getElementById('log').innerHTML = game.log.slice(0, 10).map(l => `<div><span>${fmt(l.t)}</span>${l.msg}</div>`).join('');
+  const e = game.selected, info = document.getElementById('info');
+  if (!e || (!e.isStaff && !game.customers.includes(e))) { game.selected = null; info.innerHTML = ''; return; }
+  if (e.isStaff) {
+    info.innerHTML = `<b>${e.name}</b> · ${ROLE_LABEL[e.role]}${e.zone ? ` (zona ${PRODUCT_NAME[e.zone]})` : ''}<br>
+      <span class="sub">${STATE_LABEL[e.state] || e.state} · clienti seguiti oggi: ${e.served}</span>`;
+  } else {
+    info.innerHTML = `<b>Cliente #${e.id}</b> · ${describe(e).replace('cliente ', '')}<br>
+      <span class="sub">${STATE_LABEL[e.state] || e.state}${e.staff ? ' · con ' + e.staff.name : ''}${e.state === 'waiting' ? ` · da ${e.wait.toFixed(0)} min` : ''}</span>`;
+  }
+}
+
+canvas.addEventListener('click', ev => {
+  const r = canvas.getBoundingClientRect();
+  const wx = (ev.clientX - r.left) / r.width * WORLD_W, wy = (ev.clientY - r.top) / r.height * WORLD_H;
+  let best = null, bd = 60;
+  for (const e of [...game.staff, ...game.customers]) {
+    const d = Math.hypot(e.x - wx, e.y - 20 - wy);
+    if (d < bd) { bd = d; best = e; }
+  }
+  game.selected = best;
+  updatePanel();
+});
+
+document.getElementById('speed').addEventListener('click', ev => {
+  const b = ev.target.closest('button'); if (!b) return;
+  game.speed = +b.dataset.s;
+  document.querySelectorAll('#speed button').forEach(x => x.classList.toggle('on', x === b));
+});
+document.getElementById('nextDay').addEventListener('click', () => {
+  document.getElementById('debrief').classList.remove('show');
+  newDay(game.day % 31 + 1);
+});
+
+// ─────────────────────────────────────────────────────────────
+// Ciclo principale a passo fisso
+// ─────────────────────────────────────────────────────────────
+const FIXED = 0.05; // minuti di gioco per passo
+let acc = 0, last = performance.now();
+function frame(now) {
+  const real = Math.min(0.1, (now - last) / 1000); last = now;
+  acc += real * game.speed / REAL_SEC_PER_MIN;
+  while (acc >= FIXED) { step(FIXED); acc -= FIXED; }
+  render();
+  if (now - lastPanel > 250) { updatePanel(); lastPanel = now; }
+  requestAnimationFrame(frame);
+}
+
+newDay(7);
+requestAnimationFrame(frame);
+// per i test: avanza la simulazione senza aspettare
+window.__sim = { step, get game() { return game; } };
+</script>
+</body>
+</html>
