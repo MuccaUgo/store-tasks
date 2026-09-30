@@ -46,10 +46,16 @@ Ogni giorno si apre col **Brief**: 3 gettoni da mettere tra strategia
 servizi, ma più stress) e **celebration** (più motivazione, meno stress).
 Ognuno nel team ha motivazione (velocità), stress (esperienza del cliente)
 e competenza (errori e attach); con troppo stress il giorno dopo si è in
-malattia. Il team parte poco competente e cresce col tempo. Alcuni clienti
+malattia. Il team parte poco competente e cresce col tempo. Ogni 1–2 ore i ruoli
+ruotano (chi era in vendita va a Point, Express o accessori, e viceversa);
+Point ed Express stressano di più. Durante la giornata si può mandare
+qualcuno in **pausa** 15 minuti o fargli i **complimenti** (3 al giorno).
+All'apertura entrano 5–10 clienti che aspettavano fuori, e alcuni clienti
+sono scortesi e alzano lo stress di chi li serve. Alcuni clienti
 lasciano un commento da 1 a 5: 5 vale +1, 4 vale 0, da 3 a 1 vale −1, e
-l'NPS è la somma diviso il numero di commenti, per 100 (un team formato
-sta intorno a 80, come la media di Piazza Liberty). Il Today at Apple per ora è sfondo: chi guarda a
+l'NPS è la somma diviso il numero di commenti, per 100, diviso anche tra
+Vendita e Genius Bar (un team formato e ben gestito sta intorno a 80, come
+la media di Piazza Liberty). A 1× una giornata dura circa 7 minuti. Il Today at Apple per ora è sfondo: chi guarda a
 volte si ferma lì. A fine giornata c'è il debrief.
 È un file solo, senza dipendenze: si apre com'è, anche da GitHub Pages
 (`…/plgame/`). Non tocca il database.

@@ -33,15 +33,23 @@
     height: calc(100vh - 36px); max-height: 1140px; width: auto; aspect-ratio: 288 / 380;
     cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   .box { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px; }
-  .hudTop { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-  .clock { font-size: 22px; font-weight: 700; letter-spacing: 1px; }
+  .hudRow { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .clock { font-size: 18px; font-weight: 700; letter-spacing: 1px; line-height: 1.1; }
   .sub { color: var(--muted); font-size: 12px; }
-  .btns { display: flex; gap: 6px; margin-top: 10px; }
+  .btns { display: flex; gap: 4px; }
+  .btns button { min-height: 28px; padding: 0 9px; font-size: 12px; border-radius: 5px; }
+  .npsRow { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; font-size: 12px; color: var(--muted); }
+  .npsRow .big { font-size: 18px; font-weight: 700; color: var(--text); }
+  .npsRow b { color: var(--text); }
+  .acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .acts:empty { display: none; }
+  .acts button { min-height: 34px; font-size: 12px; }
+  button:disabled { opacity: .5; cursor: default; }
   button { font: inherit; background: #33333f; color: var(--text); border: 1px solid var(--line);
     border-radius: 6px; padding: 6px 10px; cursor: pointer; min-height: 36px;
     touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   button.on { background: var(--accent); border-color: var(--accent); }
-  #zoom, .mini, .tip { display: none; }
+  .tip { display: none; }
   .stats { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; }
   .stats b { text-align: right; }
   h3 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
@@ -59,7 +67,6 @@
   .bm i { background: #4aa3ff; } .bs i { background: var(--bad); } .bc i { background: var(--good); }
   .legend { display: grid; grid-template-columns: 14px 1fr; gap: 4px 8px; font-size: 12px; align-items: center; }
   .sw { width: 12px; height: 12px; border-radius: 2px; }
-  .info:empty::before { content: "Tocca una persona o un tavolo"; color: var(--muted); font-size: 12px; }
   .overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
     background: rgba(10,10,14,.75); z-index: 10; padding: env(safe-area-inset-top) 12px env(safe-area-inset-bottom); }
   .overlay.show { display: flex; }
@@ -77,23 +84,18 @@
   .tok { letter-spacing: 2px; color: var(--accent); min-width: 36px; text-align: center; }
   #brLeft { margin: 4px 0 10px; }
 
-  /* Telefono: barra fissa in alto, store a tutta larghezza, zoom con trascinamento */
+  /* Telefono: barra fissa in alto e compatta, store a tutta larghezza */
   @media (max-width: 760px) {
     .app { grid-template-columns: minmax(0, 1fr); grid-template-areas: "hud" "stage" "side";
       padding: 8px max(12px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); gap: 10px; }
-    .hud { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; padding: 10px 12px; margin-top: env(safe-area-inset-top);
+    .hud { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; padding: 8px 10px; margin-top: env(safe-area-inset-top);
       box-shadow: 0 6px 12px rgba(0,0,0,.35); }
-    .clock { font-size: 20px; }
-    .btns button { flex: 1; min-height: 44px; padding: 0; }
-    #zoom { display: block; min-height: 44px; }
-    .mini { display: block; margin-top: 8px; font-size: 12px; color: var(--muted); }
-    .mini b { color: var(--text); }
-    .scroller { width: 100%; aspect-ratio: 288 / 380; overflow: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+    .btns button { min-height: 32px; padding: 0 10px; }
+    .scroller { width: 100%; }
     canvas { width: 100%; height: auto; max-height: none; }
-    .scroller.zoomed canvas { width: 260%; }
-    .tip { position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 2; pointer-events: none;
-      background: rgba(38,38,47,.94); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; font-size: 13px; }
-    .tip:not(:empty) { display: block; }
+    .tip { display: block; position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 2;
+      background: rgba(38,38,47,.95); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; font-size: 13px; }
+    .tip[hidden] { display: none; }
     .side { width: 100%; }
   }
 </style>
@@ -101,25 +103,23 @@
 <body>
 <div class="app">
   <div class="box hud">
-    <div class="hudTop">
+    <div class="hudRow">
       <div>
         <div class="clock" id="clock">10:00</div>
         <div class="sub" id="date"></div>
       </div>
-      <button id="zoom" aria-pressed="false">Zoom +</button>
+      <div class="btns" id="speed">
+        <button data-s="0" aria-label="Pausa">❚❚</button>
+        <button data-s="1" class="on">1×</button>
+        <button data-s="2">2×</button>
+        <button data-s="4">4×</button>
+      </div>
     </div>
-    <div class="btns" id="speed">
-      <button data-s="0" aria-label="Pausa">❚❚</button>
-      <button data-s="1" class="on">1×</button>
-      <button data-s="2">2×</button>
-      <button data-s="4">4×</button>
-      <button data-s="8">8×</button>
-    </div>
-    <div class="mini" id="mini"></div>
+    <div class="npsRow" id="npsRow"></div>
   </div>
   <div class="stage">
     <div class="scroller" id="scroller"><canvas id="game" width="288" height="380"></canvas></div>
-    <div class="tip" id="tip"></div>
+    <div class="tip" id="tip" hidden><div class="tipText"></div><div class="acts"></div></div>
     <div class="overlay" id="brief">
       <div class="card">
         <h2>Brief del giorno</h2>
@@ -154,7 +154,7 @@
     </div>
     <div class="box">
       <h3>Selezione</h3>
-      <div class="info" id="info"></div>
+      <div class="info" id="info"><div class="tipText"></div><div class="acts"></div></div>
     </div>
     <div class="box">
       <h3>Cosa succede</h3>
@@ -181,11 +181,11 @@
 // Motore: canvas 2D a bassa risoluzione, ingrandito "pixelated".
 // Tutta la logica lavora in unità della planimetria (1440×1900),
 // il disegno divide per SCALE: 1 pixel a schermo = 5 unità.
-// Il tempo di gioco è in minuti: a 1× un minuto dura 2 secondi.
+// Il tempo di gioco è in minuti: a 1× un minuto dura 0,75 secondi (una giornata circa 7 minuti).
 // ─────────────────────────────────────────────────────────────
 const SCALE = 5;
 const WORLD_W = 1440, WORLD_H = 1900;
-const REAL_SEC_PER_MIN = 2;
+const REAL_SEC_PER_MIN = 0.75;
 const WALK = 300;               // unità per minuto di gioco
 const OPEN = 10 * 60, LAST_ENTRY = 19 * 60 + 45, CLOSE = 20 * 60;
 
@@ -409,7 +409,8 @@ function newDay(dayOfMonth) {
       { start: 17 * 60 + 30, title: pick(SESSION_TITLES) },
     ].map(s => ({ ...s, end: s.start + 45, state: 'planned' })),
     reviews: [],
-    stats: { entered: 0, buyers: 0, sold: 0, accessories: 0, services: 0, errors: 0, express: 0, wallSales: 0, lost: 0, browsed: 0, genius: 0, looked: 0, today: 0, waitSum: 0, waitN: 0 },
+    kudos: 3,
+    stats: { entered: 0, buyers: 0, sold: 0, accessories: 0, services: 0, errors: 0, breaks: 0, rude: 0, express: 0, wallSales: 0, lost: 0, browsed: 0, genius: 0, looked: 0, today: 0, waitSum: 0, waitN: 0 },
   };
   game.focus = { op: 0, sales: 0, cel: 0 };
   game.briefing = true;
@@ -418,32 +419,34 @@ function newDay(dayOfMonth) {
   showBrief();
 }
 
+// I ruoli ruotano ogni 1–2 ore: chi era in vendita va a Point, Express o accessori, e viceversa.
+// L'ordine dei posti conta: se manca qualcuno, restano scoperti per primi i posti di vendita.
+const ROTA = [
+  { name: 'Point', role: 'point', post: POINT_IN, home: { x: POINT_IN.x, y: POINT_IN.y } },
+  { name: 'Point Genius Bar', role: 'point', post: POINT_GB, home: { x: POINT_GB.x, y: POINT_GB.y } },
+  { name: 'Express', role: 'express', post: EXPRESS, home: { x: EXPRESS.x, y: EXPRESS.y } },
+  { name: 'accessori sinistra', role: 'accessori', side: 'L', home: { x: 160, y: 700 } },
+  { name: 'accessori destra', role: 'accessori', side: 'R', home: { x: 1258, y: 800 } },
+  { name: 'vendita iPhone', role: 'specialist', zone: 'iphone', home: { x: 360, y: 400 } },
+  { name: 'vendita iPad', role: 'specialist', zone: 'ipad', home: { x: 580, y: 740 } },
+  { name: 'vendita Mac', role: 'specialist', zone: 'mac', home: { x: 800, y: 1080 } },
+  { name: 'vendita iPhone', role: 'specialist', zone: 'iphone', home: { x: 1030, y: 400 } },
+];
+const ROTA_PEOPLE = ['Sara', 'Francesca', 'Anna', 'Valentina', 'Simone', 'Luca', 'Giulia', 'Marco', 'Elena'];
+const FIXED_PEOPLE = [
+  { name: 'Paolo', role: 'genius', home: { x: 546, y: 1192 } },
+  { name: 'Chiara', role: 'genius', home: { x: 779, y: 1192 } },
+  { name: 'Davide', role: 'creative', home: { x: 1030, y: 1460 } },
+];
+const slotProps = i => ({ slot: i, role: ROTA[i].role, post: ROTA[i].post, side: ROTA[i].side, zone: ROTA[i].zone, home: ROTA[i].home });
+
 function makeStaff() {
-  let people = [
-    { name: 'Sara', role: 'point', post: POINT_IN, home: { x: POINT_IN.x, y: POINT_IN.y } },
-    { name: 'Francesca', role: 'point', post: POINT_GB, home: { x: POINT_GB.x, y: POINT_GB.y } },
-    { name: 'Anna', role: 'express', post: EXPRESS, home: { x: EXPRESS.x, y: EXPRESS.y } },
-    { name: 'Valentina', role: 'accessori', side: 'L', home: { x: 160, y: 700 } },
-    { name: 'Simone', role: 'accessori', side: 'R', home: { x: 1258, y: 800 } },
-    { name: 'Luca', role: 'specialist', zone: 'iphone', home: { x: 360, y: 400 } },
-    { name: 'Giulia', role: 'specialist', zone: 'iphone', home: { x: 1030, y: 400 } },
-    { name: 'Marco', role: 'specialist', zone: 'ipad', home: { x: 580, y: 740 } },
-    { name: 'Elena', role: 'specialist', zone: 'mac', home: { x: 800, y: 1080 } },
-    { name: 'Paolo', role: 'genius', home: { x: 546, y: 1192 } },
-    { name: 'Chiara', role: 'genius', home: { x: 779, y: 1192 } },
-    { name: 'Davide', role: 'creative', home: { x: 1030, y: 1460 } },
-  ];
-  // chi è in malattia resta a casa; i posti fissi li copre lo Specialist più competente
-  game.sick = people.filter(p => TEAM[p.name].sick).map(p => p.name);
-  const present = people.filter(p => !TEAM[p.name].sick);
+  game.sick = [...ROTA_PEOPLE, ...FIXED_PEOPLE.map(p => p.name)].filter(n => TEAM[n].sick);
   game.cover = [];
-  for (const p of people.filter(p => p.post && TEAM[p.name].sick)) {
-    const sub = present.filter(x => x.role === 'specialist').sort((a, b) => TEAM[b.name].comp - TEAM[a.name].comp)[0];
-    if (!sub) continue;
-    Object.assign(sub, { role: p.role, post: p.post, home: p.home, zone: undefined });
-    game.cover.push(`${sub.name} copre ${p.name}`);
-  }
-  people = present;
+  // ogni giorno si parte da un giro diverso; chi è in malattia lascia il posto e gli altri si stringono
+  const present = ROTA_PEOPLE.map((name, j) => ({ name, order: (j + game.day * 4) % ROTA.length }))
+    .filter(p => !TEAM[p.name].sick).sort((a, b) => a.order - b.order);
+  const people = [...present.map((p, i) => ({ name: p.name, ...slotProps(i) })), ...FIXED_PEOPLE.filter(p => !TEAM[p.name].sick)];
   game.staff = people.map((p, i) => ({
     id: 'S' + i, ...p, isStaff: true,
     x: p.home.x, y: p.home.y, path: [], state: 'idle', t: rand(2, 6),
@@ -451,6 +454,40 @@ function makeStaff() {
     facing: p.post ? p.post.face : 'down', walk: 0, bubble: null, customer: null, served: 0,
     stats: TEAM[p.name], start: { ...TEAM[p.name] },
   }));
+  game.nextRotation = OPEN + rand(60, 120);
+}
+
+function planRotation() {
+  const rot = game.staff.filter(x => x.slot !== undefined)
+    .sort((a, b) => (a.slot + 4) % ROTA.length - (b.slot + 4) % ROTA.length);
+  rot.forEach((x, i) => { x.nextSlot = i; });
+  log('Cambio ruoli: ' + rot.filter(x => ROTA[x.nextSlot].role !== 'specialist').map(x => `${x.name} → ${ROTA[x.nextSlot].name}`).join(', ') + ', gli altri in vendita');
+  game.nextRotation = game.time + rand(60, 120);
+}
+// il cambio avviene quando la persona ha finito con il suo cliente
+function applySlot(x) {
+  Object.assign(x, slotProps(x.nextSlot));
+  x.nextSlot = undefined;
+  x.state = 'idle'; x.t = rand(1, 3); goTo(x, x.home);
+}
+
+// Pausa di 15 minuti: chi ha un posto fisso lo passa a uno Specialist di vendita libero
+const onBreak = x => ['toBreak', 'onBreak', 'fromBreak'].includes(x.state);
+const isAvailable = x => !x.customer && (x.state === 'idle' || x.state === 'wander');
+function startBreak(x) {
+  if (x.post) {
+    const sub = game.staff.filter(y => y.role === 'specialist' && isAvailable(y) && !y.wantsBreak).sort((a, b) => dist(a, x) - dist(b, x))[0];
+    if (!sub) return;
+    const a = x.slot, b = sub.slot;
+    Object.assign(sub, slotProps(a)); sub.state = 'idle'; goTo(sub, sub.home);
+    Object.assign(x, slotProps(b));
+    [x.nextSlot, sub.nextSlot] = [sub.nextSlot, x.nextSlot];
+    log(`${sub.name} prende il posto di ${x.name} (${ROTA[a].name})`);
+  }
+  x.wantsBreak = false; x.lastBreak = game.time;
+  x.state = 'toBreak'; goTo(x, { x: DOOR.x, y: DOOR.y - 20 });
+  game.stats.breaks++;
+  log(`${x.name} va in pausa 15 minuti`);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -469,7 +506,6 @@ function showBrief() {
   document.getElementById('brTeam').innerHTML =
     `Team: motivazione <b>${avgTeam('mot')}</b> · stress <b>${avgTeam('stress')}</b> · competenza <b>${avgTeam('comp')}</b>` +
     (game.sick.length ? `<br>In malattia: <b>${game.sick.join(', ')}</b>` : '') +
-    (game.cover.length ? `<br>${game.cover.join(' · ')}` : '') +
     (stressed.length ? `<br>Molto stressati: <b>${stressed.join(', ')}</b>` : '');
   document.getElementById('brOpts').innerHTML = STRATEGIES.map(st => `
     <div class="opt"><div class="top"><b>${st.name}</b>
@@ -560,7 +596,7 @@ function spawnCustomer(kind, extra = {}) {
     x: DOOR.x + rand(-30, 30), y: DOOR.y, path: [], state: 'inLine', t: 0,
     look: { skin: pick(SKIN), hair: pick(HAIR), shirt: pick(SHIRTS), pants: pick(PANTS) },
     facing: 'down', walk: 0, bubble: null, staff: null, slot: null, wait: 0, lineIdx: -1,
-    exp: rand(64, 76), waited: 0, servedBy: null,
+    exp: rand(64, 76), waited: 0, servedBy: null, rude: Math.random() < 0.08,
     product: kind === 'buy' ? pick(['iphone', 'iphone', 'iphone', 'ipad', 'watch', 'mac', 'mac']) : null,
     ...extra,
   };
@@ -581,7 +617,9 @@ const needIcon = c => c.kind === 'buy' ? c.product : c.kind === 'genius' ? 'wren
 
 // Una fila davanti a un Point: chi è primo va a parlare appena il Point è libero
 function updateLine(line, post) {
-  const point = game.staff.find(s => s.post === post);
+  // durante un cambio ruoli il posto può restare scoperto per poco, o avere due persone: si prende chi è pronto
+  const points = game.staff.filter(s => s.post === post);
+  const point = points.find(s => s.state === 'idle' && s.path.length === 0 && s.nextSlot === undefined);
   line.forEach((c, i) => {
     if (c.lineIdx === i) return;
     c.lineIdx = i;
@@ -589,7 +627,7 @@ function updateLine(line, post) {
     goTo(c, spot);
   });
   const first = line[0];
-  if (first && point.state === 'idle' && point.path.length === 0 && first.path.length === 0) {
+  if (first && point && first.path.length === 0) {
     line.shift();
     first.lineIdx = -1; first.state = 'toPoint'; first.point = point;
     point.state = 'listening'; point.customer = first;
@@ -658,6 +696,12 @@ function serve(s, c, weight = 1) {
   c.exp += k;
   if (k < 0) c.rushed = true;
   bump(s, 'comp', 0.08 * (1 - s.stats.comp / 120));
+  // un cliente scortese pesa su chi lo serve
+  if (c.rude) {
+    bump(s, 'stress', 4); bump(s, 'mot', -1); c.exp -= 3;
+    say(c, 'angry', 2);
+    if (!c.rudeCounted) { c.rudeCounted = true; game.stats.rude++; log(`Un cliente scortese con ${s.name}`); }
+  }
   if (Math.random() < errorChance(s) * weight) {
     c.exp -= 22; c.error = true;
     say(s, 'oops', 2);
@@ -686,14 +730,17 @@ function survey(c) {
   else if (c.waited > 8) text = 'Troppa attesa';
   else if (c.rushed) text = `${n} andava di fretta`;
   else text = 'Mi aspettavo di più';
-  game.reviews.unshift({ t: game.time, score, value, text, staff: n });
+  game.reviews.unshift({ t: game.time, score, value, text, staff: n, area: c.kind === 'genius' ? 'bar' : 'vendita' });
   say(c, 'r' + score, 3);
   if (c.servedBy) {
     if (score === 5) bump(c.servedBy, 'mot', 3);
     if (score <= 3) { bump(c.servedBy, 'mot', -2); bump(c.servedBy, 'stress', 1); }
   }
 }
-const nps = () => game.reviews.length ? game.reviews.reduce((a, r) => a + r.value, 0) / game.reviews.length : null;
+const nps = area => {
+  const list = area ? game.reviews.filter(r => r.area === area) : game.reviews;
+  return list.length ? list.reduce((a, r) => a + r.value, 0) / list.length : null;
+};
 const fmtNps = v => v === null ? '–' : String(Math.round(v * 100));
 
 function releaseSlot(c) {
@@ -747,7 +794,7 @@ function updateCustomer(c, dt) {
           leave(c, 'bought');
         } else {
           say(p, 'hi', 1); p.state = 'idle'; p.customer = null;
-          log(`${p.name} accoglie un ${describe(c)}${c.kind === 'buy' ? '' : c.kind === 'genius' ? ' e lo manda da ' + game.staff.find(x => x.post === POINT_GB).name : c.kind === 'acc' ? ' e lo manda alle pareti' : ''}`);
+          log(`${p.name} accoglie un ${describe(c)}${c.kind === 'buy' ? '' : c.kind === 'genius' ? ' e lo manda al Point del Genius Bar' : c.kind === 'acc' ? ' e lo manda alle pareti' : ''}`);
           proceed(c);
         }
       }
@@ -765,7 +812,7 @@ function updateCustomer(c, dt) {
       break;
     case 'queued':
       c.wait += dt;
-      if (c.wait > 35) { log('Un cliente per assistenza se ne va dopo 35 minuti di attesa'); leave(c, 'lost'); }
+      if (c.wait > 45) { log('Un cliente per assistenza se ne va dopo 45 minuti di attesa'); leave(c, 'lost'); }
       break;
     case 'toBar':
       if (arrived) { c.state = 'atBar'; c.facing = 'right'; }
@@ -866,15 +913,29 @@ function dispatch() {
 }
 
 const BUSY = new Set(['probe', 'demo', 'checkout', 'repair', 'advise', 'listening', 'escort', 'presenting', 'toCustomer', 'toWallCustomer', 'toBar']);
+// Point ed Express stressano più della vendita e degli accessori
+const ROLE_STRESS = { point: 1.3, express: 1.3, specialist: 1, accessori: 0.9, genius: 0.8, creative: 0.8 };
 function updateStaff(s, dt) {
   const arrived = moveAlong(s, dt);
   const c = s.customer;
-  if (game.time >= OPEN && game.time < CLOSE) {
-    if (BUSY.has(s.state) || s.customer) bump(s, 'stress', 0.15 * (1 + 0.1 * F().sales) * dt);
-    else bump(s, 'stress', -0.08 * dt);
+  if (game.time >= OPEN && game.time < CLOSE && !onBreak(s)) {
+    if (BUSY.has(s.state) || s.customer) bump(s, 'stress', 0.15 * ROLE_STRESS[s.role] * (1 + 0.1 * F().sales) * dt);
+    else bump(s, 'stress', (s.post ? -0.05 : -0.08) * dt);
     bump(s, 'mot', -0.015 * (1 - 0.3 * F().cel) * dt);
   }
+  if (s.wantsBreak && isAvailable(s)) startBreak(s);
+  if (s.nextSlot !== undefined && isAvailable(s)) applySlot(s);
   switch (s.state) {
+    case 'toBreak':
+      if (arrived) { s.state = 'onBreak'; s.hidden = true; s.until = game.time + 15; }
+      break;
+    case 'onBreak':
+      bump(s, 'stress', -1.5 * dt); bump(s, 'mot', 0.2 * dt);
+      if (game.time >= s.until) { s.hidden = false; s.x = DOOR.x; s.y = DOOR.y; s.state = 'fromBreak'; goTo(s, s.home); }
+      break;
+    case 'fromBreak':
+      if (arrived) { s.state = 'idle'; s.t = rand(1, 3); }
+      break;
     case 'idle':
       if (s.post) {
         if (arrived && dist(s, s.home) > 5) goTo(s, s.home);
@@ -951,7 +1012,7 @@ function updateStaff(s, dt) {
       break;
     case 'toBar':
       if (arrived && c && c.state === 'atBar') {
-        s.state = 'repair'; s.t = rand(15, 30) * pace(s); s.facing = 'left';
+        s.state = 'repair'; s.t = rand(12, 25) * pace(s); s.facing = 'left';
         if (serve(s, c)) s.t += 8;
         say(s, 'wrench', 3); say(c, 'dots', 3);
         log(`${s.name} prende un cliente al Genius Bar (${c.bar.table.name})`);
@@ -1029,14 +1090,17 @@ function updateSessions() {
 // ─────────────────────────────────────────────────────────────
 // Arrivi e ciclo della giornata
 // ─────────────────────────────────────────────────────────────
+function pickKind() {
+  const r = Math.random();
+  return r < 0.42 ? 'buy' : r < 0.6 ? 'acc' : r < 0.85 ? 'genius' : 'look';
+}
 function spawnArrivals(dt) {
   if (game.time < OPEN || game.time >= LAST_ENTRY) return;
   const perHour = (RATE[Math.floor(game.time / 60)] || 6) * (game.weekend ? 1.8 : 1);
   game.spawnAcc += perHour / 60 * dt;
   while (game.spawnAcc >= 1) {
     game.spawnAcc -= 1 + rand(-0.4, 0.4);
-    const r = Math.random();
-    spawnCustomer(r < 0.42 ? 'buy' : r < 0.6 ? 'acc' : r < 0.85 ? 'genius' : 'look');
+    spawnCustomer(pickKind());
   }
 }
 
@@ -1044,7 +1108,12 @@ function step(dt) {
   if (game.over || game.briefing) return;
   const before = game.time;
   game.time += dt;
-  if (before < OPEN && game.time >= OPEN) log('Porte aperte');
+  if (before < OPEN && game.time >= OPEN) {
+    const n = randi(5, 10);
+    for (let i = 0; i < n; i++) spawnCustomer(pickKind());
+    log(`Porte aperte: entrano ${n} clienti che aspettavano fuori`);
+  }
+  if (game.time >= game.nextRotation && game.time < CLOSE - 30) planRotation();
   spawnArrivals(dt);
   updateSessions();
   updateLine(game.lineIn, POINT_IN);
@@ -1078,6 +1147,7 @@ function endDay() {
     ['Vendite', s.sold],
     ['Conversion', s.buyers ? Math.round(s.sold / s.buyers * 100) + '%' : '–'],
     ['NPS', `${fmtNps(nps())} <small>(${game.reviews.length} commenti)</small>`],
+    ['NPS Vendita · Bar', `${fmtNps(nps('vendita'))} · ${fmtNps(nps('bar'))}`],
     ['Promotori · passivi · detrattori', `${game.reviews.filter(r => r.score === 5).length} · ${game.reviews.filter(r => r.score === 4).length} · ${game.reviews.filter(r => r.score <= 3).length}`],
     ['Errori', s.errors],
     ['Con accessorio', s.accessories],
@@ -1088,6 +1158,8 @@ function endDay() {
     ['Solo a guardare', s.looked + s.today],
     ['…di cui fermi al Today at Apple', s.today],
     ['Persi senza essere seguiti', s.lost],
+    ['Clienti scortesi', s.rude],
+    ['Pause date', s.breaks],
     ['Attesa media', s.waitN ? (s.waitSum / s.waitN).toFixed(1) + ' min' : '–'],
     ['Focus del giorno', `op ${game.focus.op} · vend ${game.focus.sales} · cel ${game.focus.cel}`],
     ...teamDelta(),
@@ -1120,6 +1192,7 @@ const ICONS = {
   mac:      ['kkkkk', 'kbbbk', 'kbbbk', 'kkkkk', 'k...k'],
   eye:      ['.....', '.kkk.', 'kkbkk', '.kkk.', '.....'],
   oops:     ['..r..', '..r..', '..r..', '.....', '..r..'],
+  angry:    ['r...r', '.r.r.', '.....', '.rrr.', 'r...r'],
   shield:   ['bbbbb', 'bwwwb', 'bwbwb', '.bwb.', '..b..'],
 };
 function drawIcon(name, x, y) {
@@ -1282,7 +1355,7 @@ function render() {
   const drawables = [
     ...TREES.map(t => ({ y: t.y, draw: () => drawTree(t) })),
     ...game.customers.map(c => ({ y: c.y, draw: () => drawPerson(c) })),
-    ...game.staff.map(s => ({ y: s.y, draw: () => drawPerson(s) })),
+    ...game.staff.filter(s => !s.hidden).map(s => ({ y: s.y, draw: () => drawPerson(s) })),
   ].sort((a, b) => a.y - b.y);
   drawables.forEach(d => d.draw());
   // fuori orario si abbassano le luci
@@ -1301,9 +1374,10 @@ const STATE_LABEL = {
   toWallCustomer: 'va da un cliente alla parete', advise: 'consiglia un accessorio', leaving: 'esce',
   idle: 'libero', wander: 'gira nella sua zona', listening: 'ascolta un cliente', escort: 'accompagna al Genius Bar', toCustomer: 'va da un cliente',
   probe: 'fa domande', demo: 'fa la demo', checkout: 'chiude la vendita', repair: 'ripara',
-  huddle: 'momento di squadra', training: 'in formazione',
+  huddle: 'momento di squadra', training: 'in formazione', toBreak: 'va in pausa', onBreak: 'in pausa', fromBreak: 'torna dalla pausa',
   toStage: 'va allo schermo', onStage: 'prepara la sessione', presenting: 'tiene la sessione',
 };
+const roleShort = x => onBreak(x) ? 'pausa' : x.slot !== undefined ? ROTA[x.slot].name : x.role === 'genius' ? 'Genius' : 'Creative';
 const ROLE_LABEL = { point: 'Point', express: 'Cassa Express', accessori: 'Specialist accessori', specialist: 'Specialist', genius: 'Genius', creative: 'Creative' };
 
 let lastPanel = 0;
@@ -1311,7 +1385,7 @@ function updatePanel() {
   document.getElementById('clock').textContent = fmt(Math.max(OPEN - 2, game.time));
   const open = game.time >= OPEN && game.time < CLOSE;
   document.getElementById('date').textContent =
-    `${WEEKDAYS[game.date.getDay()]} ${game.day} gennaio · ${open ? 'aperto' : game.time < OPEN ? 'in apertura' : 'chiuso'}`;
+    `${WEEKDAYS[game.date.getDay()].slice(0, 3)} ${game.day} gen · ${open ? 'aperto' : game.time < OPEN ? 'in apertura' : 'chiuso'}`;
   const s = game.stats, inStore = game.customers.length;
   const waiting = game.customers.filter(c => c.state === 'waiting').length;
   const queue = game.customers.filter(c => c.state === 'queued').length + game.lineGB.length;
@@ -1320,7 +1394,7 @@ function updatePanel() {
     ['In fila dal Point', game.lineIn.length],
     ['Aspettano qualcuno', waiting],
     ['In coda Genius', queue],
-    ['NPS', `${fmtNps(nps())} <small>(${game.reviews.length})</small>`],
+    ['NPS · Vendita · Bar', `${fmtNps(nps())} · ${fmtNps(nps('vendita'))} · ${fmtNps(nps('bar'))}`],
     ['Entrati oggi', s.entered],
     ['Vendite', s.sold + (s.accessories ? ` <small>(+${s.accessories} acc.)</small>` : '')],
     ['Accessori Express · pareti', `${s.express} · ${s.wallSales}`],
@@ -1331,18 +1405,55 @@ function updatePanel() {
     ['Fermi al Today', s.today],
     ['Persi', s.lost],
   ]);
-  document.getElementById('mini').innerHTML =
-    `NPS <b>${fmtNps(nps())}</b> · Dentro <b>${inStore}</b> · Vend. <b>${s.sold}</b> · Acc. <b>${s.express + s.wallSales + s.accessories}</b> · Genius <b>${s.genius}</b> · Persi <b>${s.lost}</b>`;
+  document.getElementById('npsRow').innerHTML =
+    `<span>NPS <span class="big">${fmtNps(nps())}</span></span><span>Vendita <b>${fmtNps(nps('vendita'))}</b></span><span>Bar <b>${fmtNps(nps('bar'))}</b></span><span>${game.reviews.length} commenti</span>`;
   document.getElementById('reviews').innerHTML = game.reviews.slice(0, 8)
     .map(r => `<div><span class="score s${r.score}">${r.score}</span>${r.text} <span class="sub">${fmt(r.t)}</span></div>`).join('');
   const bar = (cls, v) => `<div class="bar ${cls}"><i style="width:${Math.round(v)}%"></i></div>`;
   document.getElementById('team').innerHTML = game.staff
-    .map(x => `<span>${x.name}</span>${bar('bm', x.stats.mot)}${bar('bs', x.stats.stress)}${bar('bc', x.stats.comp)}`).join('');
+    .map(x => `<span>${x.name} <span class="sub">${roleShort(x)}</span></span>${bar('bm', x.stats.mot)}${bar('bs', x.stats.stress)}${bar('bc', x.stats.comp)}`).join('');
   document.getElementById('log').innerHTML = game.log.slice(0, 10).map(l => `<div><span>${fmt(l.t)}</span>${l.msg}</div>`).join('');
-  const e = game.selected, info = document.getElementById('info');
-  updateInfo(e, info);
-  document.getElementById('tip').innerHTML = info.innerHTML;
+  // la selezione va sia nel pannello sia nella scheda sopra lo store (telefono);
+  // i pulsanti si ridisegnano solo quando cambiano, così il tocco non si perde
+  const sel = selectionView(game.selected);
+  for (const box of [document.getElementById('info'), document.getElementById('tip')]) {
+    box.querySelector('.tipText').innerHTML = sel.text || (box.id === 'info' ? '<span class="sub">Tocca una persona o un tavolo</span>' : '');
+    const acts = box.querySelector('.acts');
+    if (acts.dataset.key !== sel.key) { acts.innerHTML = sel.acts; acts.dataset.key = sel.key; }
+  }
+  document.getElementById('tip').hidden = !sel.text;
 }
+
+function staffActions(e) {
+  if (game.briefing || game.over || game.time >= CLOSE) return { acts: '', key: '' };
+  let pause, pk;
+  if (onBreak(e)) { pause = `<button disabled>In pausa${e.state === 'onBreak' ? ' fino alle ' + fmt(e.until) : ''}</button>`; pk = 'b' + e.state; }
+  else if (e.wantsBreak) { pause = '<button disabled>In pausa appena libero</button>'; pk = 'w'; }
+  else if (e.lastBreak !== undefined && game.time - e.lastBreak < 60) { pause = `<button disabled>Di nuovo in pausa dalle ${fmt(e.lastBreak + 60)}</button>`; pk = 'c'; }
+  else { pause = `<button data-act="break" data-id="${e.id}">Pausa 15 min</button>`; pk = 'p'; }
+  const kudos = `<button data-act="kudos" data-id="${e.id}"${game.kudos ? '' : ' disabled'}>Complimenti (${game.kudos} oggi)</button>`;
+  return { acts: pause + kudos, key: `${e.id}|${pk}|${game.kudos}` };
+}
+
+function selectionView(e) {
+  const holder = { innerHTML: '' };
+  updateInfo(e, holder);
+  const a = e && e.isStaff ? staffActions(e) : { acts: '', key: '' };
+  return { text: holder.innerHTML, ...a };
+}
+
+document.addEventListener('click', ev => {
+  const b = ev.target.closest('[data-act]');
+  if (!b || b.disabled) return;
+  const x = game.staff.find(y => y.id === b.dataset.id);
+  if (!x) return;
+  if (b.dataset.act === 'break') { x.wantsBreak = true; if (!isAvailable(x)) log(`${x.name} andrà in pausa appena finisce`); }
+  if (b.dataset.act === 'kudos' && game.kudos > 0) {
+    game.kudos--; bump(x, 'mot', 8); bump(x, 'stress', -4); say(x, 'heart', 2);
+    log(`Complimenti a ${x.name}`);
+  }
+  updatePanel();
+});
 
 function updateInfo(e, info) {
   if (e && e.isTable) {
@@ -1354,12 +1465,12 @@ function updateInfo(e, info) {
   }
   if (!e || (!e.isStaff && !game.customers.includes(e))) { game.selected = null; info.innerHTML = ''; return; }
   if (e.isStaff) {
-    info.innerHTML = `<b>${e.name}</b> · ${ROLE_LABEL[e.role]}${e.zone ? ` (zona ${PRODUCT_NAME[e.zone]})` : ''}${e.post === POINT_IN ? ' all\'ingresso' : e.post === POINT_GB ? ' del Genius Bar' : e.post === EXPRESS ? ' al tavolo B1' : ''}${e.side ? (e.side === 'L' ? ' · parete sinistra' : ' · parete destra') : ''}<br>
+    info.innerHTML = `<b>${e.name}</b> · ${e.slot !== undefined ? ROTA[e.slot].name : ROLE_LABEL[e.role]}${e.nextSlot !== undefined ? ` <span class="sub">→ ${ROTA[e.nextSlot].name}</span>` : ''}<br>
       <span class="sub">${STATE_LABEL[e.state] || e.state} · clienti seguiti oggi: ${e.served}</span><br>
       <span class="sub">Motivazione <b>${Math.round(e.stats.mot)}</b> · Stress <b>${Math.round(e.stats.stress)}</b> · Competenza <b>${Math.round(e.stats.comp)}</b></span>`;
   } else {
     info.innerHTML = `<b>Cliente #${e.id}</b> · ${describe(e).replace('cliente ', '')}<br>
-      <span class="sub">${STATE_LABEL[e.state] || e.state}${e.staff ? ' · con ' + e.staff.name : ''}${e.state === 'waiting' ? ` · da ${e.wait.toFixed(0)} min` : ''} · esperienza <b>${Math.round(e.exp)}</b></span>`;
+      <span class="sub">${STATE_LABEL[e.state] || e.state}${e.staff ? ' · con ' + e.staff.name : ''}${e.state === 'waiting' ? ` · da ${e.wait.toFixed(0)} min` : ''} · esperienza <b>${Math.round(e.exp)}</b>${e.rude ? ' · scortese' : ''}</span>`;
   }
 }
 
@@ -1367,7 +1478,7 @@ canvas.addEventListener('click', ev => {
   const r = canvas.getBoundingClientRect();
   const wx = (ev.clientX - r.left) / r.width * WORLD_W, wy = (ev.clientY - r.top) / r.height * WORLD_H;
   let best = null, bd = Math.max(60, 24 / r.width * WORLD_W);
-  for (const e of [...game.staff, ...game.customers]) {
+  for (const e of [...game.staff.filter(x => !x.hidden), ...game.customers]) {
     const d = Math.hypot(e.x - wx, e.y - 20 - wy);
     if (d < bd) { bd = d; best = e; }
   }
@@ -1377,20 +1488,6 @@ canvas.addEventListener('click', ev => {
   }
   game.selected = best;
   updatePanel();
-});
-
-// Zoom (telefono): lo store diventa più grande e si sposta trascinando
-const scroller = document.getElementById('scroller');
-document.getElementById('zoom').addEventListener('click', ev => {
-  const on = scroller.classList.toggle('zoomed');
-  ev.currentTarget.textContent = on ? 'Zoom −' : 'Zoom +';
-  ev.currentTarget.setAttribute('aria-pressed', on);
-  ev.currentTarget.classList.toggle('on', on);
-  if (!on) return;
-  const e = game.selected;
-  const target = e ? (e.isTable ? { x: e.table.x + e.table.w / 2, y: e.table.y + e.table.h / 2 } : e) : { x: WORLD_W / 2, y: 300 };
-  scroller.scrollLeft = target.x / WORLD_W * canvas.clientWidth - scroller.clientWidth / 2;
-  scroller.scrollTop = target.y / WORLD_H * canvas.clientHeight - scroller.clientHeight / 2;
 });
 
 document.getElementById('speed').addEventListener('click', ev => {
