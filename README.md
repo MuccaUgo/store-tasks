@@ -36,7 +36,9 @@ Piazza Liberty, vista dall'alto. Chi entra dalla porta in alto a destra si
 mette in fila dal **Point** e dice cosa cerca: acquisto (tavoli iPhone,
 iPad/Watch, Mac, dove poi arriva uno Specialist), assistenza (il secondo
 Point, sopra il primo tavolo del Genius Bar, fa il check-in e accompagna al
-posto) o solo un'occhiata. Il Today at Apple per ora è sfondo: chi guarda a
+posto), accessori (alle pareti, con uno Specialist per lato; chi sa già
+cosa vuole paga alla cassa Express in B1) o solo un'occhiata. I tavoli si
+chiamano A1–A5, B1–B5, C1–C5 contando da destra, e D2–D4 per il Genius Bar. Il Today at Apple per ora è sfondo: chi guarda a
 volte si ferma lì. A fine giornata c'è il debrief.
 È un file solo, senza dipendenze: si apre com'è, anche da GitHub Pages
 (`…/gioco/`). Non tocca il database.

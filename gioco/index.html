@@ -39,7 +39,7 @@
   .log span { color: var(--muted); margin-right: 6px; }
   .legend { display: grid; grid-template-columns: 14px 1fr; gap: 4px 8px; font-size: 12px; align-items: center; }
   .sw { width: 12px; height: 12px; border-radius: 2px; }
-  .info:empty::before { content: "Tocca una persona nello store"; color: var(--muted); font-size: 12px; }
+  .info:empty::before { content: "Tocca una persona o un tavolo"; color: var(--muted); font-size: 12px; }
   .overlay { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
     background: rgba(10,10,14,.7); }
   .overlay.show { display: flex; }
@@ -95,7 +95,7 @@
       <div class="legend">
         <div class="sw" style="background:#2a6ad8"></div><div>Team (maglia blu)</div>
         <div class="sw" style="background:#e05a47"></div><div>Clienti (colori vari)</div>
-        <div class="sw" style="background:#c9955c"></div><div>Tavoli: iPhone · iPad/Watch · Mac · Genius Bar</div>
+        <div class="sw" style="background:#c9955c"></div><div>Tavoli A (iPhone) · B (iPad, Watch in B2, Express in B1) · C (Mac) · D2–D4 (Genius Bar). Si contano da destra</div>
         <div class="sw" style="background:#8a8f99"></div><div>Pareti accessori</div>
         <div class="sw" style="background:#57c05e"></div><div>Alberi</div>
         <div class="sw" style="background:#1d1d24;border:1px solid #555"></div><div>Schermo Today at Apple</div>
@@ -135,27 +135,34 @@ const fmt = m => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(Math
 const DOOR = { x: 1250, y: 10 };
 // Due Point: uno all'ingresso, uno sopra il primo tavolo del Genius Bar.
 // Chi entra si mette in fila, dice al Point cosa cerca e viene mandato al posto giusto.
-const POINT_IN = { x: 1250, y: 235, talk: { x: 1250, y: 190 },
+const POINT_IN = { x: 1250, y: 235, face: 'up', talk: { x: 1250, y: 190 },
   line: [[1250, 145], [1228, 105], [1272, 105], [1228, 68], [1272, 68]].map(([x, y]) => ({ x, y })) };
-const POINT_GB = { x: 482, y: 1092, talk: { x: 428, y: 1082 },
+const POINT_GB = { x: 482, y: 1092, face: 'left', talk: { x: 428, y: 1082 },
   line: [385, 345, 305, 265, 225, 185, 145].map(x => ({ x, y: 1078 })) };
+// Cassa Express al tavolo B1: chi lavora sta a destra del tavolo, il cliente a sinistra
+const EXPRESS = { x: 1235, y: 560, face: 'left', talk: { x: 1077, y: 560 },
+  line: [[1077, 615], [1077, 665], [1060, 725], [1015, 725], [970, 725]].map(([x, y]) => ({ x, y })) };
+// Pareti accessori: x del cliente davanti alla parete
+const WALL_SPOT = { L: 132, R: 1283 };
 const WALLS = [
   { x: 63, y: 96, w: 42, h: 1652 },
   { x: 1310, y: 96, w: 42, h: 1652 },
 ];
 const COLS = [209, 431, 664, 883, 1101];
 const ROWS = [96, 463, 797];
+// Colonne da sinistra a destra; i nomi contano da destra: A1 è in alto a destra, A5 in alto a sinistra
 const ROW_PRODUCTS = [
   ['iphone', 'iphone', 'iphone', 'iphone', 'iphone'],
-  ['ipad', 'ipad', 'ipad', 'watch', 'watch'],
+  ['ipad', 'ipad', 'ipad', 'watch', 'express'],
   ['mac', 'mac', 'mac', 'mac', 'mac'],
 ];
-const PRODUCT_NAME = { iphone: 'iPhone', ipad: 'iPad', watch: 'Apple Watch', mac: 'Mac' };
+const PRODUCT_NAME = { iphone: 'iPhone', ipad: 'iPad', watch: 'Apple Watch', mac: 'Mac', express: 'cassa Express' };
 
 const TABLES = [];
 ROWS.forEach((y, r) => COLS.forEach((x, c) =>
-  TABLES.push({ x, y, w: 88, h: 227, product: ROW_PRODUCTS[r][c], kind: 'product' })));
-const SUPPORT = [438, 671, 889].map(x => ({ x, y: 1132, w: 88, h: 228, kind: 'support' }));
+  TABLES.push({ x, y, w: 88, h: 227, name: 'ABC'[r] + (5 - c), product: ROW_PRODUCTS[r][c], kind: ROW_PRODUCTS[r][c] === 'express' ? 'express' : 'product' })));
+const SUPPORT = [438, 671, 889].map((x, i) => ({ x, y: 1132, w: 88, h: 228, name: 'D' + (4 - i), kind: 'support' }));
+const tableByName = n => TABLES.concat(SUPPORT).find(t => t.name === n);
 const TREES = [];
 [1178, 1351, 1532, 1712].forEach(y => { TREES.push({ x: 275, y, r: 67 }); TREES.push({ x: 1144, y, r: 67 }); });
 const STOOLS = [
@@ -167,7 +174,7 @@ const STAGE = { x: 700, y: 1795 };
 
 // Posti attorno ai tavoli prodotto: cliente accanto al tavolo, dipendente sotto di lui
 const SLOTS = [];
-TABLES.forEach(t => {
+TABLES.filter(t => t.kind === 'product').forEach(t => {
   for (const side of [-1, 1]) {
     for (const oy of [55, 150]) {
       const x = side < 0 ? t.x - 24 : t.x + t.w + 24;
@@ -292,7 +299,7 @@ function newDay(dayOfMonth) {
   game = {
     day: dayOfMonth, date, weekend,
     time: OPEN - 2, speed: game ? game.speed : 1,
-    customers: [], staff: [], nextId: 1, lineIn: [], lineGB: [],
+    customers: [], staff: [], nextId: 1, lineIn: [], lineGB: [], lineEx: [],
     spawnAcc: 0, selected: null, over: false,
     log: [],
     sessions: [
@@ -300,7 +307,7 @@ function newDay(dayOfMonth) {
       { start: 14 * 60 + 30, title: pick(SESSION_TITLES) },
       { start: 17 * 60 + 30, title: pick(SESSION_TITLES) },
     ].map(s => ({ ...s, end: s.start + 45, state: 'planned' })),
-    stats: { entered: 0, buyers: 0, sold: 0, accessories: 0, lost: 0, browsed: 0, genius: 0, looked: 0, today: 0, waitSum: 0, waitN: 0 },
+    stats: { entered: 0, buyers: 0, sold: 0, accessories: 0, express: 0, wallSales: 0, lost: 0, browsed: 0, genius: 0, looked: 0, today: 0, waitSum: 0, waitN: 0 },
   };
   makeStaff();
   log(`Si apre: ${WEEKDAYS[date.getDay()]} ${dayOfMonth} gennaio`);
@@ -310,6 +317,9 @@ function makeStaff() {
   const people = [
     { name: 'Sara', role: 'point', post: POINT_IN, home: { x: POINT_IN.x, y: POINT_IN.y } },
     { name: 'Francesca', role: 'point', post: POINT_GB, home: { x: POINT_GB.x, y: POINT_GB.y } },
+    { name: 'Anna', role: 'express', post: EXPRESS, home: { x: EXPRESS.x, y: EXPRESS.y } },
+    { name: 'Valentina', role: 'accessori', side: 'L', home: { x: 160, y: 700 } },
+    { name: 'Simone', role: 'accessori', side: 'R', home: { x: 1258, y: 800 } },
     { name: 'Luca', role: 'specialist', zone: 'iphone', home: { x: 360, y: 400 } },
     { name: 'Giulia', role: 'specialist', zone: 'iphone', home: { x: 1030, y: 400 } },
     { name: 'Marco', role: 'specialist', zone: 'ipad', home: { x: 580, y: 740 } },
@@ -322,7 +332,7 @@ function makeStaff() {
     id: 'S' + i, ...p, isStaff: true,
     x: p.home.x, y: p.home.y, path: [], state: 'idle', t: rand(2, 6),
     look: { skin: pick(SKIN), hair: pick(HAIR), shirt: STAFF_SHIRT, pants: '#23232b' },
-    facing: p.role === 'point' ? (p.post === POINT_IN ? 'up' : 'left') : 'down', walk: 0, bubble: null, customer: null, served: 0,
+    facing: p.post ? p.post.face : 'down', walk: 0, bubble: null, customer: null, served: 0,
   }));
 }
 
@@ -379,9 +389,10 @@ function spawnCustomer(kind, extra = {}) {
 function describe(c) {
   if (c.kind === 'buy') return `cliente per ${PRODUCT_NAME[c.product]}`;
   if (c.kind === 'genius') return 'cliente per assistenza';
+  if (c.kind === 'acc') return 'cliente per accessori';
   return 'cliente che dà un\'occhiata';
 }
-const needIcon = c => c.kind === 'buy' ? c.product : c.kind === 'genius' ? 'wrench' : 'eye';
+const needIcon = c => c.kind === 'buy' ? c.product : c.kind === 'genius' ? 'wrench' : c.kind === 'acc' ? 'bag' : 'eye';
 
 // Una fila davanti a un Point: chi è primo va a parlare appena il Point è libero
 function updateLine(line, post) {
@@ -411,6 +422,12 @@ function proceed(c) {
     c.state = 'toTable'; goTo(c, slot);
   } else if (c.kind === 'genius') {
     c.state = 'inLine'; c.lineIdx = -1; game.lineGB.push(c);
+  } else if (c.kind === 'acc') {
+    // alla parete accessori: chi sa già cosa vuole prende e va all'Express, gli altri chiedono
+    c.side = Math.random() < 0.5 ? 'L' : 'R';
+    c.quick = Math.random() < 0.6;
+    c.state = 'toWall';
+    goTo(c, { x: WALL_SPOT[c.side], y: c.side === 'L' ? rand(160, 1650) : rand(400, 1650) });
   } else {
     c.visits = randi(1, 3); lookAround(c);
   }
@@ -435,7 +452,7 @@ function checkIn(point, c) {
   if (bar) {
     bar.taken = c; c.bar = bar; c.state = 'toBar'; goTo(c, bar);
     point.state = 'escort'; point.customer = c; goTo(point, { x: bar.x, y: bar.y + 34 });
-    log(`${point.name} accompagna un cliente al Genius Bar`);
+    log(`${point.name} accompagna un cliente al Genius Bar, tavolo ${bar.table.name}`);
     return;
   }
   point.state = 'idle'; point.customer = null;
@@ -452,7 +469,7 @@ function releaseSlot(c) {
 
 function leave(c, outcome) {
   releaseSlot(c);
-  for (const line of [game.lineIn, game.lineGB]) { const i = line.indexOf(c); if (i >= 0) { line.splice(i, 1); line.forEach(x => x.lineIdx = -1); } }
+  for (const line of [game.lineIn, game.lineGB, game.lineEx]) { const i = line.indexOf(c); if (i >= 0) { line.splice(i, 1); line.forEach(x => x.lineIdx = -1); } }
   if (c.point && c.point.customer === c) { c.point.customer = null; c.point.state = 'idle'; }
   c.outcome = outcome;
   const s = game.stats;
@@ -481,9 +498,14 @@ function updateCustomer(c, dt) {
       if (c.t <= 0) {
         const p = c.point; c.point = null;
         if (p.post === POINT_GB) { say(p, 'check', 1); checkIn(p, c); }
-        else {
+        else if (p.post === EXPRESS) {
+          say(p, 'check', 1); say(c, 'check', 1); p.state = 'idle'; p.customer = null; p.served++;
+          game.stats.express++;
+          log(`${p.name} incassa un accessorio all'Express (B1)`);
+          leave(c, 'bought');
+        } else {
           say(p, 'hi', 1); p.state = 'idle'; p.customer = null;
-          log(`${p.name} accoglie un ${describe(c)}`);
+          log(`${p.name} accoglie un ${describe(c)}${c.kind === 'buy' ? '' : c.kind === 'genius' ? ' e lo manda da ' + game.staff.find(x => x.post === POINT_GB).name : c.kind === 'acc' ? ' e lo manda alle pareti' : ''}`);
           proceed(c);
         }
       }
@@ -505,6 +527,22 @@ function updateCustomer(c, dt) {
       break;
     case 'toBar':
       if (arrived) { c.state = 'atBar'; c.facing = 'right'; }
+      break;
+    case 'toWall':
+      if (arrived) {
+        c.facing = c.side === 'L' ? 'left' : 'right';
+        if (c.quick) { c.state = 'pickWall'; c.t = rand(1, 3); }
+        else { c.state = 'waitWall'; c.patience = rand(6, 10); c.wait = 0; say(c, 'question', 2); }
+      }
+      break;
+    case 'pickWall':
+      c.t -= dt;
+      if (c.t <= 0) { say(c, 'bag', 2); c.state = 'inLine'; c.lineIdx = -1; game.lineEx.push(c); }
+      break;
+    case 'waitWall':
+      c.wait += dt; c.patience -= dt;
+      if (c.patience <= 0) leave(c, 'lost');
+      else if (!c.bubble && Math.random() < dt * 0.25) say(c, 'question', 1.5);
       break;
     case 'toLook':
       if (arrived) { c.state = 'looking'; c.t = rand(2, 6); face(c, { x: c.x < 700 ? c.x + 1 : c.x - 1, y: c.y }); }
@@ -536,6 +574,7 @@ function sessionSoon(mins) {
 }
 
 function wander(s) {
+  if (s.role === 'accessori') { goTo(s, { x: s.side === 'L' ? 165 : 1255, y: s.side === 'L' ? rand(200, 1600) : rand(420, 1600) }); return; }
   const zoneTables = s.zone ? TABLES.filter(t => t.product === s.zone || (s.zone === 'ipad' && t.product === 'watch')) : null;
   if (s.role === 'specialist' && zoneTables) {
     const t = pick(zoneTables);
@@ -554,6 +593,15 @@ function dispatch() {
     s.customer = c; c.staff = s; s.state = 'toCustomer';
     goTo(s, { x: c.slot.sx, y: c.slot.sy });
     game.stats.waitSum += c.wait; game.stats.waitN++;
+  }
+  // Pareti accessori: prima lo Specialist di quel lato, se è occupato quello dell'altro
+  const atWall = game.customers.filter(c => c.state === 'waitWall' && !c.staff).sort((a, b) => b.wait - a.wait);
+  for (const c of atWall) {
+    const free = game.staff.filter(s => s.role === 'accessori' && (s.state === 'idle' || s.state === 'wander'));
+    if (!free.length) break;
+    const s = free.find(x => x.side === c.side) || free[0];
+    s.customer = c; c.staff = s; s.state = 'toWallCustomer';
+    goTo(s, { x: c.x + (c.side === 'L' ? 28 : -28), y: c.y + 30 });
   }
   // Genius Bar: chi aspetta tra gli alberi prende il primo posto libero
   const queued = game.customers.filter(c => c.state === 'queued').sort((a, b) => b.wait - a.wait);
@@ -580,9 +628,9 @@ function updateStaff(s, dt) {
   const c = s.customer;
   switch (s.state) {
     case 'idle':
-      if (s.role === 'point') {
+      if (s.post) {
         if (arrived && dist(s, s.home) > 5) goTo(s, s.home);
-        else if (arrived) s.facing = s.post === POINT_IN ? 'up' : 'left';
+        else if (arrived) s.facing = s.post.face;
         break;
       }
       s.t -= dt;
@@ -594,12 +642,32 @@ function updateStaff(s, dt) {
     case 'wander':
       if (arrived) { s.state = 'idle'; s.t = rand(3, 9); }
       break;
+    case 'toWallCustomer':
+      if (!c || c.state !== 'waitWall') { s.customer = null; s.state = 'idle'; s.t = 1; break; }
+      if (arrived) {
+        s.state = 'advise'; s.t = rand(2, 4); c.state = 'servedWall';
+        face(s, c); say(s, 'question', s.t / 2); say(c, 'dots', s.t);
+      }
+      break;
+    case 'advise':
+      s.t -= dt;
+      if (s.t < 1 && !(s.bubble && s.bubble.icon === 'bag')) say(s, 'bag', 1);
+      if (s.t <= 0) {
+        if (Math.random() < 0.8) {
+          s.served++; game.stats.wallSales++;
+          say(s, 'check', 1); say(c, 'check', 1);
+          log(`${s.name} vende un accessorio alla parete ${c.side === 'L' ? 'sinistra' : 'destra'}`);
+          s.customer = null; leave(c, 'bought');
+        } else { s.customer = null; leave(c, 'browsed'); }
+        s.state = 'idle'; s.t = rand(1, 3);
+      }
+      break;
     case 'toCustomer':
       if (!c || c.state !== 'waiting') { s.customer = null; s.state = 'idle'; s.t = 1; break; }
       if (arrived) {
         s.state = 'probe'; s.t = rand(2, 4); c.state = 'served';
         face(s, c); say(s, 'question', s.t); say(c, 'dots', s.t);
-        log(`${s.name} accoglie un ${describe(c)} e fa domande`);
+        log(`${s.name} segue un ${describe(c)} al tavolo ${c.slot.table.name}`);
       }
       break;
     case 'probe':
@@ -633,7 +701,7 @@ function updateStaff(s, dt) {
       if (arrived && c && c.state === 'atBar') {
         s.state = 'repair'; s.t = rand(15, 30); s.facing = 'left';
         say(s, 'wrench', 3); say(c, 'dots', 3);
-        log(`${s.name} prende un cliente al Genius Bar`);
+        log(`${s.name} prende un cliente al Genius Bar (${c.bar.table.name})`);
       }
       break;
     case 'repair':
@@ -702,7 +770,7 @@ function spawnArrivals(dt) {
   while (game.spawnAcc >= 1) {
     game.spawnAcc -= 1 + rand(-0.4, 0.4);
     const r = Math.random();
-    spawnCustomer(r < 0.5 ? 'buy' : r < 0.8 ? 'genius' : 'look');
+    spawnCustomer(r < 0.42 ? 'buy' : r < 0.6 ? 'acc' : r < 0.85 ? 'genius' : 'look');
   }
 }
 
@@ -715,6 +783,7 @@ function step(dt) {
   updateSessions();
   updateLine(game.lineIn, POINT_IN);
   updateLine(game.lineGB, POINT_GB);
+  updateLine(game.lineEx, EXPRESS);
   dispatch();
   game.customers.forEach(c => updateCustomer(c, dt));
   game.staff.forEach(s => updateStaff(s, dt));
@@ -723,7 +792,7 @@ function step(dt) {
 
   if (before < CLOSE && game.time >= CLOSE) {
     log('Chiusura: si finisce con chi è dentro');
-    game.customers.filter(c => ['waiting', 'queued', 'inLine', 'looking', 'toLook', 'seated'].includes(c.state)).forEach(c => leave(c, c.kind === 'look' ? 'looked' : 'browsed'));
+    game.customers.filter(c => ['waiting', 'queued', 'inLine', 'looking', 'toLook', 'seated', 'toWall', 'pickWall', 'waitWall'].includes(c.state)).forEach(c => leave(c, c.kind === 'look' ? 'looked' : 'browsed'));
   }
   if (game.time >= CLOSE && game.customers.length === 0) endDay();
 }
@@ -737,6 +806,8 @@ function endDay() {
     ['Vendite', s.sold],
     ['Conversion', s.buyers ? Math.round(s.sold / s.buyers * 100) + '%' : '–'],
     ['Con accessorio', s.accessories],
+    ['Accessori all\'Express (B1)', s.express],
+    ['Accessori alle pareti', s.wallSales],
     ['Risolti al Genius Bar', s.genius],
     ['Solo a guardare', s.looked + s.today],
     ['…di cui fermi al Today at Apple', s.today],
@@ -812,20 +883,38 @@ function drawPerson(e) {
   }
 }
 
+const FONT = {
+  A: ['.#.', '#.#', '###', '#.#', '#.#'], B: ['##.', '#.#', '##.', '#.#', '##.'],
+  C: ['.##', '#..', '#..', '#..', '.##'], D: ['##.', '#.#', '#.#', '#.#', '##.'],
+  1: ['.#.', '##.', '.#.', '.#.', '###'], 2: ['##.', '..#', '.#.', '#..', '###'],
+  3: ['##.', '..#', '.#.', '..#', '##.'], 4: ['#.#', '#.#', '###', '..#', '..#'],
+  5: ['###', '#..', '##.', '..#', '##.'],
+};
+function drawText(str, x, y, color) {
+  [...str].forEach((ch, k) => FONT[ch].forEach((row, j) => [...row].forEach((b, i) => { if (b === '#') rect(x + k * 4 + i, y + j, 1, 1, color); })));
+}
 function drawTable(t) {
   const x = px(t.x), y = px(t.y), w = px(t.x + t.w) - x, h = px(t.y + t.h) - y;
   rect(x + 1, y + 1, w, h, 'rgba(0,0,0,0.2)');
   rect(x, y, w, h, '#c9955c');
   rect(x, y, w, 1, '#dcaa6e');
   rect(x, y + h - 1, w, 1, '#a8773f');
+  drawText(t.name, x + Math.floor((w - 7) / 2), y + 2, '#6b4520');
   if (t.kind === 'support') {
-    rect(x + 3, y + 3, w - 6, 1, '#a8773f');
-    for (let i = 0; i < 2; i++) { rect(x + 3, y + 10 + i * 21, 5, 4, '#bfc3c9'); rect(x + 4, y + 11 + i * 21, 3, 2, '#1d1d24'); }
+    for (let i = 0; i < 2; i++) { rect(x + 3, y + 11 + i * 21, 5, 4, '#bfc3c9'); rect(x + 4, y + 12 + i * 21, 3, 2, '#1d1d24'); }
+    return;
+  }
+  if (t.kind === 'express') {
+    // cassa: terminale e scatole di accessori
+    rect(x + 11, y + 20, 4, 6, '#1d1d24'); rect(x + 12, y + 21, 2, 2, '#4aa3ff');
+    const box = ['#f5f5f0', '#e05a47', '#4aa3ff', '#f2b134', '#6ab04c', '#e36bb5'];
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 2; c++) rect(x + 3 + c * 4, y + 10 + r * 11, 3, 3, box[(r * 2 + c) % box.length]);
+    rect(x + 3, y + 38, 12, 3, '#2a6ad8');
     return;
   }
   const p = t.product;
   for (let r = 0; r < 4; r++) for (let c = 0; c < 2; c++) {
-    const ix = x + 3 + c * 8, iy = y + 4 + r * 10;
+    const ix = x + 3 + c * 8, iy = y + 9 + r * 9;
     if (p === 'iphone') { rect(ix + 1, iy, 3, 5, '#1d1d24'); rect(ix + 2, iy + 1, 1, 3, pick4(r, c)); }
     else if (p === 'ipad') { rect(ix, iy, 6, 7, '#1d1d24'); rect(ix + 1, iy + 1, 4, 5, pick4(r, c)); }
     else if (p === 'watch') { rect(ix + 1, iy + 1, 3, 3, '#1d1d24'); rect(ix + 2, iy + 2, 1, 1, '#e36bb5'); rect(ix + 2, iy, 1, 5, '#555'); }
@@ -899,6 +988,11 @@ function render() {
   SUPPORT.forEach(drawTable);
   STOOLS.forEach(drawStool);
   drawScreen();
+  if (game.selected && game.selected.isTable) {
+    const t = game.selected.table;
+    ctx.strokeStyle = '#ffe14d'; ctx.lineWidth = 1;
+    ctx.strokeRect(px(t.x) - 1.5, px(t.y) - 1.5, px(t.x + t.w) - px(t.x) + 3, px(t.y + t.h) - px(t.y) + 3);
+  }
   // persone e alberi ordinati per profondità
   const drawables = [
     ...TREES.map(t => ({ y: t.y, draw: () => drawTree(t) })),
@@ -917,12 +1011,14 @@ const rows = list => list.map(([k, v]) => `<span>${k}</span><b>${v}</b>`).join('
 const STATE_LABEL = {
   inLine: 'in fila per il Point', toPoint: 'va dal Point', talking: 'dice al Point cosa cerca', toTable: 'va al tavolo', waiting: 'aspetta qualcuno',
   served: 'viene seguito', toQueue: 'va in attesa', queued: 'in coda per il Genius Bar', toBar: 'va al Genius Bar',
-  atBar: 'al Genius Bar', toSession: 'va al Today at Apple', seated: 'si ferma al Today at Apple', toLook: 'va a guardare', looking: 'guarda i prodotti', leaving: 'esce',
+  atBar: 'al Genius Bar', toSession: 'va al Today at Apple', seated: 'si ferma al Today at Apple', toLook: 'va a guardare', looking: 'guarda i prodotti',
+  toWall: 'va alla parete accessori', pickWall: 'sceglie un accessorio', waitWall: 'aspetta qualcuno alla parete', servedWall: 'viene consigliato',
+  toWallCustomer: 'va da un cliente alla parete', advise: 'consiglia un accessorio', leaving: 'esce',
   idle: 'libero', wander: 'gira nella sua zona', listening: 'ascolta un cliente', escort: 'accompagna al Genius Bar', toCustomer: 'va da un cliente',
   probe: 'fa domande', demo: 'fa la demo', checkout: 'chiude la vendita', repair: 'ripara',
   toStage: 'va allo schermo', onStage: 'prepara la sessione', presenting: 'tiene la sessione',
 };
-const ROLE_LABEL = { point: 'Point', specialist: 'Specialist', genius: 'Genius', creative: 'Creative' };
+const ROLE_LABEL = { point: 'Point', express: 'Cassa Express', accessori: 'Specialist accessori', specialist: 'Specialist', genius: 'Genius', creative: 'Creative' };
 
 let lastPanel = 0;
 function updatePanel() {
@@ -940,6 +1036,8 @@ function updatePanel() {
     ['In coda Genius', queue],
     ['Entrati oggi', s.entered],
     ['Vendite', s.sold + (s.accessories ? ` <small>(+${s.accessories} acc.)</small>` : '')],
+    ['Accessori Express · pareti', `${s.express} · ${s.wallSales}`],
+    ['In fila all\'Express', game.lineEx.length],
     ['Genius risolti', s.genius],
     ['Solo a guardare', s.looked + s.today],
     ['Fermi al Today', s.today],
@@ -947,9 +1045,16 @@ function updatePanel() {
   ]);
   document.getElementById('log').innerHTML = game.log.slice(0, 10).map(l => `<div><span>${fmt(l.t)}</span>${l.msg}</div>`).join('');
   const e = game.selected, info = document.getElementById('info');
+  if (e && e.isTable) {
+    const t = e.table;
+    const here = game.customers.filter(c => (c.slot && c.slot.table === t) || (c.bar && c.bar.table === t)).length;
+    const what = t.kind === 'support' ? 'Genius Bar' : t.kind === 'express' ? 'Cassa Express · accessori rapidi' : PRODUCT_NAME[t.product];
+    info.innerHTML = `<b>Tavolo ${t.name}</b> · ${what}<br><span class="sub">${t.kind === 'express' ? `in fila: ${game.lineEx.length}` : `clienti al tavolo: ${here}`}</span>`;
+    return;
+  }
   if (!e || (!e.isStaff && !game.customers.includes(e))) { game.selected = null; info.innerHTML = ''; return; }
   if (e.isStaff) {
-    info.innerHTML = `<b>${e.name}</b> · ${ROLE_LABEL[e.role]}${e.zone ? ` (zona ${PRODUCT_NAME[e.zone]})` : ''}${e.post ? (e.post === POINT_IN ? ' all\'ingresso' : ' del Genius Bar') : ''}<br>
+    info.innerHTML = `<b>${e.name}</b> · ${ROLE_LABEL[e.role]}${e.zone ? ` (zona ${PRODUCT_NAME[e.zone]})` : ''}${e.post === POINT_IN ? ' all\'ingresso' : e.post === POINT_GB ? ' del Genius Bar' : e.post === EXPRESS ? ' al tavolo B1' : ''}${e.side ? (e.side === 'L' ? ' · parete sinistra' : ' · parete destra') : ''}<br>
       <span class="sub">${STATE_LABEL[e.state] || e.state} · clienti seguiti oggi: ${e.served}</span>`;
   } else {
     info.innerHTML = `<b>Cliente #${e.id}</b> · ${describe(e).replace('cliente ', '')}<br>
@@ -964,6 +1069,10 @@ canvas.addEventListener('click', ev => {
   for (const e of [...game.staff, ...game.customers]) {
     const d = Math.hypot(e.x - wx, e.y - 20 - wy);
     if (d < bd) { bd = d; best = e; }
+  }
+  if (!best) {
+    const t = TABLES.concat(SUPPORT).find(t => wx >= t.x && wx <= t.x + t.w && wy >= t.y && wy <= t.y + t.h);
+    if (t) best = { isTable: true, table: t };
   }
   game.selected = best;
   updatePanel();
