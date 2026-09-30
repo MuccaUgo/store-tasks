@@ -47,17 +47,34 @@
   .log { max-height: 220px; overflow: hidden; font-size: 12px; }
   .log div { padding: 2px 0; border-bottom: 1px dashed #33333d; }
   .log span { color: var(--muted); margin-right: 6px; }
+  .reviews { font-size: 12px; }
+  .reviews:empty::before { content: "Ancora nessun commento"; color: var(--muted); }
+  .reviews div { padding: 3px 0; border-bottom: 1px dashed #33333d; }
+  .score { display: inline-block; min-width: 20px; text-align: center; border-radius: 3px; margin-right: 6px; font-weight: 700; color: #111; }
+  .s5 { background: var(--good); } .s4 { background: #bfc3c9; } .s3, .s2, .s1 { background: var(--bad); }
+  .team { display: grid; grid-template-columns: auto 1fr 1fr 1fr; gap: 4px 6px; font-size: 12px; align-items: center; }
+  .bar { height: 6px; background: #3a3a46; border-radius: 3px; overflow: hidden; }
+  .bar i { display: block; height: 100%; }
+  .bm i { background: #4aa3ff; } .bs i { background: var(--bad); } .bc i { background: var(--good); }
   .legend { display: grid; grid-template-columns: 14px 1fr; gap: 4px 8px; font-size: 12px; align-items: center; }
   .sw { width: 12px; height: 12px; border-radius: 2px; }
   .info:empty::before { content: "Tocca una persona o un tavolo"; color: var(--muted); font-size: 12px; }
-  .overlay { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
-    background: rgba(10,10,14,.7); z-index: 3; }
+  .overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(10,10,14,.75); z-index: 10; padding: env(safe-area-inset-top) 12px env(safe-area-inset-bottom); }
   .overlay.show { display: flex; }
   .card { background: var(--panel); border: 2px solid var(--line); border-radius: 6px; padding: 18px 20px; width: min(320px, 92%);
     max-height: 96%; overflow: auto; }
   .card h2 { margin: 0 0 4px; font-size: 18px; }
   .card .stats { margin: 12px 0 16px; }
   .card button { width: 100%; min-height: 44px; }
+  .brTeam { font-size: 12px; margin: 10px 0; padding: 8px; background: #1f1f27; border-radius: 4px; }
+  .opt { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; }
+  .opt .top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .opt .desc { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .opt .ctl { display: flex; align-items: center; gap: 6px; }
+  .opt .ctl button { width: 36px; min-height: 36px; padding: 0; }
+  .tok { letter-spacing: 2px; color: var(--accent); min-width: 36px; text-align: center; }
+  #brLeft { margin: 4px 0 10px; }
 
   /* Telefono: barra fissa in alto, store a tutta larghezza, zoom con trascinamento */
   @media (max-width: 760px) {
@@ -102,6 +119,16 @@
   <div class="stage">
     <div class="scroller" id="scroller"><canvas id="game" width="288" height="380"></canvas></div>
     <div class="tip" id="tip"></div>
+    <div class="overlay" id="brief">
+      <div class="card">
+        <h2>Brief del giorno</h2>
+        <div class="sub" id="brDate"></div>
+        <div class="brTeam" id="brTeam"></div>
+        <div id="brOpts"></div>
+        <div class="sub" id="brLeft"></div>
+        <button class="on" id="openStore">Apri lo store</button>
+      </div>
+    </div>
     <div class="overlay" id="debrief">
       <div class="card">
         <h2>Debrief di giornata</h2>
@@ -115,6 +142,14 @@
     <div class="box">
       <h3>Oggi</h3>
       <div class="stats" id="stats"></div>
+    </div>
+    <div class="box">
+      <h3>Commenti dei clienti</h3>
+      <div class="reviews" id="reviews"></div>
+    </div>
+    <div class="box">
+      <h3>Team <span class="sub">motivazione · stress · competenza</span></h3>
+      <div class="team" id="team"></div>
     </div>
     <div class="box">
       <h3>Selezione</h3>
@@ -323,6 +358,36 @@ const RATE = { 10: 6, 11: 9, 12: 12, 13: 12, 14: 9, 15: 10, 16: 12, 17: 16, 18: 
 
 let game;
 
+// Il team resta da un giorno all'altro: motivazione, stress e competenza (0–100)
+const PROFILES = {
+  Sara: [70, 30, 75], Francesca: [60, 45, 80], Anna: [55, 30, 60], Valentina: [80, 25, 45],
+  Simone: [50, 40, 65], Luca: [85, 20, 40], Giulia: [65, 35, 80], Marco: [40, 30, 85],
+  Elena: [60, 70, 70], Paolo: [70, 40, 75], Chiara: [55, 55, 85], Davide: [75, 30, 65],
+};
+const TEAM = {};
+for (const [name, [mot, stress, comp]] of Object.entries(PROFILES)) TEAM[name] = { mot, stress, comp };
+// La notte si riposa: lo stress scende, la motivazione torna verso la media
+// Stress alto a fine giornata: il giorno dopo si rischia la malattia
+function overnight(focus = { op: 0 }) {
+  for (const t of Object.values(TEAM)) {
+    if (t.sick) { t.sick = false; t.stress = 20; continue; }
+    if (t.stress > 70 && Math.random() < (t.stress - 70) / 60) t.sick = true;
+    t.stress *= 0.7;
+    t.mot += (60 - t.mot) * 0.15;
+    t.comp = clamp(t.comp - 0.4 + 0.5 * focus.op);
+  }
+}
+
+const clamp = v => Math.max(0, Math.min(100, v));
+function bump(s, key, d) { s.stats[key] = clamp(s.stats[key] + d); }
+// I gettoni del Brief: game.focus = { op, sales, cel }, da 0 a 3 ciascuno
+const F = () => game.focus;
+const pace = s => 1.3 - 0.6 * s.stats.mot / 100;                                         // motivazione → più veloce
+const errorChance = s => 0.2 * (1 - s.stats.comp / 100) * (1 - 0.25 * F().op);            // competenza e operativa → meno errori
+const attachChance = s => (0.15 + 0.45 * s.stats.comp / 100) * (1 + 0.25 * F().sales);   // competenza e vendita → più attach
+// stress → esperienza peggiore; spingere le vendite senza competenza si sente
+const care = s => 12 - 0.22 * s.stats.stress - 2 * F().sales * (1 - s.stats.comp / 100);
+
 function newDay(dayOfMonth) {
   const date = new Date(2027, 0, dayOfMonth);
   const weekend = date.getDay() === 0 || date.getDay() === 6;
@@ -341,14 +406,18 @@ function newDay(dayOfMonth) {
       { start: 14 * 60 + 30, title: pick(SESSION_TITLES) },
       { start: 17 * 60 + 30, title: pick(SESSION_TITLES) },
     ].map(s => ({ ...s, end: s.start + 45, state: 'planned' })),
-    stats: { entered: 0, buyers: 0, sold: 0, accessories: 0, express: 0, wallSales: 0, lost: 0, browsed: 0, genius: 0, looked: 0, today: 0, waitSum: 0, waitN: 0 },
+    reviews: [],
+    stats: { entered: 0, buyers: 0, sold: 0, accessories: 0, services: 0, errors: 0, express: 0, wallSales: 0, lost: 0, browsed: 0, genius: 0, looked: 0, today: 0, waitSum: 0, waitN: 0 },
   };
+  game.focus = { op: 0, sales: 0, cel: 0 };
+  game.briefing = true;
+  document.getElementById('debrief').classList.remove('show');
   makeStaff();
-  log(`Si apre: ${WEEKDAYS[date.getDay()]} ${dayOfMonth} gennaio`);
+  showBrief();
 }
 
 function makeStaff() {
-  const people = [
+  let people = [
     { name: 'Sara', role: 'point', post: POINT_IN, home: { x: POINT_IN.x, y: POINT_IN.y } },
     { name: 'Francesca', role: 'point', post: POINT_GB, home: { x: POINT_GB.x, y: POINT_GB.y } },
     { name: 'Anna', role: 'express', post: EXPRESS, home: { x: EXPRESS.x, y: EXPRESS.y } },
@@ -362,12 +431,91 @@ function makeStaff() {
     { name: 'Chiara', role: 'genius', home: { x: 779, y: 1192 } },
     { name: 'Davide', role: 'creative', home: { x: 1030, y: 1460 } },
   ];
+  // chi è in malattia resta a casa; i posti fissi li copre lo Specialist più competente
+  game.sick = people.filter(p => TEAM[p.name].sick).map(p => p.name);
+  const present = people.filter(p => !TEAM[p.name].sick);
+  game.cover = [];
+  for (const p of people.filter(p => p.post && TEAM[p.name].sick)) {
+    const sub = present.filter(x => x.role === 'specialist').sort((a, b) => TEAM[b.name].comp - TEAM[a.name].comp)[0];
+    if (!sub) continue;
+    Object.assign(sub, { role: p.role, post: p.post, home: p.home, zone: undefined });
+    game.cover.push(`${sub.name} copre ${p.name}`);
+  }
+  people = present;
   game.staff = people.map((p, i) => ({
     id: 'S' + i, ...p, isStaff: true,
     x: p.home.x, y: p.home.y, path: [], state: 'idle', t: rand(2, 6),
     look: { skin: pick(SKIN), hair: pick(HAIR), shirt: STAFF_SHIRT, pants: '#23232b' },
     facing: p.post ? p.post.face : 'down', walk: 0, bubble: null, customer: null, served: 0,
+    stats: TEAM[p.name], start: { ...TEAM[p.name] },
   }));
+}
+
+// ─────────────────────────────────────────────────────────────
+// Brief: 3 gettoni tra operativa, vendita e celebration
+// ─────────────────────────────────────────────────────────────
+const STRATEGIES = [
+  { key: 'op', name: 'Operativa', desc: 'Processi e formazione: meno errori, e la competenza cresce. Ogni gettone manda uno Specialist in formazione la prima ora.' },
+  { key: 'sales', name: 'Vendita', desc: 'Accessori e servizi: più attach. Ma più stress, e con poca competenza il cliente si sente spinto.' },
+  { key: 'cel', name: 'Celebration', desc: 'Riconoscimenti: più motivazione e meno stress. Ogni gettone è un momento di squadra di 5 minuti all\'apertura.' },
+];
+const avgTeam = k => Math.round(game.staff.reduce((a, x) => a + x.stats[k], 0) / game.staff.length);
+function showBrief() {
+  const f = game.focus, used = f.op + f.sales + f.cel;
+  document.getElementById('brDate').textContent = `${WEEKDAYS[game.date.getDay()]} ${game.day} gennaio${game.weekend ? ' · weekend, più gente' : ''}`;
+  const stressed = game.staff.filter(x => x.stats.stress > 60).map(x => x.name);
+  document.getElementById('brTeam').innerHTML =
+    `Team: motivazione <b>${avgTeam('mot')}</b> · stress <b>${avgTeam('stress')}</b> · competenza <b>${avgTeam('comp')}</b>` +
+    (game.sick.length ? `<br>In malattia: <b>${game.sick.join(', ')}</b>` : '') +
+    (game.cover.length ? `<br>${game.cover.join(' · ')}` : '') +
+    (stressed.length ? `<br>Molto stressati: <b>${stressed.join(', ')}</b>` : '');
+  document.getElementById('brOpts').innerHTML = STRATEGIES.map(st => `
+    <div class="opt"><div class="top"><b>${st.name}</b>
+      <span class="ctl"><button data-k="${st.key}" data-d="-1" aria-label="Togli un gettone">−</button>
+      <span class="tok">${'●'.repeat(f[st.key])}${'○'.repeat(3 - f[st.key])}</span>
+      <button data-k="${st.key}" data-d="1" aria-label="Aggiungi un gettone">+</button></span></div>
+      <div class="desc">${st.desc}</div></div>`).join('');
+  document.getElementById('brLeft').textContent = used < 3 ? `Gettoni da mettere: ${3 - used}` : 'Tutti i gettoni sono assegnati';
+  document.getElementById('brief').classList.add('show');
+}
+document.getElementById('brOpts').addEventListener('click', ev => {
+  const b = ev.target.closest('button'); if (!b) return;
+  const f = game.focus, k = b.dataset.k, d = +b.dataset.d;
+  if (d > 0 && f.op + f.sales + f.cel >= 3) return;
+  f[k] = Math.max(0, Math.min(3, f[k] + d));
+  showBrief();
+});
+document.getElementById('openStore').addEventListener('click', () => startDay(game.focus));
+
+function startDay(focus) {
+  game.focus = focus;
+  game.briefing = false;
+  document.getElementById('brief').classList.remove('show');
+  const names = { op: 'operativa', sales: 'vendita', cel: 'celebration' };
+  const chosen = Object.entries(focus).filter(([, v]) => v).map(([k, v]) => `${names[k]} ${v}`).join(', ');
+  log(`Si apre: ${WEEKDAYS[game.date.getDay()]} ${game.day} gennaio · focus ${chosen || 'nessuno'}`);
+  // celebration: subito più motivazione e meno stress, poi il momento di squadra
+  if (focus.cel) {
+    game.staff.forEach(x => { bump(x, 'mot', 3 * focus.cel); bump(x, 'stress', -4 * focus.cel); });
+    game.staff.forEach((x, i) => {
+      const a = i / game.staff.length * Math.PI * 2;
+      x.state = 'huddle'; x.until = OPEN + 5 * focus.cel;
+      goTo(x, { x: 700 + Math.cos(a) * 110, y: 1440 + Math.sin(a) * 45 });
+    });
+    log(`Momento di squadra di ${5 * focus.cel} minuti`);
+  }
+  // operativa: i meno competenti vanno in formazione la prima ora, seduti al Forum
+  if (focus.op) {
+    const trainees = game.staff.filter(x => x.role === 'specialist').sort((a, b) => a.stats.comp - b.stats.comp).slice(0, focus.op);
+    trainees.forEach(x => {
+      const seat = STOOLS.find(st => !st.taken);
+      if (!seat) return;
+      seat.taken = x; x.seat = seat;
+      x.state = 'training'; x.until = OPEN + 60 + (focus.cel ? 5 * focus.cel : 0);
+      goTo(x, seat);
+    });
+    if (trainees.length) log(`In formazione fino alle ${fmt(OPEN + 60)}: ${trainees.map(x => x.name).join(', ')}`);
+  }
 }
 
 function log(msg) {
@@ -410,6 +558,7 @@ function spawnCustomer(kind, extra = {}) {
     x: DOOR.x + rand(-30, 30), y: DOOR.y, path: [], state: 'inLine', t: 0,
     look: { skin: pick(SKIN), hair: pick(HAIR), shirt: pick(SHIRTS), pants: pick(PANTS) },
     facing: 'down', walk: 0, bubble: null, staff: null, slot: null, wait: 0, lineIdx: -1,
+    exp: rand(58, 70), waited: 0, servedBy: null,
     product: kind === 'buy' ? pick(['iphone', 'iphone', 'iphone', 'ipad', 'watch', 'mac', 'mac']) : null,
     ...extra,
   };
@@ -496,6 +645,55 @@ function checkIn(point, c) {
   log(`${point.name}: Genius Bar pieno, il cliente aspetta`);
 }
 
+// Un momento di servizio: lo stress di chi serve pesa sull'esperienza, la competenza sugli errori
+const ERROR_TEXT = {
+  point: 'manda il cliente nel posto sbagliato', express: 'sbaglia lo scontrino', accessori: 'consiglia l\'accessorio sbagliato',
+  specialist: 'dà un\'informazione sbagliata', genius: 'deve rifare la riparazione', creative: 'dà un\'informazione sbagliata',
+};
+function serve(s, c, weight = 1) {
+  c.servedBy = s;
+  const k = care(s) * weight;
+  c.exp += k;
+  if (k < 0) c.rushed = true;
+  bump(s, 'comp', 0.03);
+  if (Math.random() < errorChance(s) * weight) {
+    c.exp -= 30; c.error = true;
+    say(s, 'oops', 2);
+    bump(s, 'mot', -3); bump(s, 'stress', 3);
+    game.stats.errors++;
+    log(`${s.name} ${ERROR_TEXT[s.role]}`);
+    return true;
+  }
+  return false;
+}
+
+// Il commento: non tutti lo lasciano. 5 positivo (+1), 4 passivo (0), da 3 a 1 negativo (−1)
+function survey(c) {
+  if (c.outcome === 'lost') c.exp = Math.min(c.exp, 30);
+  if (Math.random() > (c.outcome === 'lost' ? 0.45 : 0.3)) return;
+  const e = c.exp;
+  const score = e >= 80 ? 5 : e >= 65 ? 4 : e >= 50 ? 3 : e >= 35 ? 2 : 1;
+  const value = score === 5 ? 1 : score === 4 ? 0 : -1;
+  const n = c.servedBy ? c.servedBy.name : null;
+  let text;
+  if (score === 5) text = n ? pick([`Esperienza top, grazie a ${n}`, `${n} mi ha fatto provare tutto con calma`, `Seguito subito, grazie ${n}`])
+    : 'Bel negozio, trovato tutto';
+  else if (score === 4) text = pick(['Tutto ok, niente di speciale', 'Bene, ma un po\' di attesa', 'Ho trovato quello che cercavo']);
+  else if (c.outcome === 'lost') text = 'Ho aspettato e nessuno mi ha seguito';
+  else if (c.error) text = `${n} ha sbagliato qualcosa con me`;
+  else if (c.waited > 8) text = 'Troppa attesa';
+  else if (c.rushed) text = `${n} andava di fretta`;
+  else text = 'Mi aspettavo di più';
+  game.reviews.unshift({ t: game.time, score, value, text, staff: n });
+  say(c, 'r' + score, 3);
+  if (c.servedBy) {
+    if (score === 5) bump(c.servedBy, 'mot', 3);
+    if (score <= 3) { bump(c.servedBy, 'mot', -2); bump(c.servedBy, 'stress', 1); }
+  }
+}
+const nps = () => game.reviews.length ? game.reviews.reduce((a, r) => a + r.value, 0) / game.reviews.length : null;
+const fmtNps = v => v === null ? '–' : (v > 0 ? '+' : '') + v.toFixed(2).replace('.', ',');
+
 function releaseSlot(c) {
   if (c.slot) { c.slot.taken = null; c.slot = null; }
   if (c.bar) { c.bar.taken = null; c.bar = null; }
@@ -511,18 +709,24 @@ function leave(c, outcome) {
   else if (outcome === 'browsed') { s.browsed++; if (!c.bubble) say(c, 'meh', 2); }
   else if (outcome === 'looked') { s.looked++; }
   else say(c, 'heart', 3);
+  c.exp += { bought: 10, fixed: 12, session: 5 }[outcome] || 0;
+  if (c.servedBy && (outcome === 'bought' || outcome === 'fixed')) bump(c.servedBy, 'mot', 1);
+  survey(c);
   if (c.staff) { c.staff.customer = null; c.staff = null; }
   c.state = 'leaving';
   goTo(c, { x: DOOR.x + rand(-30, 30), y: DOOR.y - 20 });
 }
 
+const WAIT_COST = { inLine: 1, waiting: 1.5, waitWall: 1.5, queued: 0.5, atBar: 0.8 };
 function updateCustomer(c, dt) {
   const arrived = moveAlong(c, dt);
+  const cost = WAIT_COST[c.state];
+  if (cost && !(c.state === 'atBar' && c.staff && c.staff.state === 'repair')) { c.exp -= cost * dt; c.waited += dt; }
   switch (c.state) {
     case 'toPoint':
       if (arrived) {
         const p = c.point;
-        c.state = 'talking'; c.t = rand(0.7, 1.5);
+        c.state = 'talking'; c.t = rand(0.7, 1.5) * pace(p);
         face(c, p); face(p, c);
         say(p, 'question', c.t / 2); say(c, needIcon(c), c.t);
       }
@@ -532,6 +736,7 @@ function updateCustomer(c, dt) {
       if (c.t <= 0) {
         const p = c.point; c.point = null;
         if (p.post !== EXPRESS) p.served++;
+        serve(p, c, 0.5);
         if (p.post === POINT_GB) { say(p, 'check', 1); checkIn(p, c); }
         else if (p.post === EXPRESS) {
           say(p, 'check', 1); say(c, 'check', 1); p.state = 'idle'; p.customer = null; p.served++;
@@ -658,9 +863,15 @@ function dispatch() {
   }
 }
 
+const BUSY = new Set(['probe', 'demo', 'checkout', 'repair', 'advise', 'listening', 'escort', 'presenting', 'toCustomer', 'toWallCustomer', 'toBar']);
 function updateStaff(s, dt) {
   const arrived = moveAlong(s, dt);
   const c = s.customer;
+  if (game.time >= OPEN && game.time < CLOSE) {
+    if (BUSY.has(s.state) || s.customer) bump(s, 'stress', 0.15 * (1 + 0.1 * F().sales) * dt);
+    else bump(s, 'stress', -0.08 * dt);
+    bump(s, 'mot', -0.015 * (1 - 0.3 * F().cel) * dt);
+  }
   switch (s.state) {
     case 'idle':
       if (s.post) {
@@ -680,7 +891,7 @@ function updateStaff(s, dt) {
     case 'toWallCustomer':
       if (!c || c.state !== 'waitWall') { s.customer = null; s.state = 'idle'; s.t = 1; break; }
       if (arrived) {
-        s.state = 'advise'; s.t = rand(2, 4); c.state = 'servedWall';
+        s.state = 'advise'; s.t = rand(2, 4) * pace(s); c.state = 'servedWall'; serve(s, c);
         face(s, c); say(s, 'question', s.t / 2); say(c, 'dots', s.t);
       }
       break;
@@ -688,7 +899,7 @@ function updateStaff(s, dt) {
       s.t -= dt;
       if (s.t < 1 && !(s.bubble && s.bubble.icon === 'bag')) say(s, 'bag', 1);
       if (s.t <= 0) {
-        if (Math.random() < 0.8) {
+        if (Math.random() < 0.6 + 0.3 * s.stats.comp / 100) {
           s.served++; game.stats.wallSales++;
           say(s, 'check', 1); say(c, 'check', 1);
           log(`${s.name} vende un accessorio alla parete ${c.side === 'L' ? 'sinistra' : 'destra'}`);
@@ -700,22 +911,22 @@ function updateStaff(s, dt) {
     case 'toCustomer':
       if (!c || c.state !== 'waiting') { s.customer = null; s.state = 'idle'; s.t = 1; break; }
       if (arrived) {
-        s.state = 'probe'; s.t = rand(2, 4); c.state = 'served';
+        s.state = 'probe'; s.t = rand(2, 4) * pace(s); c.state = 'served'; serve(s, c);
         face(s, c); say(s, 'question', s.t); say(c, 'dots', s.t);
         log(`${s.name} segue un ${describe(c)} al tavolo ${c.slot.table.name}`);
       }
       break;
     case 'probe':
       s.t -= dt;
-      if (s.t <= 0) { s.state = 'demo'; s.t = rand(4, 9); say(s, c.product, s.t); say(c, 'dots', s.t); }
+      if (s.t <= 0) { s.state = 'demo'; s.t = rand(4, 9) * pace(s); say(s, c.product, s.t); say(c, 'dots', s.t); }
       break;
     case 'demo':
       s.t -= dt;
       if (s.t <= 0) {
         // Più ha aspettato, meno compra
-        const p = 0.55 - Math.min(0.3, c.wait * 0.03);
+        const p = 0.45 + 0.15 * s.stats.comp / 100 - Math.min(0.3, c.wait * 0.03);
         if (Math.random() < p) {
-          s.state = 'checkout'; s.t = rand(2, 4); c.bought = true;
+          s.state = 'checkout'; s.t = rand(2, 4) * pace(s); c.bought = true;
           say(s, 'check', s.t); say(c, 'check', s.t);
         } else {
           log(`Il cliente di ${s.name} ci pensa ancora`);
@@ -726,15 +937,20 @@ function updateStaff(s, dt) {
     case 'checkout':
       s.t -= dt;
       if (s.t <= 0) {
-        if (!c.accTried && Math.random() < 0.4) {
-          c.accTried = true; s.t = rand(1.5, 3); say(s, 'bag', s.t);
+        // prima l'accessorio, poi il servizio (AppleCare, permuta, configurazione)
+        if (!c.accTried && Math.random() < attachChance(s)) {
+          c.accTried = true; s.t = rand(1.5, 3) * pace(s); say(s, 'bag', s.t);
           c.accessory = Math.random() < 0.6;
+        } else if (!c.svcTried && Math.random() < attachChance(s) * 0.7) {
+          c.svcTried = true; s.t = rand(1.5, 3) * pace(s); say(s, 'shield', s.t);
+          c.service = Math.random() < 0.5;
         } else finishSale(s, c, true);
       }
       break;
     case 'toBar':
       if (arrived && c && c.state === 'atBar') {
-        s.state = 'repair'; s.t = rand(15, 30); s.facing = 'left';
+        s.state = 'repair'; s.t = rand(15, 30) * pace(s); s.facing = 'left';
+        if (serve(s, c)) s.t += 8;
         say(s, 'wrench', 3); say(c, 'dots', 3);
         log(`${s.name} prende un cliente al Genius Bar (${c.bar.table.name})`);
       }
@@ -744,6 +960,7 @@ function updateStaff(s, dt) {
       if (Math.random() < dt * 0.15) say(s, pick(['wrench', 'dots', 'question']), 1.5);
       if (s.t <= 0) {
         game.stats.genius++; s.served++;
+        if (Math.random() < attachChance(s) * 0.3) { game.stats.services++; log(`${s.name} aggiunge AppleCare`); }
         log(`${s.name} risolve al Genius Bar`);
         leave(c, 'fixed');
         s.state = 'idle'; s.t = rand(1, 3); goTo(s, s.home);
@@ -751,6 +968,16 @@ function updateStaff(s, dt) {
       break;
     case 'toStage':
       if (arrived) { s.state = 'onStage'; s.facing = 'up'; }
+      break;
+    case 'huddle':
+      if (arrived) face(s, { x: 700, y: 1440 });
+      if (game.time >= s.until) { s.state = 'idle'; s.t = rand(0, 2); say(s, 'star', 1); goTo(s, s.home); }
+      break;
+    case 'training':
+      if (game.time >= s.until) {
+        s.seat.taken = null; s.seat = null; bump(s, 'comp', 2);
+        s.state = 'idle'; s.t = rand(0, 2); goTo(s, s.home);
+      }
       break;
     case 'presenting':
       if (Math.random() < dt * 0.3) say(s, pick(['star', 'iphone', 'ipad', 'hi']), 1.5);
@@ -764,7 +991,8 @@ function finishSale(s, c, bought) {
   if (bought) {
     st.sold++;
     if (c.accessory) st.accessories++;
-    log(`${s.name} vende ${PRODUCT_NAME[c.product]}${c.accessory ? ' + accessorio' : ''}`);
+    if (c.service) st.services++;
+    log(`${s.name} vende ${PRODUCT_NAME[c.product]}${c.accessory ? ' + accessorio' : ''}${c.service ? ' + AppleCare' : ''}`);
     leave(c, 'bought');
   } else leave(c, 'browsed');
   s.customer = null; s.state = 'idle'; s.t = rand(1, 3);
@@ -775,6 +1003,7 @@ function finishSale(s, c, bought) {
 // ─────────────────────────────────────────────────────────────
 function updateSessions() {
   const creative = game.staff.find(s => s.role === 'creative');
+  if (!creative) return;
   for (const ses of game.sessions) {
     const t = game.time;
     if (ses.state === 'planned' && t >= ses.start - 10) ses.state = 'arriving';
@@ -810,7 +1039,7 @@ function spawnArrivals(dt) {
 }
 
 function step(dt) {
-  if (game.over) return;
+  if (game.over || game.briefing) return;
   const before = game.time;
   game.time += dt;
   if (before < OPEN && game.time >= OPEN) log('Porte aperte');
@@ -832,6 +1061,12 @@ function step(dt) {
   if (game.time >= CLOSE && game.customers.length === 0) endDay();
 }
 
+function teamDelta() {
+  const avg = (k, from) => game.staff.reduce((a, x) => a + (from ? x.start : x.stats)[k], 0) / game.staff.length;
+  const d = k => { const a = avg(k, true), b = avg(k, false), v = Math.round(b - a); return `${Math.round(b)} <small>(${v >= 0 ? '+' : ''}${v})</small>`; };
+  return [['Team · motivazione', d('mot')], ['Team · stress', d('stress')], ['Team · competenza', d('comp')]];
+}
+
 function endDay() {
   game.over = true;
   const s = game.stats;
@@ -840,7 +1075,11 @@ function endDay() {
     ['Clienti entrati', s.entered],
     ['Vendite', s.sold],
     ['Conversion', s.buyers ? Math.round(s.sold / s.buyers * 100) + '%' : '–'],
+    ['NPS', `${fmtNps(nps())} <small>(${game.reviews.length} commenti)</small>`],
+    ['Promotori · passivi · detrattori', `${game.reviews.filter(r => r.score === 5).length} · ${game.reviews.filter(r => r.score === 4).length} · ${game.reviews.filter(r => r.score <= 3).length}`],
+    ['Errori', s.errors],
     ['Con accessorio', s.accessories],
+    ['Servizi (AppleCare)', s.services],
     ['Accessori all\'Express (B1)', s.express],
     ['Accessori alle pareti', s.wallSales],
     ['Risolti al Genius Bar', s.genius],
@@ -848,6 +1087,8 @@ function endDay() {
     ['…di cui fermi al Today at Apple', s.today],
     ['Persi senza essere seguiti', s.lost],
     ['Attesa media', s.waitN ? (s.waitSum / s.waitN).toFixed(1) + ' min' : '–'],
+    ['Focus del giorno', `op ${game.focus.op} · vend ${game.focus.sales} · cel ${game.focus.cel}`],
+    ...teamDelta(),
   ]);
   document.getElementById('debrief').classList.add('show');
 }
@@ -876,15 +1117,22 @@ const ICONS = {
   watch:    ['.kkk.', 'kpppk', 'kpppk', 'kpppk', '.kkk.'],
   mac:      ['kkkkk', 'kbbbk', 'kbbbk', 'kkkkk', 'k...k'],
   eye:      ['.....', '.kkk.', 'kkbkk', '.kkk.', '.....'],
+  oops:     ['..r..', '..r..', '..r..', '.....', '..r..'],
+  shield:   ['bbbbb', 'bwwwb', 'bwbwb', '.bwb.', '..b..'],
 };
 function drawIcon(name, x, y) {
+  if (name[0] === 'r' && FONT[name[1]]) {                       // voto del cliente: la cifra colorata
+    const n = +name[1];
+    drawText(name[1], x + 1, y, n === 5 ? '#3aa655' : n === 4 ? '#6b6b75' : '#e0453a');
+    return;
+  }
   const rows = ICONS[name]; if (!rows) return;
   rows.forEach((r, j) => [...r].forEach((ch, i) => { if (ch !== '.') rect(x + i, y + j, 1, 1, ICON_COLORS[ch]); }));
 }
 
 // Omino 5×8 visto da sopra/di tre quarti
 function drawPerson(e) {
-  const x = px(e.x) - 2, seated = e.state === 'seated';
+  const x = px(e.x) - 2, seated = e.state === 'seated' || (e.state === 'training' && e.path.length === 0);
   const y = px(e.y) - 8 + (seated ? 2 : 0);
   const L = e.look, moving = e.path.length > 0, frame = moving ? Math.floor(e.walk) % 2 : -1;
   rect(x, y + 7 + (seated ? -2 : 0), 5, 1, 'rgba(0,0,0,0.18)');           // ombra
@@ -934,9 +1182,9 @@ function drawTable(t) {
   rect(x, y, w, h, '#c9955c');
   rect(x, y, w, 1, '#dcaa6e');
   rect(x, y + h - 1, w, 1, '#a8773f');
-  drawText(t.name, x + Math.floor((w - 7) / 2), y + 2, '#6b4520');
   if (t.kind === 'support') {
-    for (let i = 0; i < 2; i++) { rect(x + 3, y + 11 + i * 21, 5, 4, '#bfc3c9'); rect(x + 4, y + 12 + i * 21, 3, 2, '#1d1d24'); }
+    rect(x + 3, y + 3, w - 6, 1, '#a8773f');
+    for (let i = 0; i < 2; i++) { rect(x + 3, y + 10 + i * 21, 5, 4, '#bfc3c9'); rect(x + 4, y + 11 + i * 21, 3, 2, '#1d1d24'); }
     return;
   }
   if (t.kind === 'express') {
@@ -949,7 +1197,7 @@ function drawTable(t) {
   }
   const p = t.product;
   for (let r = 0; r < 4; r++) for (let c = 0; c < 2; c++) {
-    const ix = x + 3 + c * 8, iy = y + 9 + r * 9;
+    const ix = x + 3 + c * 8, iy = y + 4 + r * 10;
     if (p === 'iphone') { rect(ix + 1, iy, 3, 5, '#1d1d24'); rect(ix + 2, iy + 1, 1, 3, pick4(r, c)); }
     else if (p === 'ipad') { rect(ix, iy, 6, 7, '#1d1d24'); rect(ix + 1, iy + 1, 4, 5, pick4(r, c)); }
     else if (p === 'watch') { rect(ix + 1, iy + 1, 3, 3, '#1d1d24'); rect(ix + 2, iy + 2, 1, 1, '#e36bb5'); rect(ix + 2, iy, 1, 5, '#555'); }
@@ -1051,6 +1299,7 @@ const STATE_LABEL = {
   toWallCustomer: 'va da un cliente alla parete', advise: 'consiglia un accessorio', leaving: 'esce',
   idle: 'libero', wander: 'gira nella sua zona', listening: 'ascolta un cliente', escort: 'accompagna al Genius Bar', toCustomer: 'va da un cliente',
   probe: 'fa domande', demo: 'fa la demo', checkout: 'chiude la vendita', repair: 'ripara',
+  huddle: 'momento di squadra', training: 'in formazione',
   toStage: 'va allo schermo', onStage: 'prepara la sessione', presenting: 'tiene la sessione',
 };
 const ROLE_LABEL = { point: 'Point', express: 'Cassa Express', accessori: 'Specialist accessori', specialist: 'Specialist', genius: 'Genius', creative: 'Creative' };
@@ -1069,9 +1318,11 @@ function updatePanel() {
     ['In fila dal Point', game.lineIn.length],
     ['Aspettano qualcuno', waiting],
     ['In coda Genius', queue],
+    ['NPS', `${fmtNps(nps())} <small>(${game.reviews.length})</small>`],
     ['Entrati oggi', s.entered],
     ['Vendite', s.sold + (s.accessories ? ` <small>(+${s.accessories} acc.)</small>` : '')],
     ['Accessori Express · pareti', `${s.express} · ${s.wallSales}`],
+    ['Servizi · errori', `${s.services} · ${s.errors}`],
     ['In fila all\'Express', game.lineEx.length],
     ['Genius risolti', s.genius],
     ['Solo a guardare', s.looked + s.today],
@@ -1079,7 +1330,12 @@ function updatePanel() {
     ['Persi', s.lost],
   ]);
   document.getElementById('mini').innerHTML =
-    `Dentro <b>${inStore}</b> · Vend. <b>${s.sold}</b> · Acc. <b>${s.express + s.wallSales + s.accessories}</b> · Genius <b>${s.genius}</b> · Persi <b>${s.lost}</b>`;
+    `NPS <b>${fmtNps(nps())}</b> · Dentro <b>${inStore}</b> · Vend. <b>${s.sold}</b> · Acc. <b>${s.express + s.wallSales + s.accessories}</b> · Genius <b>${s.genius}</b> · Persi <b>${s.lost}</b>`;
+  document.getElementById('reviews').innerHTML = game.reviews.slice(0, 8)
+    .map(r => `<div><span class="score s${r.score}">${r.score}</span>${r.text} <span class="sub">${fmt(r.t)}</span></div>`).join('');
+  const bar = (cls, v) => `<div class="bar ${cls}"><i style="width:${Math.round(v)}%"></i></div>`;
+  document.getElementById('team').innerHTML = game.staff
+    .map(x => `<span>${x.name}</span>${bar('bm', x.stats.mot)}${bar('bs', x.stats.stress)}${bar('bc', x.stats.comp)}`).join('');
   document.getElementById('log').innerHTML = game.log.slice(0, 10).map(l => `<div><span>${fmt(l.t)}</span>${l.msg}</div>`).join('');
   const e = game.selected, info = document.getElementById('info');
   updateInfo(e, info);
@@ -1097,10 +1353,11 @@ function updateInfo(e, info) {
   if (!e || (!e.isStaff && !game.customers.includes(e))) { game.selected = null; info.innerHTML = ''; return; }
   if (e.isStaff) {
     info.innerHTML = `<b>${e.name}</b> · ${ROLE_LABEL[e.role]}${e.zone ? ` (zona ${PRODUCT_NAME[e.zone]})` : ''}${e.post === POINT_IN ? ' all\'ingresso' : e.post === POINT_GB ? ' del Genius Bar' : e.post === EXPRESS ? ' al tavolo B1' : ''}${e.side ? (e.side === 'L' ? ' · parete sinistra' : ' · parete destra') : ''}<br>
-      <span class="sub">${STATE_LABEL[e.state] || e.state} · clienti seguiti oggi: ${e.served}</span>`;
+      <span class="sub">${STATE_LABEL[e.state] || e.state} · clienti seguiti oggi: ${e.served}</span><br>
+      <span class="sub">Motivazione <b>${Math.round(e.stats.mot)}</b> · Stress <b>${Math.round(e.stats.stress)}</b> · Competenza <b>${Math.round(e.stats.comp)}</b></span>`;
   } else {
     info.innerHTML = `<b>Cliente #${e.id}</b> · ${describe(e).replace('cliente ', '')}<br>
-      <span class="sub">${STATE_LABEL[e.state] || e.state}${e.staff ? ' · con ' + e.staff.name : ''}${e.state === 'waiting' ? ` · da ${e.wait.toFixed(0)} min` : ''}</span>`;
+      <span class="sub">${STATE_LABEL[e.state] || e.state}${e.staff ? ' · con ' + e.staff.name : ''}${e.state === 'waiting' ? ` · da ${e.wait.toFixed(0)} min` : ''} · esperienza <b>${Math.round(e.exp)}</b></span>`;
   }
 }
 
@@ -1141,6 +1398,7 @@ document.getElementById('speed').addEventListener('click', ev => {
 });
 document.getElementById('nextDay').addEventListener('click', () => {
   document.getElementById('debrief').classList.remove('show');
+  overnight(game.focus);
   newDay(game.day % 31 + 1);
 });
 
@@ -1161,7 +1419,7 @@ function frame(now) {
 newDay(7);
 requestAnimationFrame(frame);
 // per i test: avanza la simulazione senza aspettare
-window.__sim = { step, get game() { return game; } };
+window.__sim = { step, startDay, get game() { return game; } };
 </script>
 </body>
 </html>
