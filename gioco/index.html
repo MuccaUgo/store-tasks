@@ -133,7 +133,12 @@ const fmt = m => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(Math
 // Planimetria (Piazza Liberty), dalle misure del disegno
 // ─────────────────────────────────────────────────────────────
 const DOOR = { x: 1250, y: 10 };
-const GREET = { x: 1250, y: 150 };
+// Due Point: uno all'ingresso, uno sopra il primo tavolo del Genius Bar.
+// Chi entra si mette in fila, dice al Point cosa cerca e viene mandato al posto giusto.
+const POINT_IN = { x: 1250, y: 235, talk: { x: 1250, y: 190 },
+  line: [[1250, 145], [1228, 105], [1272, 105], [1228, 68], [1272, 68]].map(([x, y]) => ({ x, y })) };
+const POINT_GB = { x: 482, y: 1092, talk: { x: 428, y: 1082 },
+  line: [385, 345, 305, 265, 225, 185, 145].map(x => ({ x, y: 1078 })) };
 const WALLS = [
   { x: 63, y: 96, w: 42, h: 1652 },
   { x: 1310, y: 96, w: 42, h: 1652 },
@@ -174,15 +179,12 @@ TABLES.forEach(t => {
 const BAR = [];
 SUPPORT.forEach(t => {
   for (const oy of [60, 165]) {
-    BAR.push({ table: t, x: t.x - 20, y: t.y + oy, gx: t.x + t.w + 20, gy: t.y + oy, taken: null, genius: null });
+    BAR.push({ table: t, x: t.x - 20, y: t.y + oy, gx: t.x + t.w + 20, gy: t.y + oy, taken: null });
   }
 });
 // Attesa Genius: corridoi tra alberi e Genius Bar
 const QUEUE = [];
 for (let y = 1150; y <= 1400; y += 50) { QUEUE.push({ x: 370, y, taken: null }); QUEUE.push({ x: 1050, y, taken: null }); }
-// Chi arriva tardi al Today at Apple resta in piedi dietro
-const STANDING = [];
-for (let x = 470; x <= 930; x += 50) STANDING.push({ x, y: 1420, taken: null });
 
 // ─────────────────────────────────────────────────────────────
 // Griglia e A* (celle da 20 unità, ostacoli gonfiati)
@@ -285,21 +287,20 @@ function newDay(dayOfMonth) {
   const weekend = date.getDay() === 0 || date.getDay() === 6;
   STOOLS.forEach(s => s.taken = null);
   SLOTS.forEach(s => s.taken = null);
-  BAR.forEach(s => { s.taken = null; s.genius = null; });
+  BAR.forEach(s => s.taken = null);
   QUEUE.forEach(s => s.taken = null);
-  STANDING.forEach(s => s.taken = null);
   game = {
     day: dayOfMonth, date, weekend,
     time: OPEN - 2, speed: game ? game.speed : 1,
-    customers: [], staff: [], nextId: 1,
+    customers: [], staff: [], nextId: 1, lineIn: [], lineGB: [],
     spawnAcc: 0, selected: null, over: false,
     log: [],
     sessions: [
       { start: 11 * 60, title: pick(SESSION_TITLES) },
       { start: 14 * 60 + 30, title: pick(SESSION_TITLES) },
       { start: 17 * 60 + 30, title: pick(SESSION_TITLES) },
-    ].map(s => ({ ...s, end: s.start + 45, seats: weekend ? randi(6, 11) : randi(3, 7), spawned: 0, state: 'planned' })),
-    stats: { entered: 0, buyers: 0, sold: 0, accessories: 0, lost: 0, browsed: 0, genius: 0, today: 0, waitSum: 0, waitN: 0 },
+    ].map(s => ({ ...s, end: s.start + 45, state: 'planned' })),
+    stats: { entered: 0, buyers: 0, sold: 0, accessories: 0, lost: 0, browsed: 0, genius: 0, looked: 0, today: 0, waitSum: 0, waitN: 0 },
   };
   makeStaff();
   log(`Si apre: ${WEEKDAYS[date.getDay()]} ${dayOfMonth} gennaio`);
@@ -307,7 +308,8 @@ function newDay(dayOfMonth) {
 
 function makeStaff() {
   const people = [
-    { name: 'Sara', role: 'greeter', home: { x: 1250, y: 210 } },
+    { name: 'Sara', role: 'point', post: POINT_IN, home: { x: POINT_IN.x, y: POINT_IN.y } },
+    { name: 'Francesca', role: 'point', post: POINT_GB, home: { x: POINT_GB.x, y: POINT_GB.y } },
     { name: 'Luca', role: 'specialist', zone: 'iphone', home: { x: 360, y: 400 } },
     { name: 'Giulia', role: 'specialist', zone: 'iphone', home: { x: 1030, y: 400 } },
     { name: 'Marco', role: 'specialist', zone: 'ipad', home: { x: 580, y: 740 } },
@@ -320,7 +322,7 @@ function makeStaff() {
     id: 'S' + i, ...p, isStaff: true,
     x: p.home.x, y: p.home.y, path: [], state: 'idle', t: rand(2, 6),
     look: { skin: pick(SKIN), hair: pick(HAIR), shirt: STAFF_SHIRT, pants: '#23232b' },
-    facing: 'down', walk: 0, bubble: null, customer: null, served: 0,
+    facing: p.role === 'point' ? (p.post === POINT_IN ? 'up' : 'left') : 'down', walk: 0, bubble: null, customer: null, served: 0,
   }));
 }
 
@@ -361,25 +363,45 @@ function face(e, target) {
 function spawnCustomer(kind, extra = {}) {
   const c = {
     id: game.nextId++, kind, isStaff: false,
-    x: DOOR.x + rand(-30, 30), y: DOOR.y, path: [], state: 'entering', t: 0,
+    x: DOOR.x + rand(-30, 30), y: DOOR.y, path: [], state: 'inLine', t: 0,
     look: { skin: pick(SKIN), hair: pick(HAIR), shirt: pick(SHIRTS), pants: pick(PANTS) },
-    facing: 'down', walk: 0, bubble: null, staff: null, slot: null, wait: 0,
+    facing: 'down', walk: 0, bubble: null, staff: null, slot: null, wait: 0, lineIdx: -1,
     product: kind === 'buy' ? pick(['iphone', 'iphone', 'iphone', 'ipad', 'watch', 'mac', 'mac']) : null,
     ...extra,
   };
   game.customers.push(c);
   game.stats.entered++;
   if (kind === 'buy') game.stats.buyers++;
-  goTo(c, { x: GREET.x + rand(-20, 20), y: GREET.y });
+  game.lineIn.push(c);
   return c;
 }
 
 function describe(c) {
   if (c.kind === 'buy') return `cliente per ${PRODUCT_NAME[c.product]}`;
-  if (c.kind === 'genius') return 'cliente per il Genius Bar';
-  return 'cliente per Today at Apple';
+  if (c.kind === 'genius') return 'cliente per assistenza';
+  return 'cliente che dà un\'occhiata';
+}
+const needIcon = c => c.kind === 'buy' ? c.product : c.kind === 'genius' ? 'wrench' : 'eye';
+
+// Una fila davanti a un Point: chi è primo va a parlare appena il Point è libero
+function updateLine(line, post) {
+  const point = game.staff.find(s => s.post === post);
+  line.forEach((c, i) => {
+    if (c.lineIdx === i) return;
+    c.lineIdx = i;
+    const spot = post.line[i] || { x: post.line[post.line.length - 1].x + rand(-25, 25), y: post.line[post.line.length - 1].y + (post === POINT_IN ? -30 : 0) };
+    goTo(c, spot);
+  });
+  const first = line[0];
+  if (first && point.state === 'idle' && point.path.length === 0 && first.path.length === 0) {
+    line.shift();
+    first.lineIdx = -1; first.state = 'toPoint'; first.point = point;
+    point.state = 'listening'; point.customer = first;
+    goTo(first, post.talk);
+  }
 }
 
+// Dopo il Point: al tavolo giusto, in fila al Genius Bar o a guardarsi intorno
 function proceed(c) {
   if (c.kind === 'buy') {
     const free = SLOTS.filter(s => !s.taken && s.table.product === c.product);
@@ -388,14 +410,39 @@ function proceed(c) {
     slot.taken = c; c.slot = slot;
     c.state = 'toTable'; goTo(c, slot);
   } else if (c.kind === 'genius') {
-    const q = QUEUE.find(s => !s.taken);
-    if (!q) { leave(c, 'lost'); return; }
-    q.taken = c; c.slot = q; c.state = 'toQueue'; goTo(c, q);
+    c.state = 'inLine'; c.lineIdx = -1; game.lineGB.push(c);
   } else {
-    const seat = STOOLS.find(s => !s.taken) || STANDING.find(s => !s.taken);
-    if (!seat) { leave(c, 'browsed'); return; }
-    seat.taken = c; c.slot = seat; c.state = 'toSession'; goTo(c, seat);
+    c.visits = randi(1, 3); lookAround(c);
   }
+}
+
+function lookAround(c) {
+  const t = pick(TABLES);
+  const left = Math.random() < 0.5;
+  c.state = 'toLook';
+  goTo(c, { x: left ? t.x - 24 : t.x + t.w + 24, y: t.y + rand(30, t.h - 30) });
+}
+
+function afterLooking(c) {
+  const seat = Math.random() < 0.5 && STOOLS.find(s => !s.taken);
+  if (seat) { seat.taken = c; c.slot = seat; c.state = 'toSession'; goTo(c, seat); }
+  else leave(c, 'looked');
+}
+
+// Check-in al Genius Bar: se c'è un posto il Point accompagna, altrimenti si aspetta tra gli alberi
+function checkIn(point, c) {
+  const bar = BAR.find(b => !b.taken);
+  if (bar) {
+    bar.taken = c; c.bar = bar; c.state = 'toBar'; goTo(c, bar);
+    point.state = 'escort'; point.customer = c; goTo(point, { x: bar.x, y: bar.y + 34 });
+    log(`${point.name} accompagna un cliente al Genius Bar`);
+    return;
+  }
+  point.state = 'idle'; point.customer = null;
+  const q = QUEUE.find(s => !s.taken);
+  if (!q) { leave(c, 'lost'); return; }
+  q.taken = c; c.slot = q; c.state = 'toQueue'; goTo(c, q);
+  log(`${point.name}: Genius Bar pieno, il cliente aspetta`);
 }
 
 function releaseSlot(c) {
@@ -405,10 +452,13 @@ function releaseSlot(c) {
 
 function leave(c, outcome) {
   releaseSlot(c);
+  for (const line of [game.lineIn, game.lineGB]) { const i = line.indexOf(c); if (i >= 0) { line.splice(i, 1); line.forEach(x => x.lineIdx = -1); } }
+  if (c.point && c.point.customer === c) { c.point.customer = null; c.point.state = 'idle'; }
   c.outcome = outcome;
   const s = game.stats;
   if (outcome === 'lost') { s.lost++; say(c, 'cross', 3); log(`Un ${describe(c)} se ne va: nessuno l'ha seguito`); }
   else if (outcome === 'browsed') { s.browsed++; if (!c.bubble) say(c, 'meh', 2); }
+  else if (outcome === 'looked') { s.looked++; }
   else say(c, 'heart', 3);
   if (c.staff) { c.staff.customer = null; c.staff = null; }
   c.state = 'leaving';
@@ -418,20 +468,25 @@ function leave(c, outcome) {
 function updateCustomer(c, dt) {
   const arrived = moveAlong(c, dt);
   switch (c.state) {
-    case 'entering':
+    case 'toPoint':
       if (arrived) {
-        const greeter = game.staff.find(s => s.role === 'greeter');
-        if (greeter.state === 'idle' && dist(greeter, c) < 180) {
-          greeter.state = 'greeting'; greeter.t = 1; greeter.customer = c;
-          face(greeter, c); face(c, greeter);
-          say(greeter, 'hi', 1); say(c, c.kind === 'buy' ? c.product : c.kind === 'genius' ? 'wrench' : 'star', 1);
-          c.state = 'greeted'; c.t = 1;
-        } else proceed(c);
+        const p = c.point;
+        c.state = 'talking'; c.t = rand(0.7, 1.5);
+        face(c, p); face(p, c);
+        say(p, 'question', c.t / 2); say(c, needIcon(c), c.t);
       }
       break;
-    case 'greeted':
+    case 'talking':
       c.t -= dt;
-      if (c.t <= 0) proceed(c);
+      if (c.t <= 0) {
+        const p = c.point; c.point = null;
+        if (p.post === POINT_GB) { say(p, 'check', 1); checkIn(p, c); }
+        else {
+          say(p, 'hi', 1); p.state = 'idle'; p.customer = null;
+          log(`${p.name} accoglie un ${describe(c)}`);
+          proceed(c);
+        }
+      }
       break;
     case 'toTable':
       if (arrived) { c.state = 'waiting'; c.patience = rand(5, 12); c.wait = 0; c.facing = c.slot.x < c.slot.table.x ? 'right' : 'left'; say(c, 'question', 2); }
@@ -446,13 +501,27 @@ function updateCustomer(c, dt) {
       break;
     case 'queued':
       c.wait += dt;
-      if (c.wait > 35) { log('Un cliente Genius se ne va dopo 35 minuti di attesa'); leave(c, 'lost'); }
+      if (c.wait > 35) { log('Un cliente per assistenza se ne va dopo 35 minuti di attesa'); leave(c, 'lost'); }
       break;
     case 'toBar':
       if (arrived) { c.state = 'atBar'; c.facing = 'right'; }
       break;
+    case 'toLook':
+      if (arrived) { c.state = 'looking'; c.t = rand(2, 6); face(c, { x: c.x < 700 ? c.x + 1 : c.x - 1, y: c.y }); }
+      break;
+    case 'looking':
+      c.t -= dt;
+      if (c.t <= 0) { if (--c.visits > 0) lookAround(c); else afterLooking(c); }
+      break;
     case 'toSession':
-      if (arrived) { c.state = 'seated'; c.facing = 'down'; }
+      if (arrived) {
+        c.state = 'seated'; c.facing = 'down'; c.t = rand(10, 30);
+        game.stats.today++; log('Un cliente si ferma al Today at Apple');
+      }
+      break;
+    case 'seated':
+      c.t -= dt;
+      if (c.t <= 0) leave(c, 'session');
       break;
   }
   if (c.state === 'leaving' && arrived) c.gone = true;
@@ -470,7 +539,7 @@ function wander(s) {
   const zoneTables = s.zone ? TABLES.filter(t => t.product === s.zone || (s.zone === 'ipad' && t.product === 'watch')) : null;
   if (s.role === 'specialist' && zoneTables) {
     const t = pick(zoneTables);
-    goTo(s, { x: t.x + (Math.random() < 0.5 ? -40 : t.w + 40), y: t.y + t.h + 40 });
+    goTo(s, { x: t.x + (Math.random() < 0.5 ? -40 : t.w + 40), y: t.y === ROWS[0] ? t.y + t.h + 40 : t.y - 40 });
   } else goTo(s, { x: s.home.x + rand(-40, 40), y: s.home.y + rand(-20, 20) });
 }
 
@@ -486,17 +555,23 @@ function dispatch() {
     goTo(s, { x: c.slot.sx, y: c.slot.sy });
     game.stats.waitSum += c.wait; game.stats.waitN++;
   }
-  // Genius Bar: coda in ordine d'arrivo
+  // Genius Bar: chi aspetta tra gli alberi prende il primo posto libero
   const queued = game.customers.filter(c => c.state === 'queued').sort((a, b) => b.wait - a.wait);
   for (const c of queued) {
-    const g = game.staff.find(s => s.role === 'genius' && (s.state === 'idle' || s.state === 'wander'));
     const bar = BAR.find(b => !b.taken);
-    if (!g || !bar) break;
+    if (!bar) break;
     releaseSlot(c);
-    bar.taken = c; bar.genius = g; c.bar = bar; c.staff = g; g.customer = c;
-    c.state = 'toBar'; goTo(c, bar);
-    g.state = 'toBar'; goTo(g, { x: bar.gx, y: bar.gy });
-    say(g, 'hi', 1);
+    bar.taken = c; c.bar = bar; c.state = 'toBar'; goTo(c, bar);
+  }
+  // ...e al posto arriva il Genius libero più vicino
+  const seated = game.customers.filter(c => (c.state === 'atBar' || c.state === 'toBar') && !c.staff);
+  for (const c of seated) {
+    const free = game.staff.filter(s => s.role === 'genius' && (s.state === 'idle' || s.state === 'wander'));
+    if (!free.length) break;
+    free.sort((a, b) => dist(a, c.bar) - dist(b, c.bar));
+    const g = free[0];
+    c.staff = g; g.customer = c;
+    g.state = 'toBar'; goTo(g, { x: c.bar.gx, y: c.bar.gy });
   }
 }
 
@@ -505,15 +580,19 @@ function updateStaff(s, dt) {
   const c = s.customer;
   switch (s.state) {
     case 'idle':
+      if (s.role === 'point') {
+        if (arrived && dist(s, s.home) > 5) goTo(s, s.home);
+        else if (arrived) s.facing = s.post === POINT_IN ? 'up' : 'left';
+        break;
+      }
       s.t -= dt;
       if (s.t <= 0) { s.state = 'wander'; wander(s); }
       break;
+    case 'escort':
+      if (arrived) { say(s, 'hi', 1); s.customer = null; s.state = 'idle'; goTo(s, s.home); }
+      break;
     case 'wander':
       if (arrived) { s.state = 'idle'; s.t = rand(3, 9); }
-      break;
-    case 'greeting':
-      s.t -= dt;
-      if (s.t <= 0) { s.customer = null; s.state = 'idle'; s.t = rand(1, 3); goTo(s, s.home); }
       break;
     case 'toCustomer':
       if (!c || c.state !== 'waiting') { s.customer = null; s.state = 'idle'; s.t = 1; break; }
@@ -562,8 +641,6 @@ function updateStaff(s, dt) {
       if (Math.random() < dt * 0.15) say(s, pick(['wrench', 'dots', 'question']), 1.5);
       if (s.t <= 0) {
         game.stats.genius++; s.served++;
-        const bar = c.bar;
-        if (bar) bar.genius = null;
         log(`${s.name} risolve al Genius Bar`);
         leave(c, 'fixed');
         s.state = 'idle'; s.t = rand(1, 3); goTo(s, s.home);
@@ -597,28 +674,20 @@ function updateSessions() {
   const creative = game.staff.find(s => s.role === 'creative');
   for (const ses of game.sessions) {
     const t = game.time;
-    if (ses.state === 'planned' && t >= ses.start - 25) {
-      ses.state = 'arriving';
-      log(`Today at Apple alle ${fmt(ses.start)}: «${ses.title}»`);
-    }
+    if (ses.state === 'planned' && t >= ses.start - 10) ses.state = 'arriving';
     if (ses.state === 'arriving') {
-      // i partecipanti arrivano sparsi tra -25 e +5 minuti
-      const due = Math.floor(ses.seats * Math.min(1, (t - (ses.start - 25)) / 30));
-      while (ses.spawned < due) { ses.spawned++; spawnCustomer('today', { session: ses }); }
       if (t >= ses.start - 8 && creative.state !== 'toStage' && creative.state !== 'onStage' && !creative.customer) {
         creative.state = 'toStage'; goTo(creative, STAGE);
       }
       if (t >= ses.start && (creative.state === 'onStage' || creative.state === 'toStage')) {
         ses.state = 'live'; creative.state = 'presenting'; creative.facing = 'up';
-        game.stats.today += game.customers.filter(c => c.session === ses && !c.gone).length;
         log(`${creative.name} inizia «${ses.title}»`);
       }
     }
     if (ses.state === 'live' && t >= ses.end) {
       ses.state = 'done';
-      game.customers.filter(c => c.session === ses && c.state !== 'leaving').forEach(c => leave(c, 'session'));
       creative.state = 'idle'; creative.t = rand(2, 4); goTo(creative, creative.home);
-      log(`Fine sessione: ${creative.name} saluta i partecipanti`);
+      log(`Fine di «${ses.title}»`);
     }
   }
 }
@@ -632,7 +701,8 @@ function spawnArrivals(dt) {
   game.spawnAcc += perHour / 60 * dt;
   while (game.spawnAcc >= 1) {
     game.spawnAcc -= 1 + rand(-0.4, 0.4);
-    spawnCustomer(Math.random() < 0.65 ? 'buy' : 'genius');
+    const r = Math.random();
+    spawnCustomer(r < 0.5 ? 'buy' : r < 0.8 ? 'genius' : 'look');
   }
 }
 
@@ -643,6 +713,8 @@ function step(dt) {
   if (before < OPEN && game.time >= OPEN) log('Porte aperte');
   spawnArrivals(dt);
   updateSessions();
+  updateLine(game.lineIn, POINT_IN);
+  updateLine(game.lineGB, POINT_GB);
   dispatch();
   game.customers.forEach(c => updateCustomer(c, dt));
   game.staff.forEach(s => updateStaff(s, dt));
@@ -651,7 +723,7 @@ function step(dt) {
 
   if (before < CLOSE && game.time >= CLOSE) {
     log('Chiusura: si finisce con chi è dentro');
-    game.customers.filter(c => c.state === 'waiting' || c.state === 'queued').forEach(c => leave(c, 'browsed'));
+    game.customers.filter(c => ['waiting', 'queued', 'inLine', 'looking', 'toLook', 'seated'].includes(c.state)).forEach(c => leave(c, c.kind === 'look' ? 'looked' : 'browsed'));
   }
   if (game.time >= CLOSE && game.customers.length === 0) endDay();
 }
@@ -666,7 +738,8 @@ function endDay() {
     ['Conversion', s.buyers ? Math.round(s.sold / s.buyers * 100) + '%' : '–'],
     ['Con accessorio', s.accessories],
     ['Risolti al Genius Bar', s.genius],
-    ['Today at Apple', s.today + ' persone'],
+    ['Solo a guardare', s.looked + s.today],
+    ['…di cui fermi al Today at Apple', s.today],
     ['Persi senza essere seguiti', s.lost],
     ['Attesa media', s.waitN ? (s.waitSum / s.waitN).toFixed(1) + ' min' : '–'],
   ]);
@@ -696,6 +769,7 @@ const ICONS = {
   ipad:     ['kkkkk', 'kbbbk', 'kbbbk', 'kbbbk', 'kkkkk'],
   watch:    ['.kkk.', 'kpppk', 'kpppk', 'kpppk', '.kkk.'],
   mac:      ['kkkkk', 'kbbbk', 'kbbbk', 'kkkkk', 'k...k'],
+  eye:      ['.....', '.kkk.', 'kkbkk', '.kkk.', '.....'],
 };
 function drawIcon(name, x, y) {
   const rows = ICONS[name]; if (!rows) return;
@@ -841,14 +915,14 @@ function render() {
 // ─────────────────────────────────────────────────────────────
 const rows = list => list.map(([k, v]) => `<span>${k}</span><b>${v}</b>`).join('');
 const STATE_LABEL = {
-  entering: 'entra', greeted: 'accolto all\'ingresso', toTable: 'va al tavolo', waiting: 'aspetta qualcuno',
+  inLine: 'in fila per il Point', toPoint: 'va dal Point', talking: 'dice al Point cosa cerca', toTable: 'va al tavolo', waiting: 'aspetta qualcuno',
   served: 'viene seguito', toQueue: 'va in attesa', queued: 'in coda per il Genius Bar', toBar: 'va al Genius Bar',
-  atBar: 'al Genius Bar', toSession: 'va al Today at Apple', seated: 'segue la sessione', leaving: 'esce',
-  idle: 'libero', wander: 'gira nella sua zona', greeting: 'accoglie', toCustomer: 'va da un cliente',
+  atBar: 'al Genius Bar', toSession: 'va al Today at Apple', seated: 'si ferma al Today at Apple', toLook: 'va a guardare', looking: 'guarda i prodotti', leaving: 'esce',
+  idle: 'libero', wander: 'gira nella sua zona', listening: 'ascolta un cliente', escort: 'accompagna al Genius Bar', toCustomer: 'va da un cliente',
   probe: 'fa domande', demo: 'fa la demo', checkout: 'chiude la vendita', repair: 'ripara',
   toStage: 'va allo schermo', onStage: 'prepara la sessione', presenting: 'tiene la sessione',
 };
-const ROLE_LABEL = { greeter: 'Accoglienza', specialist: 'Specialist', genius: 'Genius', creative: 'Creative' };
+const ROLE_LABEL = { point: 'Point', specialist: 'Specialist', genius: 'Genius', creative: 'Creative' };
 
 let lastPanel = 0;
 function updatePanel() {
@@ -858,22 +932,24 @@ function updatePanel() {
     `${WEEKDAYS[game.date.getDay()]} ${game.day} gennaio · ${open ? 'aperto' : game.time < OPEN ? 'in apertura' : 'chiuso'}`;
   const s = game.stats, inStore = game.customers.length;
   const waiting = game.customers.filter(c => c.state === 'waiting').length;
-  const queue = game.customers.filter(c => c.state === 'queued').length;
+  const queue = game.customers.filter(c => c.state === 'queued').length + game.lineGB.length;
   document.getElementById('stats').innerHTML = rows([
     ['Clienti nello store', inStore],
+    ['In fila dal Point', game.lineIn.length],
     ['Aspettano qualcuno', waiting],
     ['In coda Genius', queue],
     ['Entrati oggi', s.entered],
     ['Vendite', s.sold + (s.accessories ? ` <small>(+${s.accessories} acc.)</small>` : '')],
     ['Genius risolti', s.genius],
-    ['Today at Apple', s.today],
+    ['Solo a guardare', s.looked + s.today],
+    ['Fermi al Today', s.today],
     ['Persi', s.lost],
   ]);
   document.getElementById('log').innerHTML = game.log.slice(0, 10).map(l => `<div><span>${fmt(l.t)}</span>${l.msg}</div>`).join('');
   const e = game.selected, info = document.getElementById('info');
   if (!e || (!e.isStaff && !game.customers.includes(e))) { game.selected = null; info.innerHTML = ''; return; }
   if (e.isStaff) {
-    info.innerHTML = `<b>${e.name}</b> · ${ROLE_LABEL[e.role]}${e.zone ? ` (zona ${PRODUCT_NAME[e.zone]})` : ''}<br>
+    info.innerHTML = `<b>${e.name}</b> · ${ROLE_LABEL[e.role]}${e.zone ? ` (zona ${PRODUCT_NAME[e.zone]})` : ''}${e.post ? (e.post === POINT_IN ? ' all\'ingresso' : ' del Genius Bar') : ''}<br>
       <span class="sub">${STATE_LABEL[e.state] || e.state} · clienti seguiti oggi: ${e.served}</span>`;
   } else {
     info.innerHTML = `<b>Cliente #${e.id}</b> · ${describe(e).replace('cliente ', '')}<br>

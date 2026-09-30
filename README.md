@@ -32,9 +32,12 @@ Frontend statico (GitHub Pages) + database e login su Supabase (piano gratuito).
 
 ### Il gioco (prototipo)
 In `gioco/index.html` c'è la simulazione in pixel art dello store di
-Piazza Liberty, vista dall'alto: i clienti entrano dalla porta in alto a
-destra per comprare (tavoli iPhone, iPad/Watch, Mac), per il Genius Bar o
-per il Today at Apple, e il team li segue. A fine giornata c'è il debrief.
+Piazza Liberty, vista dall'alto. Chi entra dalla porta in alto a destra si
+mette in fila dal **Point** e dice cosa cerca: acquisto (tavoli iPhone,
+iPad/Watch, Mac, dove poi arriva uno Specialist), assistenza (il secondo
+Point, sopra il primo tavolo del Genius Bar, fa il check-in e accompagna al
+posto) o solo un'occhiata. Il Today at Apple per ora è sfondo: chi guarda a
+volte si ferma lì. A fine giornata c'è il debrief.
 È un file solo, senza dipendenze: si apre com'è, anche da GitHub Pages
 (`…/gioco/`). Non tocca il database.
 
