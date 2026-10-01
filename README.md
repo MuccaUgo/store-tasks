@@ -43,9 +43,11 @@ cosa vuole paga alla cassa Express in B1) o solo un'occhiata. I tavoli si
 chiamano A1–A5, B1–B5, C1–C5 contando da destra, e D2–D4 per il Genius Bar
 (i nomi non sono scritti, si vedono toccando il tavolo).
 
-Ogni giorno si apre col **Brief**: 3 gettoni da mettere tra strategia
-**operativa** (meno errori, formazione), **vendita** (più accessori e
-servizi, ma più stress) e **celebration** (più motivazione, meno stress).
+Ogni giorno si apre con l'**Apertura**: scegli l'argomento del **DD del
+mattino** (Product, Support, Business, Creative, Fun, ognuno con un effetto
+sulla giornata) e chi lo facilita, e decidi il **piano dei ruoli**: chi va
+al Point, all'Express, agli accessori e al Point del Genius Bar. A ogni
+cambio ruoli il gioco propone la rotazione e tu puoi cambiarla.
 Ognuno nel team ha motivazione (velocità), stress (esperienza del cliente)
 e competenza (errori e attach); con troppo stress il giorno dopo si è in
 malattia. La squadra è di 43 persone, tutte full time: in vendita 12 Specialist,
