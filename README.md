@@ -32,7 +32,9 @@ Frontend statico (GitHub Pages) + database e login su Supabase (piano gratuito).
 
 ### PLGame, il gioco (prototipo)
 In `plgame/index.html` c'è la simulazione in pixel art dello store di
-Piazza Liberty, vista dall'alto. Chi entra dalla porta in alto a destra si
+Piazza Liberty, vista dall'alto. Tavoli: iPhone da A2 ad A5 e in B4–B5, iPad
+in A1 e B2, Watch in B3 e C3, Mac in C2 e C4, cassa Express in B1; C1 e C5
+sono liberi per aiutare i clienti con una domanda veloce. Chi entra dalla porta in alto a destra si
 mette in fila dal **Point** e dice cosa cerca: acquisto (tavoli iPhone,
 iPad/Watch, Mac, dove poi arriva uno Specialist), assistenza (il secondo
 Point, sopra il primo tavolo del Genius Bar, fa il check-in e accompagna al
@@ -41,15 +43,45 @@ cosa vuole paga alla cassa Express in B1) o solo un'occhiata. I tavoli si
 chiamano A1–A5, B1–B5, C1–C5 contando da destra, e D2–D4 per il Genius Bar
 (i nomi non sono scritti, si vedono toccando il tavolo).
 
-Ogni giorno si apre col **Brief**: 3 gettoni da mettere tra strategia
-**operativa** (meno errori, formazione), **vendita** (più accessori e
-servizi, ma più stress) e **celebration** (più motivazione, meno stress).
+Ogni giorno si apre con l'**Apertura**: costruisci il **DD del mattino**
+scegliendo argomento (Product, Support, Business, Creative, Fun), su cosa
+concentrarlo, formato (breve, oppure approfondito: più effetto ma chi
+partecipa entra in sala alle 10:15), chi partecipa, chi lo facilita e chi
+affianca un collega meno esperto; ripetere lo stesso argomento più giorni
+di fila fa crescere di più la competenza. Poi e decidi il **piano dei ruoli**: chi va
+al Point, all'Express, agli accessori e al Point del Genius Bar. A ogni
+cambio ruoli il gioco propone la rotazione e tu puoi cambiarla. Come una
+squadra di calcio scegli anche la **formazione** del floor (Accoglienza,
+Tavoli, Essenziale), perché non sempre ci sono tutti: qualcuno è in ferie,
+qualcuno in malattia, e qualcuno può sentirsi male durante la giornata.
+Allora decidi se coprire il suo posto, cambiare formazione o chiedere alla
+squadra di andare più veloce per due ore, con più stress.
 Ognuno nel team ha motivazione (velocità), stress (esperienza del cliente)
 e competenza (errori e attach); con troppo stress il giorno dopo si è in
-malattia. Il team parte poco competente e cresce col tempo. Alcuni clienti
+malattia. La squadra è di 43 persone, tutte full time: in vendita 12 Specialist,
+6 Expert e 3 Pro; al Genius Bar 10 Technical Specialist, 5 Technical Expert
+e 2 Genius; al Today at Apple 3 Creative e 2 Creative Pro. Ognuno ha due
+giorni liberi in settimana, nel weekend lavorano tutti (il sabato è il
+giorno più pieno). I livelli più alti arrivano a più competenza, vendono o
+riparano meglio e reggono meglio lo stress; al Genius Bar le riparazioni
+sono rapide, medie o complesse, e il Point lo fanno i Technical Specialist.
+I Creative tengono le lezioni a turno, convincono qualche partecipante a
+comprare e nel tempo libero aiutano agli accessori.
+Il team parte poco competente e cresce col tempo. Ogni 1–2 ore i ruoli
+ruotano (chi era in vendita va a Point, Express o accessori, e viceversa);
+Point ed Express stressano di più. Durante la giornata si può mandare
+qualcuno in **pausa** 15 minuti o fargli i **complimenti** (3 al giorno).
+Ogni cliente che vuole comprare ha un bisogno nascosto: più il team è
+competente, più spesso emerge e porta alla proposta e all'accessorio giusti.
+Quando sul floor succede qualcosa di importante (qualcuno è al limite, una
+grande vendita, un errore serio) il gioco si ferma su un **momento da
+leader**: scegli come intervenire e vedi l'effetto su persone e clienti.
+All'apertura entrano 5–10 clienti che aspettavano fuori, e alcuni clienti
+sono scortesi e alzano lo stress di chi li serve. Alcuni clienti
 lasciano un commento da 1 a 5: 5 vale +1, 4 vale 0, da 3 a 1 vale −1, e
-l'NPS è la somma diviso il numero di commenti, per 100 (un team formato
-sta intorno a 80, come la media di Piazza Liberty). Il Today at Apple per ora è sfondo: chi guarda a
+l'NPS è la somma diviso il numero di commenti, per 100, diviso anche tra
+Vendita e Genius Bar (un team formato e ben gestito sta intorno a 80, come
+la media di Piazza Liberty). A 1× una giornata dura circa 7 minuti. Il Today at Apple per ora è sfondo: chi guarda a
 volte si ferma lì. A fine giornata c'è il debrief.
 È un file solo, senza dipendenze: si apre com'è, anche da GitHub Pages
 (`…/plgame/`). Non tocca il database.
