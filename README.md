@@ -50,6 +50,11 @@ malattia. Il team parte poco competente e cresce col tempo. Ogni 1–2 ore i ruo
 ruotano (chi era in vendita va a Point, Express o accessori, e viceversa);
 Point ed Express stressano di più. Durante la giornata si può mandare
 qualcuno in **pausa** 15 minuti o fargli i **complimenti** (3 al giorno).
+Ogni cliente che vuole comprare ha un bisogno nascosto: le domande giuste
+lo fanno emergere (più spesso con un team competente) e cambiano proposta e
+accessorio. Due o tre volte al giorno il gioco si ferma su un **momento
+ASOS**: suggerisci allo Specialist come approfondire, presentare e
+concludere, e alla fine vedi cosa ha funzionato, anche nel debrief.
 All'apertura entrano 5–10 clienti che aspettavano fuori, e alcuni clienti
 sono scortesi e alzano lo stress di chi li serve. Alcuni clienti
 lasciano un commento da 1 a 5: 5 vale +1, 4 vale 0, da 3 a 1 vale −1, e
