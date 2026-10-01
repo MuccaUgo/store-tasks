@@ -88,7 +88,7 @@
   .lessons { font-size: 12px; margin: -6px 0 14px; }
   .lessons div { padding: 4px 0; border-top: 1px dashed #33333d; }
   .card h3 { margin: 14px 0 6px; }
-  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
   .card .chips button { width: auto; min-height: 34px; padding: 0 10px; font-size: 12px; }
   .ddDesc { font-size: 12px; color: var(--muted); margin: 6px 0; }
   .card select { font: inherit; width: 100%; min-height: 36px; background: #33333f; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 0 8px; }
@@ -457,7 +457,13 @@ function bump(s, key, d) { s.stats[key] = key === 'comp' ? Math.min(s.stats.cap,
 const F = () => game.focus;
 const pushed = s => game.push && game.time < game.push.until && TIER[s.tier].area === game.push.area;
 const pace = s => (1.3 - 0.6 * s.stats.mot / 100) * (pushed(s) ? 0.8 : 1);                                         // motivazione → più veloce
-const errorChance = s => 0.2 * (1 - s.stats.comp / 100) * (1 - 0.25 * F().op) * (DD() === 'support' && s.role === 'genius' ? 0.7 : 1); // competenza e DD Support → meno errori
+const errorChance = (s, c) => 0.2 * (1 - s.stats.comp / 100) * (1 - 0.25 * F().op) * ddSupport(s, c); // competenza e DD Support → meno errori
+// DD Support: meno errori al Bar, molti meno sul tipo di riparazione scelto
+function ddSupport(s, c) {
+  if (!ddOn('support') || s.role !== 'genius' || !ddInvolved(s)) return 1;
+  const match = c && c.repair !== undefined && (game.dd.target === 'complesse' ? c.repair === 2 : c.repair <= 1);
+  return 1 - (match ? 0.4 : 0.1) * ddMult();
+}
 const attachChance = s => (0.15 + 0.45 * s.stats.comp / 100) * (1 + 0.25 * F().sales) + (TIER[s.tier].sales || 0); // competenza, vendita e livello → più attach
 // stress → esperienza peggiore; spingere le vendite senza competenza si sente
 const care = s => 12 - 0.22 * s.stats.stress - 2 * F().sales * (1 - s.stats.comp / 100) - (pushed(s) ? 3 : 0);
@@ -641,35 +647,80 @@ function startBreak(x) {
 // ─────────────────────────────────────────────────────────────
 // Apertura: il DD del mattino e il piano dei ruoli
 // ─────────────────────────────────────────────────────────────
+// Il DD del mattino si costruisce in più scelte: argomento, focus preciso, formato, chi partecipa,
+// chi lo facilita e chi affianca un collega. Ripetere lo stesso argomento più giorni consolida l'effetto.
 const DD_TOPICS = [
-  { key: 'product', name: 'Product', desc: 'Novità e domande giuste: oggi in vendita i bisogni dei clienti emergono più spesso, e la competenza della vendita cresce un po\'.' },
-  { key: 'support', name: 'Support', desc: 'Casi tecnici e procedure: oggi al Genius Bar si sbaglia meno, e la competenza del Bar cresce un po\'.' },
-  { key: 'business', name: 'Business', desc: 'Servizi e clienti con partita IVA: oggi AppleCare viene proposto e accettato più spesso.' },
-  { key: 'creative', name: 'Creative', desc: 'Lezioni e creatività: oggi dopo il Today at Apple più partecipanti diventano clienti.' },
-  { key: 'fun', name: 'Fun', desc: 'Un momento leggero insieme: più motivazione e meno stress per tutti, da subito.' },
+  { key: 'product', name: 'Product', area: 'floor', desc: 'Novità e domande giuste: i bisogni dei clienti emergono più spesso, soprattutto sulla linea scelta.',
+    targets: [['iphone', 'iPhone'], ['ipad', 'iPad'], ['mac', 'Mac'], ['watch', 'Apple Watch']] },
+  { key: 'support', name: 'Support', area: 'bar', desc: 'Casi tecnici e procedure: al Genius Bar si sbaglia meno sul tipo di riparazione scelto.',
+    targets: [['rapide', 'riparazioni rapide e medie'], ['complesse', 'riparazioni complesse']] },
+  { key: 'business', name: 'Business', area: 'floor', desc: 'Offerta completa: oggi si propone meglio quello che completa l\'acquisto.',
+    targets: [['applecare', 'AppleCare'], ['accessori', 'accessori pertinenti']] },
+  { key: 'creative', name: 'Creative', area: 'creative', desc: 'Today at Apple e creatività: lezioni più efficaci o Creative più forti agli accessori.',
+    targets: [['lezioni', 'partecipanti che diventano clienti'], ['accessori', 'Creative agli accessori']] },
+  { key: 'fun', name: 'Fun', area: 'all', desc: 'Un momento per la squadra: energia per tutti, o un riconoscimento a chi ne ha più bisogno.',
+    targets: [['squadra', 'gioco di squadra'], ['riconoscimenti', 'riconoscimenti mirati']] },
 ];
+const DD_FORMATS = [
+  ['breve', 'Breve', 'Dieci minuti prima dell\'apertura: effetto normale, tutti in sala alle 10.'],
+  ['approfondito', 'Approfondito', 'Mezz\'ora: effetto più forte e più competenza, ma chi partecipa entra in sala alle 10:15 mentre i primi clienti aspettano.'],
+];
+const DD_WHO = [['tutti', 'Tutti'], ['floor', 'Vendita'], ['bar', 'Genius Bar'], ['creative', 'Creative']];
+const DD_HISTORY = [];                      // argomenti dei giorni passati, per le serie
 const DD = () => game.dd ? game.dd.topic : null;
+const ddOn = (topic, target) => game.dd && game.dd.topic === topic && (!target || game.dd.target === target);
+const ddMult = () => game.dd && game.dd.format === 'approfondito' ? 1.6 : 1;
+const ddStreak = topic => { let n = 1; for (let i = DD_HISTORY.length - 1; i >= 0 && DD_HISTORY[i] === topic; i--) n++; return Math.min(n, 3); };
+const ddInvolved = x => !game.dd || game.dd.who === 'tutti' || TIER[x.tier].area === game.dd.who;
+// gli effetti di oggi, per chi gioca
+function ddPreview(d) {
+  const t = DD_TOPICS.find(x => x.key === d.topic), target = t.targets.find(x => x[0] === d.target)[1];
+  const strong = d.format === 'approfondito' ? 'molto ' : '';
+  const effects = {
+    product: `In vendita i bisogni emergono ${strong}più spesso, soprattutto per ${target}. Competenza della vendita su.`,
+    support: `Al Genius Bar ${strong}meno errori sulle ${target}.${d.target === 'complesse' ? ' Le complesse si chiudono anche un po\' prima.' : ''} Competenza del Bar su.`,
+    business: d.target === 'applecare' ? `AppleCare proposto e accettato ${strong}più spesso.` : `Gli accessori proposti vengono accettati ${strong}più spesso, al tavolo e alle pareti.`,
+    creative: d.target === 'lezioni' ? `Dopo il Today at Apple ${strong}più partecipanti diventano clienti.` : `I Creative agli accessori vendono ${strong}di più nel tempo libero.`,
+    fun: d.target === 'squadra' ? `${d.format === 'approfondito' ? 'Molta' : 'Più'} motivazione e meno stress per chi partecipa.` : 'Motivazione su per le cinque persone che ne hanno più bisogno, e due complimenti in più da fare oggi.',
+  }[d.topic];
+  const streak = ddStreak(d.topic);
+  const warn = t.area !== 'all' && d.who !== 'tutti' && d.who !== t.area ? ' Attenzione: chi partecipa non è la squadra che ne beneficia di più.' : '';
+  return effects + (streak > 1 ? ` Serie di ${streak} giorni: la competenza cresce di più.` : '') + warn;
+}
 const avgTeam = k => Math.round(game.staff.reduce((a, x) => a + x.stats[k], 0) / game.staff.length);
 function showBrief() {
   if (!game.dd) {
     const experts = game.staff.filter(x => ['E', 'P', 'TE', 'G', 'CP'].includes(x.tier));
-    game.dd = { topic: 'product', by: (experts.length ? pick(experts) : game.staff[0]).name };
+    game.dd = { topic: 'product', target: 'iphone', format: 'breve', who: 'tutti', by: (experts.length ? pick(experts) : game.staff[0]).name, coach: '' };
   }
   document.getElementById('brDate').textContent = `${WEEKDAYS[game.date.getDay()]} ${game.day} gennaio${game.date.getDay() === 6 ? ' · sabato, il giorno più pieno' : game.weekend ? ' · domenica, tanta gente' : ''}`;
   const stressed = game.staff.filter(x => x.stats.stress > 60).map(x => x.name).slice(0, 8);
   document.getElementById('brTeam').innerHTML =
     `In turno <b>${game.staff.length}</b> su ${Object.keys(TEAM).length} · a riposo ${game.offToday}<br>` +
+    [['floor', 'Vendita'], ['bar', 'Genius Bar'], ['creative', 'Creative']].map(([a, l]) => `${l}: ` +
+      Object.keys(TIER).filter(k => TIER[k].area === a).map(k => `${game.staff.filter(x => x.tier === k).length} ${TIER[k].label}`).join(', ')).join('<br>') + '<br>' +
     `Team: motivazione <b>${avgTeam('mot')}</b> · stress <b>${avgTeam('stress')}</b> · competenza <b>${avgTeam('comp')}</b>` +
     (game.sick.length ? `<br>In malattia: <b>${game.sick.join(', ')}</b>` : '') +
     (game.vacation.length ? `<br>In ferie: <b>${game.vacation.join(', ')}</b>` : '') +
     (stressed.length ? `<br>Molto stressati: <b>${stressed.join(', ')}</b>` : '');
-  const t = DD_TOPICS.find(x => x.key === game.dd.topic);
+  const t = DD_TOPICS.find(x => x.key === game.dd.topic), d = game.dd;
+  const chips = (key, list, cur) => `<div class="chips">${list.map(([k, l]) => `<button data-${key}="${k}" class="${k === cur ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+  const seniors = game.staff.filter(x => ['E', 'P', 'TE', 'G', 'CP'].includes(x.tier));
+  const juniors = game.staff.filter(x => ['S', 'TS', 'C'].includes(x.tier)).sort((a, b) => a.stats.comp - b.stats.comp);
   document.getElementById('brOpts').innerHTML = `
     <h3>DD del mattino</h3>
-    <div class="chips">${DD_TOPICS.map(x => `<button data-dd="${x.key}" class="${x.key === game.dd.topic ? 'on' : ''}">${x.name}</button>`).join('')}</div>
+    <div class="sub">Argomento</div>
+    <div class="chips">${DD_TOPICS.map(x => `<button data-dd="${x.key}" class="${x.key === d.topic ? 'on' : ''}">${x.name}</button>`).join('')}</div>
     <div class="ddDesc">${t.desc}</div>
+    <div class="sub">Su cosa</div>${chips('ddt', t.targets, d.target)}
+    <div class="sub">Formato</div>${chips('ddf', DD_FORMATS, d.format)}
+    <div class="ddDesc">${DD_FORMATS.find(x => x[0] === d.format)[2]}</div>
+    <div class="sub">Chi partecipa</div>${chips('ddw', DD_WHO, d.who)}
     <label class="sub" for="ddBy">Lo facilita (competenza e motivazione su)</label>
-    <select id="ddBy">${game.staff.map(x => `<option value="${x.name}"${x.name === game.dd.by ? ' selected' : ''}>${x.name} · ${TIER[x.tier].label}</option>`).join('')}</select>
+    <select id="ddBy">${game.staff.map(x => `<option value="${x.name}"${x.name === d.by ? ' selected' : ''}>${x.name} · ${TIER[x.tier].label}</option>`).join('')}</select>
+    <label class="sub" for="ddCoach">Durante il DD affianca un collega meno esperto (competenza su per lui)</label>
+    <select id="ddCoach"><option value="">Nessuno</option>${juniors.map(x => `<option value="${x.name}"${x.name === d.coach ? ' selected' : ''}>${x.name} · ${TIER[x.tier].label} · competenza ${Math.round(x.stats.comp)}</option>`).join('')}</select>
+    <div class="ddDesc"><b>Oggi:</b> ${ddPreview(d)}</div>
     <h3>Formazione</h3>
     <div class="sub">In vendita oggi siete in ${game.staff.filter(x => x.rota === 'floor').length}.</div>
     <div class="chips">${FORMATION_ORDER.map(k => `<button data-form="${k}" class="${k === game.formation ? 'on' : ''}">${FORMATIONS[k].name}</button>`).join('')}</div>
@@ -681,27 +732,45 @@ function showBrief() {
 }
 document.getElementById('brOpts').addEventListener('click', ev => {
   const b = ev.target.closest('button'); if (!b) return;
-  if (b.dataset.dd) { game.dd.topic = b.dataset.dd; showBrief(); return; }
+  if (b.dataset.dd) { game.dd.topic = b.dataset.dd; game.dd.target = DD_TOPICS.find(x => x.key === b.dataset.dd).targets[0][0]; showBrief(); return; }
+  if (b.dataset.ddt) { game.dd.target = b.dataset.ddt; showBrief(); return; }
+  if (b.dataset.ddf) { game.dd.format = b.dataset.ddf; showBrief(); return; }
+  if (b.dataset.ddw) { game.dd.who = b.dataset.ddw; showBrief(); return; }
   if (b.dataset.form) { changeFormation(b.dataset.form, 'open'); showBrief(); return; }
   if (b.dataset.post) { openPicker('open', b.dataset.rota, +b.dataset.post); }
 });
-document.getElementById('brOpts').addEventListener('change', ev => { if (ev.target.id === 'ddBy') game.dd.by = ev.target.value; });
+document.getElementById('brOpts').addEventListener('change', ev => {
+  if (ev.target.id === 'ddBy') game.dd.by = ev.target.value;
+  if (ev.target.id === 'ddCoach') { game.dd.coach = ev.target.value; showBrief(); }
+});
 document.getElementById('openStore').addEventListener('click', () => startDay({ dd: game.dd }));
 
 function startDay(opts = {}) {
   game.focus = { op: opts.op || 0, sales: opts.sales || 0, cel: opts.cel || 0 };   // i gettoni restano solo per le simulazioni di prova
-  game.dd = opts.dd || game.dd || null;
+  game.dd = opts.dd ? { target: DD_TOPICS.find(x => x.key === opts.dd.topic).targets[0][0], format: 'breve', who: 'tutti', coach: '', ...opts.dd } : game.dd || null;
   game.briefing = false;
   document.getElementById('brief').classList.remove('show');
   const focus = game.focus;
   if (game.dd) {
-    const t = DD_TOPICS.find(x => x.key === game.dd.topic);
-    const by = game.staff.find(x => x.name === game.dd.by);
-    log(`Si apre: ${WEEKDAYS[game.date.getDay()]} ${game.day} gennaio · DD ${t.name}${by ? ' con ' + by.name : ''}`);
-    if (by) { bump(by, 'comp', 1.5); bump(by, 'mot', 4); }
-    if (t.key === 'product') game.staff.filter(x => TIER[x.tier].area === 'floor').forEach(x => bump(x, 'comp', 0.5));
-    if (t.key === 'support') game.staff.filter(x => TIER[x.tier].area === 'bar').forEach(x => bump(x, 'comp', 0.5));
-    if (t.key === 'fun') game.staff.forEach(x => { bump(x, 'mot', 4); bump(x, 'stress', -3); });
+    const d = game.dd, t = DD_TOPICS.find(x => x.key === d.topic), m = ddMult();
+    const by = game.staff.find(x => x.name === d.by), coach = game.staff.find(x => x.name === d.coach);
+    const who = game.staff.filter(ddInvolved);
+    const streak = ddStreak(d.topic);
+    DD_HISTORY.push(d.topic);
+    log(`Si apre: ${WEEKDAYS[game.date.getDay()]} ${game.day} gennaio · DD ${t.name} (${t.targets.find(x => x[0] === d.target)[1]}, ${d.format})${by ? ' con ' + by.name : ''}`);
+    if (by) { bump(by, 'comp', 1.5 * m); bump(by, 'mot', 4); }
+    if (coach) { bump(coach, 'comp', 2 * m); bump(coach, 'mot', 2); if (by) bump(by, 'mot', 2); }
+    // competenza che resta: più forte se l'argomento si ripete nei giorni
+    const grow = 0.5 * m * (1 + 0.5 * (streak - 1));
+    if (t.area !== 'all') who.filter(x => TIER[x.tier].area === t.area).forEach(x => bump(x, 'comp', grow));
+    if (d.topic === 'fun' && d.target === 'squadra') who.forEach(x => { bump(x, 'mot', 4 * m); bump(x, 'stress', -3 * m); });
+    if (d.topic === 'fun' && d.target === 'riconoscimenti') { [...who].sort((a, b) => a.stats.mot - b.stats.mot).slice(0, 5).forEach(x => bump(x, 'mot', 8 * m)); game.kudos += 2; }
+    // formato approfondito: chi partecipa entra in sala alle 10:15
+    if (d.format === 'approfondito') who.forEach((x, i) => {
+      const a = i / who.length * Math.PI * 2;
+      x.state = 'huddle'; x.until = OPEN + 15;
+      goTo(x, { x: 700 + Math.cos(a) * 200, y: 1440 + Math.sin(a) * 70 });
+    });
   } else log(`Si apre: ${WEEKDAYS[game.date.getDay()]} ${game.day} gennaio`);
   // celebration: subito più motivazione e meno stress, poi il momento di squadra
   if (focus.cel) {
@@ -957,7 +1026,7 @@ function serve(s, c, weight = 1, errMul = 1) {
     say(c, 'angry', 2);
     if (!c.rudeCounted) { c.rudeCounted = true; game.stats.rude++; log(`Un cliente scortese con ${s.name}`); }
   }
-  if (Math.random() < errorChance(s) * weight * errMul) {
+  if (Math.random() < errorChance(s, c) * weight * errMul) {
     c.exp -= 22; c.error = true;
     say(s, 'oops', 2);
     bump(s, 'mot', -3); bump(s, 'stress', 3);
@@ -1232,7 +1301,7 @@ function updateStaff(s, dt) {
       s.t -= dt;
       if (s.t < 1 && !(s.bubble && s.bubble.icon === 'bag')) say(s, 'bag', 1);
       if (s.t <= 0) {
-        if (Math.random() < 0.6 + 0.3 * s.stats.comp / 100) {
+        if (Math.random() < 0.6 + 0.3 * s.stats.comp / 100 + (ddOn('business', 'accessori') ? 0.08 * ddMult() : 0) + (s.role === 'creative' && ddOn('creative', 'accessori') ? 0.15 * ddMult() : 0)) {
           s.served++; game.stats.wallSales++;
           say(s, 'check', 1); say(c, 'check', 1);
           log(`${s.name} vende un accessorio alla parete ${c.side === 'L' ? 'sinistra' : 'destra'}`);
@@ -1266,7 +1335,7 @@ function updateStaff(s, dt) {
       s.t -= dt;
       if (s.t <= 0) {
         // più competenza, più spesso le domande fanno emergere il bisogno
-        c.needKnown = Math.random() < 0.35 + 0.55 * s.stats.comp / 100 + (DD() === 'product' ? 0.15 : 0);
+        c.needKnown = Math.random() < 0.35 + 0.55 * s.stats.comp / 100 + (ddOn('product') && ddInvolved(s) ? (game.dd.target === c.product ? 0.25 : 0.05) * ddMult() : 0);
         if (c.needKnown) c.exp += 4;
         s.state = 'demo'; s.t = rand(4, 9) * pace(s); say(s, c.product, s.t); say(c, 'dots', s.t);
       }
@@ -1293,8 +1362,8 @@ function updateStaff(s, dt) {
         if (!c.accTried && Math.random() < attachChance(s) + (c.needKnown ? 0.15 : 0)) {
           c.accTried = true; s.t = rand(1.5, 3) * pace(s); say(s, 'bag', s.t);
           c.accName = c.needKnown ? c.need.acc : 'una custodia';
-          c.accessory = Math.random() < (c.needKnown ? 0.8 : 0.4);
-        } else if (!c.svcTried && Math.random() < attachChance(s) * 0.7 * (DD() === 'business' ? 1.4 : 1)) {
+          c.accessory = Math.random() < (c.needKnown ? 0.8 : 0.4) + (ddOn('business', 'accessori') ? 0.1 * ddMult() : 0);
+        } else if (!c.svcTried && Math.random() < attachChance(s) * 0.7 * (ddOn('business', 'applecare') ? 1 + 0.4 * ddMult() : 1)) {
           c.svcTried = true; s.t = rand(1.5, 3) * pace(s); say(s, 'shield', s.t);
           c.service = Math.random() < 0.5;
         } else finishSale(s, c, true);
@@ -1303,7 +1372,7 @@ function updateStaff(s, dt) {
     case 'toBar':
       if (arrived && c && c.state === 'atBar') {
         const gap = Math.max(0, c.repair - TIER[s.tier].skill);
-        s.state = 'repair'; s.t = rand(...REPAIR_TIME[c.repair]) * (1 + 0.4 * gap) * pace(s); s.facing = 'left';
+        s.state = 'repair'; s.t = rand(...REPAIR_TIME[c.repair]) * (1 + 0.4 * gap) * pace(s) * (c.repair === 2 && ddOn('support', 'complesse') && ddInvolved(s) ? 0.9 : 1); s.facing = 'left';
         if (serve(s, c, 1, 1 + gap)) s.t += 8;
         say(s, 'wrench', 3); say(c, 'dots', 3);
         log(`${s.name} (${TIER[s.tier].label}) prende una riparazione ${REPAIR_NAME[c.repair]} al tavolo ${c.bar.table.name}`);
@@ -1315,7 +1384,7 @@ function updateStaff(s, dt) {
       if (Math.random() < dt * 0.15) say(s, pick(['wrench', 'dots', 'question']), 1.5);
       if (s.t <= 0) {
         game.stats.genius++; s.served++;
-        if (Math.random() < attachChance(s) * 0.3 * (DD() === 'business' ? 1.4 : 1)) { game.stats.services++; log(`${s.name} aggiunge AppleCare`); }
+        if (Math.random() < attachChance(s) * 0.3 * (ddOn('business', 'applecare') ? 1 + 0.4 * ddMult() : 1)) { game.stats.services++; log(`${s.name} aggiunge AppleCare`); }
         log(`${s.name} risolve al Genius Bar`);
         leave(c, 'fixed');
         s.state = 'idle'; s.t = rand(1, 3); goTo(s, s.home);
@@ -1577,7 +1646,7 @@ function updateSessions() {
       // dopo la lezione qualche partecipante vuole diventare proprietario
       let n = 0;
       for (const c of game.customers.filter(x => x.state === 'seated')) {
-        if (Math.random() < TIER[creative.tier].convert + (DD() === 'creative' ? 0.1 : 0)) { convertFromToday(c); n++; }
+        if (Math.random() < TIER[creative.tier].convert + (ddOn('creative', 'lezioni') ? 0.12 * ddMult() : 0)) { convertFromToday(c); n++; }
       }
       log(`Fine di «${ses.title}»` + (n ? `: ${n} partecipant${n > 1 ? 'i vogliono' : 'e vuole'} comprare` : ''));
     }
@@ -1684,7 +1753,7 @@ function endDay() {
     ['Andati a casa malati', s.sickNow],
     ['Formazione a fine giornata', FORMATIONS[game.formation].name],
     ['Attesa media', s.waitN ? (s.waitSum / s.waitN).toFixed(1) + ' min' : '–'],
-    ['DD del mattino', game.dd ? `${DD_TOPICS.find(x => x.key === game.dd.topic).name} con ${game.dd.by}` : '–'],
+    ['DD del mattino', game.dd ? `${DD_TOPICS.find(x => x.key === game.dd.topic).name} · ${DD_TOPICS.find(x => x.key === game.dd.topic).targets.find(x => x[0] === game.dd.target)[1]} · ${game.dd.format}` : '–'],
     ...teamDelta(),
   ]);
   document.getElementById('dbLessons').innerHTML = game.lessons.length
