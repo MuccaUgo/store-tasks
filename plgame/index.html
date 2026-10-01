@@ -144,7 +144,7 @@
     </div>
     <div class="overlay" id="moment">
       <div class="card">
-        <h2 id="mTitle">Momento ASOS</h2>
+        <h2 id="mTitle">Momento da leader</h2>
         <div class="mWhere" id="mWhere"></div>
         <div class="mSteps" id="mSteps"></div>
         <div id="mBody"></div>
@@ -244,12 +244,13 @@ const WALLS = [
 const COLS = [209, 431, 664, 883, 1101];
 const ROWS = [96, 463, 797];
 // Colonne da sinistra a destra; i nomi contano da destra: A1 è in alto a destra, A5 in alto a sinistra
+// A: iPhone, A1 iPad · B: iPhone in B5 e B4, Watch in B3, iPad in B2, Express in B1 · C: Mac, Watch in C3, C1 e C5 per aiutare i clienti
 const ROW_PRODUCTS = [
-  ['iphone', 'iphone', 'iphone', 'iphone', 'iphone'],
-  ['ipad', 'ipad', 'ipad', 'watch', 'express'],
-  ['mac', 'mac', 'mac', 'mac', 'mac'],
+  ['iphone', 'iphone', 'iphone', 'iphone', 'ipad'],
+  ['iphone', 'iphone', 'watch', 'ipad', 'express'],
+  ['help', 'mac', 'watch', 'mac', 'help'],
 ];
-const PRODUCT_NAME = { iphone: 'iPhone', ipad: 'iPad', watch: 'Apple Watch', mac: 'Mac', express: 'cassa Express' };
+const PRODUCT_NAME = { iphone: 'iPhone', ipad: 'iPad', watch: 'Apple Watch', mac: 'Mac', express: 'cassa Express', help: 'aiuto ai clienti' };
 
 const TABLES = [];
 ROWS.forEach((y, r) => COLS.forEach((x, c) =>
@@ -454,8 +455,8 @@ function newDay(dayOfMonth) {
       { start: 17 * 60 + 30, title: pick(SESSION_TITLES) },
     ].map(s => ({ ...s, end: s.start + 45, state: 'planned' })),
     reviews: [],
-    kudos: 3, moment: null, momentsDone: 0, momentsMax: randi(2, 3), lastMoment: -999, lessons: [],
-    stats: { todayConv: 0, entered: 0, buyers: 0, sold: 0, accessories: 0, services: 0, errors: 0, breaks: 0, rude: 0, express: 0, wallSales: 0, lost: 0, browsed: 0, genius: 0, looked: 0, today: 0, waitSum: 0, waitN: 0 },
+    kudos: 3, moment: null, momentTypes: [], momentsDone: 0, momentsMax: randi(2, 3), lastMoment: -999, lessons: [],
+    stats: { helped: 0, todayConv: 0, entered: 0, buyers: 0, sold: 0, accessories: 0, services: 0, errors: 0, breaks: 0, rude: 0, express: 0, wallSales: 0, lost: 0, browsed: 0, genius: 0, looked: 0, today: 0, waitSum: 0, waitN: 0 },
   };
   game.focus = { op: 0, sales: 0, cel: 0 };
   game.briefing = true;
@@ -724,9 +725,10 @@ function describe(c) {
   if (c.kind === 'buy') return `cliente per ${PRODUCT_NAME[c.product]}`;
   if (c.kind === 'genius') return 'cliente per assistenza';
   if (c.kind === 'acc') return 'cliente per accessori';
+  if (c.kind === 'help') return 'cliente con una domanda veloce';
   return 'cliente che dà un\'occhiata';
 }
-const needIcon = c => c.kind === 'buy' ? c.product : c.kind === 'genius' ? 'wrench' : c.kind === 'acc' ? 'bag' : 'eye';
+const needIcon = c => c.kind === 'buy' ? c.product : c.kind === 'genius' ? 'wrench' : c.kind === 'acc' ? 'bag' : c.kind === 'help' ? 'question' : 'eye';
 
 // Una fila davanti a un Point: chi è primo va a parlare appena il Point è libero
 function updateLine(line, post, also = []) {
@@ -750,8 +752,8 @@ function updateLine(line, post, also = []) {
 
 // Dopo il Point: al tavolo giusto, in fila al Genius Bar o a guardarsi intorno
 function proceed(c) {
-  if (c.kind === 'buy') {
-    const free = SLOTS.filter(s => !s.taken && s.table.product === c.product);
+  if (c.kind === 'buy' || c.kind === 'help') {
+    const free = SLOTS.filter(s => !s.taken && s.table.product === (c.kind === 'help' ? 'help' : c.product));
     const slot = free.length ? pick(free) : null;
     if (!slot) { say(c, 'dots'); leave(c, 'browsed'); return; }
     slot.taken = c; c.slot = slot;
@@ -821,6 +823,7 @@ function serve(s, c, weight = 1, errMul = 1) {
     bump(s, 'mot', -3); bump(s, 'stress', 3);
     game.stats.errors++;
     log(`${s.name} ${ERROR_TEXT[s.role]}`);
+    if (leaderReady('error') && Math.random() < 0.3) errorMoment(s, c);
     return true;
   }
   return false;
@@ -835,11 +838,13 @@ function survey(c) {
   const value = score === 5 ? 1 : score === 4 ? 0 : -1;
   const n = c.servedBy ? c.servedBy.name : null;
   let text;
-  if (score === 5 && c.needKnown && n) text = pick([`${n} ha capito subito cosa mi serviva`, `${n} mi ha fatto provare proprio quello che cercavo`]);
+  if (score >= 4 && c.error && c.recovered) text = 'Hanno sbagliato, ma hanno rimediato subito';
+  else if (score === 5 && c.needKnown && n) text = pick([`${n} ha capito subito cosa mi serviva`, `${n} mi ha fatto provare proprio quello che cercavo`]);
   else if (score === 5) text = n ? pick([`Esperienza top, grazie a ${n}`, `${n} mi ha fatto provare tutto con calma`, `Seguito subito, grazie ${n}`])
     : 'Bel negozio, trovato tutto';
   else if (score === 4) text = pick(['Tutto ok, niente di speciale', 'Bene, ma un po\' di attesa', 'Ho trovato quello che cercavo']);
   else if (c.outcome === 'lost') text = 'Ho aspettato e nessuno mi ha seguito';
+  else if (c.error && c.recovered) text = 'Hanno sbagliato, ma hanno rimediato subito';
   else if (c.error) text = `${n} ha sbagliato qualcosa con me`;
   else if (c.waited > 8) text = 'Troppa attesa';
   else if (c.rushed) text = `${n} andava di fretta`;
@@ -873,7 +878,7 @@ function leave(c, outcome) {
   else if (outcome === 'browsed') { s.browsed++; if (!c.bubble) say(c, 'meh', 2); }
   else if (outcome === 'looked') { s.looked++; }
   else say(c, 'heart', 3);
-  c.exp += { bought: 10, fixed: 12, session: 5 }[outcome] || 0;
+  c.exp += { bought: 10, fixed: 12, session: 5, helped: 8 }[outcome] || 0;
   if (c.servedBy && (outcome === 'bought' || outcome === 'fixed')) bump(c.servedBy, 'mot', 1);
   survey(c);
   if (c.staff) { c.staff.customer = null; c.staff = null; }
@@ -1022,7 +1027,7 @@ function dispatch() {
     const free = game.staff.filter(s => s.role === 'genius' && (s.state === 'idle' || s.state === 'wander'));
     if (!free.length) break;
     // la riparazione va a chi ha il livello giusto: né sotto (più lento, più errori) né sprecando un Genius
-    const fit = s => { const k = TIER[s.tier].skill; return k < c.repair ? 10 + c.repair - k : k - c.repair; };
+    const fit = s => { const k = TIER[s.tier].skill; return (s.calmUntil > game.time && c.repair > 0 ? 20 : 0) + (k < c.repair ? 10 + c.repair - k : k - c.repair); };
     free.sort((a, b) => fit(a) - fit(b) || dist(a, c.bar) - dist(b, c.bar));
     const g = free[0];
     c.staff = g; g.customer = c;
@@ -1039,7 +1044,7 @@ function updateStaff(s, dt) {
   const arrived = moveAlong(s, dt);
   const c = s.customer;
   if (game.time >= OPEN && game.time < CLOSE && !onBreak(s)) {
-    if (BUSY.has(s.state) || s.customer) bump(s, 'stress', 0.15 * ROLE_STRESS[s.role] * TIER[s.tier].stress * (1 + 0.1 * F().sales) * dt);
+    if (BUSY.has(s.state) || s.customer) bump(s, 'stress', 0.15 * ROLE_STRESS[s.role] * TIER[s.tier].stress * (1 + 0.1 * F().sales) * (s.calmUntil > game.time ? 0.5 : 1) * dt);
     else bump(s, 'stress', (s.post ? -0.03 : -0.05) * dt);
     bump(s, 'mot', -0.015 * (1 - 0.3 * F().cel) * dt);
   }
@@ -1095,10 +1100,21 @@ function updateStaff(s, dt) {
       if (!c || c.state !== 'waiting') { s.customer = null; s.state = 'idle'; s.t = 1; break; }
       if (arrived) {
         c.state = 'served'; serve(s, c); face(s, c);
-        if (shouldCoach(c)) { startMoment(s, c); break; }
+        if (c.kind === 'help') {
+          s.state = 'helping'; s.t = rand(4, 9) * pace(s); say(s, 'question', 2); say(c, 'dots', s.t);
+          break;
+        }
         s.state = 'probe'; s.t = rand(2, 4) * pace(s);
         say(s, 'question', s.t); say(c, 'dots', s.t);
         log(`${s.name} segue un ${describe(c)} al tavolo ${c.slot.table.name}`);
+      }
+      break;
+    case 'helping':
+      s.t -= dt;
+      if (s.t <= 0) {
+        s.served++; game.stats.helped++; say(s, 'check', 1);
+        s.customer = null; leave(c, 'helped');
+        s.state = 'idle'; s.t = rand(1, 3);
       }
       break;
     case 'probe':
@@ -1179,128 +1195,122 @@ function updateStaff(s, dt) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Momenti ASOS: 2–3 al giorno il gioco si ferma su una visita importante
-// e suggerisci allo Specialist come procedere. Alla fine si vede cosa ha funzionato.
+// Momenti da leader: quando sul floor succede qualcosa di importante (qualcuno è al limite,
+// una grande vendita, un errore serio) il gioco si ferma e decidi tu come intervenire.
 // ─────────────────────────────────────────────────────────────
-function shouldCoach(c) {
-  return c.kind === 'buy' && game.momentsDone < game.momentsMax && game.time >= OPEN + 30 && game.time < CLOSE - 20 &&
-    game.time - game.lastMoment >= 90 && Math.random() < 0.35;
-}
-const STEP_NAMES = ['Accogliere', 'Approfondire', 'Presentare', 'Concludere'];
-function momentChoices(m) {
-  const { c } = m, need = c.need;
-  if (m.step === 1) return [
-    { k: 'uso', t: `Chiedigli come userà ${PRODUCT_NAME[c.product]} nella sua giornata` },
-    { k: 'budget', t: 'Chiedigli quanto vuole spendere' },
-    { k: 'nuovo', t: 'Mostragli subito il modello più nuovo' },
-  ];
-  if (m.step === 2) return m.known ? [
-    { k: 'match', t: `Fagli provare ${need.feature}` },
-    { k: 'lista', t: 'Elencagli tutte le caratteristiche' },
-    { k: 'prova', t: 'Mettiglielo in mano e lascialo esplorare' },
-  ] : [
-    { k: 'torna', t: 'Fai un passo indietro: chiedigli come lo userà' },
-    { k: 'lista', t: 'Elencagli tutte le caratteristiche' },
-    { k: 'prova', t: 'Mettiglielo in mano e lascialo esplorare' },
-  ];
-  return m.known ? [
-    { k: 'accmatch', t: `Proponi ${need.acc}` },
-    { k: 'accgen', t: 'Proponi una custodia' },
-    { k: 'chiudi', t: 'Chiudi la vendita senza proporre altro' },
-  ] : [
-    { k: 'ascolta', t: 'Chiedigli se c\'è altro che gli servirebbe' },
-    { k: 'accgen', t: 'Proponi una custodia' },
-    { k: 'chiudi', t: 'Chiudi la vendita senza proporre altro' },
-  ];
-}
-function momentSays(m) {
-  const { c } = m;
-  if (m.step === 1) return `«Sto guardando ${PRODUCT_NAME[c.product]}, ma non so bene quale prendere.»`;
-  if (m.step === 2) return m.known ? `«${c.need.says}»` : m.probe === 'budget' ? '«Non vorrei spendere troppo.»' : '«Bello… ma è davvero quello che mi serve?»';
-  return m.present === 'lista' ? '«Ok… quindi quale mi consiglia?»' : '«Mi piace. Mi serve altro?»';
-}
-function startMoment(s, c) {
-  game.moment = { s, c, step: 1, known: false };
-  game.momentsDone++; game.lastMoment = game.time;
-  s.state = 'coached';
-  say(s, 'question', 2); say(c, 'dots', 2);
-  if (window.autoCoach) {                             // per i test: le scelte arrivano da fuori
-    while (game.moment && !game.moment.result) chooseMoment(window.autoCoach(momentChoices(game.moment), game.moment));
-    closeMoment();
-    return;
-  }
+// ogni tipo di momento al massimo una volta al giorno, così le situazioni cambiano
+const leaderReady = type => !game.moment && game.momentsDone < game.momentsMax && !game.momentTypes.includes(type) &&
+  game.time >= OPEN + 15 && game.time < CLOSE - 15 && game.time - game.lastMoment >= 45;
+function openMoment(m) {
+  game.moment = m; game.momentsDone++; game.lastMoment = game.time; game.momentTypes.push(m.type);
+  if (window.autoCoach) { chooseMoment(window.autoCoach(m.choices, m)); closeMoment(); return; }   // per i test
   renderMoment();
 }
+function stressMoment(s) {
+  const area = TIER[s.tier].area;
+  const calmer = s.post ? `Fallo sostituire (${roleShort(s)}) e mettilo ai tavoli per un'ora`
+    : area === 'bar' ? 'Per un\'ora affidagli solo riparazioni rapide'
+    : area === 'creative' ? 'Per un\'ora lascialo agli accessori, senza lezioni'
+    : 'Dagli un\'ora più leggera ai tavoli';
+  openMoment({ type: 'stress', s, title: 'Qualcuno è al limite',
+    where: `${s.name} (${TIER[s.tier].label}, ${roleShort(s)}) ha lo stress a ${Math.round(s.stats.stress)}.`,
+    says: 'Risponde in fretta e i clienti se ne accorgono. Se finisce la giornata così, domani rischia di restare a casa.',
+    choices: [
+      { k: 'pausa', t: 'Mandalo in pausa adesso' },
+      { k: 'sposta', t: calmer },
+      { k: 'tieni', t: 'Chiedigli di tenere duro fino al cambio' },
+    ] });
+}
+function saleMoment(s, c) {
+  openMoment({ type: 'sale', s, title: 'Una grande vendita',
+    where: `${s.name} (${TIER[s.tier].label}) ha venduto ${PRODUCT_NAME[c.product]} con ${c.accName} e AppleCare.`,
+    says: 'Il cliente esce contento, e una parte della squadra ha visto come ci è arrivato.',
+    choices: [
+      { k: 'pubblico', t: 'Riconoscilo davanti alla squadra' },
+      { k: 'privato', t: 'Ringrazialo in privato' },
+      { k: 'dd', t: 'Chiedigli di raccontarla al prossimo DD' },
+      { k: 'niente', t: 'Non dire niente, è il suo lavoro' },
+    ] });
+}
+function errorMoment(s, c) {
+  openMoment({ type: 'error', s, c, title: 'Un errore serio',
+    where: `${s.name} (${TIER[s.tier].label}) ${ERROR_TEXT[s.role]}.`,
+    says: 'Il cliente è irritato e lo fa capire. Ti stai avvicinando al tavolo.',
+    choices: [
+      { k: 'affianca', t: 'Affiancalo e rimediate insieme con il cliente' },
+      { k: 'privato', t: 'Lascia che finisca, poi ne parlate in privato' },
+      { k: 'davanti', t: 'Correggilo subito davanti al cliente' },
+      { k: 'lascia', t: 'Lascia correre' },
+    ] });
+}
 function renderMoment() {
-  const m = game.moment, el = document.getElementById('moment');
-  document.getElementById('mTitle').textContent = m.result ? 'Com\'è andata' : 'Momento ASOS';
-  document.getElementById('mWhere').textContent = `${m.s.name} è al tavolo ${m.c.slot.table.name} con un cliente per ${PRODUCT_NAME[m.c.product]}. Cosa gli suggerisci?`;
-  const now = m.result ? 4 : m.step;
-  document.getElementById('mSteps').innerHTML = STEP_NAMES.map((n, i) => `<span class="${i < now ? 'done' : i === now ? 'now' : ''}">${i < now ? '✓ ' : ''}${n}</span>`).join('');
+  const m = game.moment;
+  document.getElementById('mTitle').textContent = m.result ? 'Com\'è andata' : m.title;
+  document.getElementById('mWhere').textContent = m.where;
+  document.getElementById('mSteps').innerHTML = '';
+  if (!m.order) m.order = [...m.choices].sort(() => Math.random() - 0.5);
   document.getElementById('mBody').innerHTML = m.result
     ? `<div class="mResult">${m.result.text}</div><button class="on" id="mDone">Continua</button>`
-    : `<div class="mSays">${momentSays(m)}</div><div class="mChoices">${shuffleOnce(m).map(o => `<button data-k="${o.k}">${o.t}</button>`).join('')}</div>`;
-  el.classList.add('show');
-}
-// l'ordine delle scelte cambia a ogni passo, ma resta fermo mentre la scheda è aperta
-function shuffleOnce(m) {
-  if (m.order && m.order.step === m.step) return m.order.list;
-  const list = momentChoices(m).sort(() => Math.random() - 0.5);
-  m.order = { step: m.step, list };
-  return list;
+    : `<div class="mSays">${m.says}</div><div class="mChoices">${m.order.map(o => `<button data-k="${o.k}">${o.t}</button>`).join('')}</div>`;
+  document.getElementById('moment').classList.add('show');
 }
 function chooseMoment(k) {
-  const m = game.moment;
-  if (m.step === 1) { m.probe = k; m.known = k === 'uso'; m.step = 2; }
-  else if (m.step === 2) { m.present = k; if (k === 'torna') m.known = true; m.step = 3; }
-  else { m.close = k; m.result = resolveMoment(m); }
-}
-function resolveMoment(m) {
-  const { s, c } = m, need = c.need, prod = PRODUCT_NAME[c.product];
-  const p = 0.35 + 0.15 * s.stats.comp / 100 + { uso: 0.1, budget: 0, nuovo: -0.05 }[m.probe]
-    + { match: 0.3, torna: 0.25, prova: 0.12, lista: -0.05 }[m.present];
-  const bought = Math.random() < p;
-  const accP = { accmatch: 0.85, ascolta: 0.65, accgen: 0.35, chiudi: 0 }[m.close];
-  const matched = m.close === 'accmatch' || m.close === 'ascolta';
-  const acc = bought && Math.random() < accP;
-  c.exp += { uso: 5, budget: 0, nuovo: -2 }[m.probe] + { match: 6, torna: 4, prova: 3, lista: -3 }[m.present] + (matched ? 3 : m.close === 'accgen' ? -1 : 0);
-  c.needKnown = m.known || m.close === 'ascolta';
-  c.accessory = acc; c.accName = matched ? need.acc : 'una custodia';
-  const parts = [];
-  parts.push({
-    uso: `La domanda sull'uso ha fatto emergere che ${need.who}.`,
-    budget: `Partire dal budget non ha fatto emergere come avrebbe usato ${prod}.`,
-    nuovo: 'Mostrare subito il modello più nuovo ha saltato la domanda sul bisogno.',
-  }[m.probe]);
-  parts.push({
-    match: `Provare ${need.feature} ha risposto proprio a quel bisogno.`,
-    torna: `Il passo indietro ha recuperato il bisogno: ${need.who}, e ${need.feature} gli ha risposto.`,
-    prova: 'Provarlo in mano lo ha coinvolto, ma senza legarlo a un bisogno preciso.',
-    lista: 'L\'elenco delle caratteristiche non ha parlato al suo bisogno.',
-  }[m.present]);
-  if (bought) {
-    let line = `Il cliente ha comprato ${prod}`;
-    if (acc && m.close === 'ascolta') line += ` e, chiedendogli cosa gli servisse, è emerso che ${need.who}: ha aggiunto ${need.acc}.`;
-    else if (acc && matched) line += ` e ha aggiunto ${need.acc}, perché rispondeva al suo bisogno.`;
-    else if (acc) line += ' e ha preso anche una custodia.';
-    else if (matched) line += `. ${need.acc[0].toUpperCase() + need.acc.slice(1)} era la proposta giusta, ma oggi ha detto di no.`;
-    else if (m.close === 'accgen') line += `. La custodia non gli interessava: ${need.acc} gli sarebbe servito di più.`;
-    else line += `. Nessun accessorio proposto: ${need.acc} gli sarebbe servito.`;
-    parts.push(line);
+  const m = game.moment, s = m.s, n = s.name;
+  const mates = game.staff.filter(x => x !== s && TIER[x.tier].area === TIER[s.tier].area && !onBreak(x));
+  let text, good;
+  if (m.type === 'stress') {
+    if (k === 'pausa') {
+      s.wantsBreak = true; bump(s, 'stress', -5); good = true;
+      text = `${n} va in pausa appena finisce con il cliente: in un quarto d'ora lo stress scende di circa 20 punti.` + (s.post ? ' Un collega prende il suo posto.' : '');
+    } else if (k === 'sposta') {
+      s.calmUntil = game.time + 60; good = true;
+      if (s.post) {
+        const sub = game.staff.filter(y => y.rota === s.rota && y !== s && !y.post && !onBreak(y)).sort((a, b) => a.stats.stress - b.stats.stress)[0];
+        if (sub) { const a = s.slot; s.nextSlot = sub.slot; sub.nextSlot = a; }
+      }
+      text = `Per un'ora ${n} lavora con meno pressione: lo stress sale la metà del solito, e resta in squadra.`;
+    } else {
+      bump(s, 'mot', -4); good = false;
+      text = `${n} resta dov'è. Lo stress continua a salire, la motivazione cala un po' e cresce il rischio che domani resti a casa.`;
+    }
+  } else if (m.type === 'sale') {
+    if (k === 'pubblico') {
+      bump(s, 'mot', 8); mates.forEach(x => bump(x, 'mot', 2)); good = true;
+      text = `Riconoscerlo davanti a tutti ha dato energia alla squadra: motivazione su per ${n} e un po' per i colleghi.`;
+    } else if (k === 'privato') {
+      bump(s, 'mot', 6); good = true;
+      text = `Il grazie in privato ha alzato la motivazione di ${n}.`;
+    } else if (k === 'dd') {
+      bump(s, 'comp', 2); bump(s, 'mot', 3); mates.forEach(x => bump(x, 'comp', 0.5)); good = true;
+      text = `Raccontata al DD, la vendita diventa un esempio: ${n} si sente valorizzato e la squadra impara come ci è arrivato.`;
+    } else {
+      bump(s, 'mot', -3); good = false;
+      text = `Una bella vendita passata sotto silenzio: la motivazione di ${n} cala un po'.`;
+    }
   } else {
-    parts.push(`Il cliente è uscito dicendo «ci penso».` + (m.known ? '' : ` ${need.who[0].toUpperCase() + need.who.slice(1)}: ${need.feature} lo avrebbe convinto.`));
+    const c = m.c;
+    if (k === 'affianca') {
+      c.exp += 18; c.recovered = true; bump(s, 'comp', 2); bump(s, 'stress', 2); good = true;
+      text = `Affiancarlo ha recuperato il cliente, e ${n} ha visto come si rimedia: competenza su.`;
+    } else if (k === 'privato') {
+      bump(s, 'comp', 3); bump(s, 'mot', -1); good = true;
+      text = `Il cliente resta deluso, ma il confronto in privato aiuta ${n} a non ripeterlo: competenza su.`;
+    } else if (k === 'davanti') {
+      c.exp += 5; bump(s, 'mot', -10); bump(s, 'stress', 8); good = false;
+      text = `Correggerlo davanti al cliente ha sistemato poco e ha pesato su ${n}: motivazione giù, stress su.`;
+    } else {
+      good = false;
+      text = 'Nessuno ne parla: il cliente se ne va deluso e l\'errore può ripetersi.';
+    }
   }
-  const text = parts.join(' ');
-  return { bought, text, good: bought && (acc || matched) };
+  m.result = { text, good };
 }
 function closeMoment() {
   const m = game.moment;
-  game.lessons.push({ t: game.time, name: m.s.name, text: m.result.text, good: m.result.good });
-  log(`${m.s.name}, momento ASOS: ${m.result.bought ? 'vendita' : 'il cliente ci pensa'}`);
-  if (m.result.bought) { say(m.s, 'check', 2); say(m.c, 'check', 2); }
+  game.lessons.push({ t: game.time, name: m.s.name, title: m.title, text: m.result.text, good: m.result.good });
+  log(`${m.title}: ${m.s.name}`);
   game.moment = null;
   document.getElementById('moment').classList.remove('show');
-  finishSale(m.s, m.c, m.result.bought);
 }
 document.getElementById('mBody').addEventListener('click', ev => {
   const b = ev.target.closest('button'); if (!b || !game.moment) return;
@@ -1318,6 +1328,7 @@ function finishSale(s, c, bought) {
     if (c.service) st.services++;
     log(`${s.name} vende ${PRODUCT_NAME[c.product]}${c.accessory ? ' + ' + c.accName : ''}${c.service ? ' + AppleCare' : ''}`);
     leave(c, 'bought');
+    if (c.accessory && c.service && leaderReady('sale') && Math.random() < 0.6) saleMoment(s, c);
   } else leave(c, 'browsed');
   s.customer = null; s.state = 'idle'; s.t = rand(1, 3);
 }
@@ -1331,7 +1342,7 @@ function updateSessions() {
     const t = game.time;
     if (ses.state === 'planned' && t >= ses.start - 25) {
       // tiene la lezione il Creative che ne ha fatte meno oggi
-      const free = game.staff.filter(x => x.role === 'creative').sort((a, b) => a.sessions - b.sessions);
+      const free = game.staff.filter(x => x.role === 'creative').sort((a, b) => (a.calmUntil > t) - (b.calmUntil > t) || a.sessions - b.sessions);
       if (!free.length) { ses.state = 'done'; continue; }
       ses.presenter = free[0]; ses.presenter.sessions++;
       ses.state = 'arriving';
@@ -1374,7 +1385,7 @@ function convertFromToday(c) {
 // ─────────────────────────────────────────────────────────────
 function pickKind() {
   const r = Math.random();
-  return r < 0.42 ? 'buy' : r < 0.6 ? 'acc' : r < 0.85 ? 'genius' : 'look';
+  return r < 0.38 ? 'buy' : r < 0.44 ? 'help' : r < 0.62 ? 'acc' : r < 0.87 ? 'genius' : 'look';
 }
 function spawnArrivals(dt) {
   if (game.time < OPEN || game.time >= LAST_ENTRY) return;
@@ -1397,6 +1408,10 @@ function step(dt) {
     log(`Porte aperte: entrano ${n} clienti che aspettavano fuori`);
   }
   if (game.time >= game.nextRotation && game.time < CLOSE - 30) planRotation();
+  if (leaderReady('stress') && Math.floor(game.time / 10) !== Math.floor(before / 10)) {
+    const s = game.staff.filter(x => x.stats.stress >= 70 && !onBreak(x) && !x.wantsBreak).sort((a, b) => b.stats.stress - a.stats.stress)[0];
+    if (s) stressMoment(s);
+  }
   spawnArrivals(dt);
   updateSessions();
   updateLine(game.lineIn, POINT_IN, [POINT_IN2]);
@@ -1438,6 +1453,7 @@ function endDay() {
     ['Accessori all\'Express (B1)', s.express],
     ['Accessori alle pareti', s.wallSales],
     ['Risolti al Genius Bar', s.genius],
+    ['Aiutati ai tavoli C1 e C5', s.helped],
     ['Solo a guardare', s.looked + s.today],
     ['…di cui fermi al Today at Apple', s.today],
     ['Diventati clienti dopo una lezione', s.todayConv],
@@ -1449,7 +1465,7 @@ function endDay() {
     ...teamDelta(),
   ]);
   document.getElementById('dbLessons').innerHTML = game.lessons.length
-    ? '<h3>Momenti ASOS</h3>' + game.lessons.map(l => `<div>${l.good ? '✓' : '·'} <b>${l.name}</b>, ${fmt(l.t)}: ${l.text}</div>`).join('')
+    ? '<h3>Momenti da leader</h3>' + game.lessons.map(l => `<div>${l.good ? '✓' : '·'} <b>${l.title}</b> · ${l.name}, ${fmt(l.t)}: ${l.text}</div>`).join('')
     : '';
   document.getElementById('debrief').classList.add('show');
 }
@@ -1558,9 +1574,10 @@ function drawTable(t) {
     return;
   }
   const p = t.product;
+  if (p === 'help') { rect(x + 4, y + 18, w - 8, 8, '#d9b07a'); return; }        // tavolo libero per aiutare i clienti
   for (let r = 0; r < 4; r++) for (let c = 0; c < 2; c++) {
     const ix = x + 3 + c * 8, iy = y + 4 + r * 10;
-    if (p === 'iphone') { rect(ix + 1, iy, 3, 5, '#1d1d24'); rect(ix + 2, iy + 1, 1, 3, pick4(r, c)); }
+      if (p === 'iphone') { rect(ix + 1, iy, 3, 5, '#1d1d24'); rect(ix + 2, iy + 1, 1, 3, pick4(r, c)); }
     else if (p === 'ipad') { rect(ix, iy, 6, 7, '#1d1d24'); rect(ix + 1, iy + 1, 4, 5, pick4(r, c)); }
     else if (p === 'watch') { rect(ix + 1, iy + 1, 3, 3, '#1d1d24'); rect(ix + 2, iy + 2, 1, 1, '#e36bb5'); rect(ix + 2, iy, 1, 5, '#555'); }
     else { rect(ix, iy, 6, 4, '#bfc3c9'); rect(ix + 1, iy + 1, 4, 2, pick4(r, c)); rect(ix - 1, iy + 4, 8, 2, '#9ea3aa'); }
@@ -1659,9 +1676,9 @@ const STATE_LABEL = {
   atBar: 'al Genius Bar', toSession: 'va al Today at Apple', seated: 'si ferma al Today at Apple', toLook: 'va a guardare', looking: 'guarda i prodotti',
   toWall: 'va alla parete accessori', pickWall: 'sceglie un accessorio', waitWall: 'aspetta qualcuno alla parete', servedWall: 'viene consigliato',
   toWallCustomer: 'va da un cliente alla parete', advise: 'consiglia un accessorio', leaving: 'esce',
-  idle: 'libero', wander: 'gira nella sua zona', listening: 'ascolta un cliente', escort: 'accompagna al Genius Bar', toCustomer: 'va da un cliente',
+  helping: 'aiuta un cliente', idle: 'libero', wander: 'gira nella sua zona', listening: 'ascolta un cliente', escort: 'accompagna al Genius Bar', toCustomer: 'va da un cliente',
   probe: 'fa domande', demo: 'fa la demo', checkout: 'chiude la vendita', repair: 'ripara',
-  coached: 'segue il tuo suggerimento', huddle: 'momento di squadra', training: 'in formazione', toBreak: 'va in pausa', onBreak: 'in pausa', fromBreak: 'torna dalla pausa',
+huddle: 'momento di squadra', training: 'in formazione', toBreak: 'va in pausa', onBreak: 'in pausa', fromBreak: 'torna dalla pausa',
   toStage: 'va allo schermo', onStage: 'prepara la sessione', presenting: 'tiene la sessione',
 };
 const roleShort = x => onBreak(x) ? 'pausa' : x.slot !== undefined ? rotaOf(x)[x.slot].name : 'Today at Apple';

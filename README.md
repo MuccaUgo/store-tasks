@@ -32,7 +32,9 @@ Frontend statico (GitHub Pages) + database e login su Supabase (piano gratuito).
 
 ### PLGame, il gioco (prototipo)
 In `plgame/index.html` c'è la simulazione in pixel art dello store di
-Piazza Liberty, vista dall'alto. Chi entra dalla porta in alto a destra si
+Piazza Liberty, vista dall'alto. Tavoli: iPhone da A2 ad A5 e in B4–B5, iPad
+in A1 e B2, Watch in B3 e C3, Mac in C2 e C4, cassa Express in B1; C1 e C5
+sono liberi per aiutare i clienti con una domanda veloce. Chi entra dalla porta in alto a destra si
 mette in fila dal **Point** e dice cosa cerca: acquisto (tavoli iPhone,
 iPad/Watch, Mac, dove poi arriva uno Specialist), assistenza (il secondo
 Point, sopra il primo tavolo del Genius Bar, fa il check-in e accompagna al
@@ -59,11 +61,11 @@ Il team parte poco competente e cresce col tempo. Ogni 1–2 ore i ruoli
 ruotano (chi era in vendita va a Point, Express o accessori, e viceversa);
 Point ed Express stressano di più. Durante la giornata si può mandare
 qualcuno in **pausa** 15 minuti o fargli i **complimenti** (3 al giorno).
-Ogni cliente che vuole comprare ha un bisogno nascosto: le domande giuste
-lo fanno emergere (più spesso con un team competente) e cambiano proposta e
-accessorio. Due o tre volte al giorno il gioco si ferma su un **momento
-ASOS**: suggerisci allo Specialist come approfondire, presentare e
-concludere, e alla fine vedi cosa ha funzionato, anche nel debrief.
+Ogni cliente che vuole comprare ha un bisogno nascosto: più il team è
+competente, più spesso emerge e porta alla proposta e all'accessorio giusti.
+Quando sul floor succede qualcosa di importante (qualcuno è al limite, una
+grande vendita, un errore serio) il gioco si ferma su un **momento da
+leader**: scegli come intervenire e vedi l'effetto su persone e clienti.
 All'apertura entrano 5–10 clienti che aspettavano fuori, e alcuni clienti
 sono scortesi e alzano lo stress di chi li serve. Alcuni clienti
 lasciano un commento da 1 a 5: 5 vale +1, 4 vale 0, da 3 a 1 vale −1, e
