@@ -46,7 +46,16 @@ Ogni giorno si apre col **Brief**: 3 gettoni da mettere tra strategia
 servizi, ma più stress) e **celebration** (più motivazione, meno stress).
 Ognuno nel team ha motivazione (velocità), stress (esperienza del cliente)
 e competenza (errori e attach); con troppo stress il giorno dopo si è in
-malattia. Il team parte poco competente e cresce col tempo. Ogni 1–2 ore i ruoli
+malattia. La squadra è di 43 persone, tutte full time: in vendita 12 Specialist,
+6 Expert e 3 Pro; al Genius Bar 10 Technical Specialist, 5 Technical Expert
+e 2 Genius; al Today at Apple 3 Creative e 2 Creative Pro. Ognuno ha due
+giorni liberi in settimana, nel weekend lavorano tutti (il sabato è il
+giorno più pieno). I livelli più alti arrivano a più competenza, vendono o
+riparano meglio e reggono meglio lo stress; al Genius Bar le riparazioni
+sono rapide, medie o complesse, e il Point lo fanno i Technical Specialist.
+I Creative tengono le lezioni a turno, convincono qualche partecipante a
+comprare e nel tempo libero aiutano agli accessori.
+Il team parte poco competente e cresce col tempo. Ogni 1–2 ore i ruoli
 ruotano (chi era in vendita va a Point, Express o accessori, e viceversa);
 Point ed Express stressano di più. Durante la giornata si può mandare
 qualcuno in **pausa** 15 minuti o fargli i **complimenti** (3 al giorno).
