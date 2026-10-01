@@ -47,7 +47,12 @@ Ogni giorno si apre con l'**Apertura**: scegli l'argomento del **DD del
 mattino** (Product, Support, Business, Creative, Fun, ognuno con un effetto
 sulla giornata) e chi lo facilita, e decidi il **piano dei ruoli**: chi va
 al Point, all'Express, agli accessori e al Point del Genius Bar. A ogni
-cambio ruoli il gioco propone la rotazione e tu puoi cambiarla.
+cambio ruoli il gioco propone la rotazione e tu puoi cambiarla. Come una
+squadra di calcio scegli anche la **formazione** del floor (Accoglienza,
+Tavoli, Essenziale), perché non sempre ci sono tutti: qualcuno è in ferie,
+qualcuno in malattia, e qualcuno può sentirsi male durante la giornata.
+Allora decidi se coprire il suo posto, cambiare formazione o chiedere alla
+squadra di andare più veloce per due ore, con più stress.
 Ognuno nel team ha motivazione (velocità), stress (esperienza del cliente)
 e competenza (errori e attach); con troppo stress il giorno dopo si è in
 malattia. La squadra è di 43 persone, tutte full time: in vendita 12 Specialist,
