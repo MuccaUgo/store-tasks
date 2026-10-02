@@ -546,7 +546,7 @@ const errorChance = (s, c) => 0.2 * (1 - s.stats.comp / 100) * (1 - 0.25 * F().o
 function ddSupport(s, c) {
   if (!ddOn('support') || s.role !== 'genius' || !ddInvolved(s)) return 1;
   const match = c && c.repair !== undefined && (game.dd.target === 'complesse' ? c.repair === 2 : c.repair <= 1);
-  return 1 - (match ? 0.4 : 0.1) * ddMult();
+  return Math.max(0.1, 1 - (match ? 0.55 : 0.2) * ddMult());
 }
 const attachChance = s => ((0.15 + 0.45 * s.stats.comp / 100) * (1 + 0.25 * F().sales) + (TIER[s.tier].sales || 0)) * T(s).attach; // competenza, vendita e livello → più attach
 // stress → esperienza peggiore; spingere le vendite senza competenza si sente
@@ -823,7 +823,7 @@ const LEVELS = [
     lesson: 'La conversion la fa il modo di stare col cliente, non il numero di persone ai tavoli. Con un team ancora poco esperto la tattica Qualità chiude di più: c\'è tempo per far emergere il bisogno. Vendita aiuta, ma l\'esperienza ne risente; Velocità fa perdere vendite.' },
   { name: 'AppleCare', day: 6, weather: 'sole', traffic: 1, comp: 15, stress: 20, formation: 'accoglienza', unlock: ['form', 'tactic', 'dd'],
     from: 'Market Leader', msg: 'Siamo indietro su AppleCare rispetto agli altri store. Oggi è il focus: ogni cliente deve sapere cosa gli offre.',
-    goal: { key: 'applecare', stars: [20, 28, 36] },
+    goal: { key: 'applecare', stars: [28, 45, 60] },
     hint: 'Il DD del mattino può mettere tutti sulla stessa pagina.',
     lesson: 'Il DD Business su AppleCare è la leva più forte: tutti lo propongono, anche al Genius Bar. La tattica Vendita lo fa proporre ancora più spesso; approfondito vale di più ma il team entra tardi.' },
   { name: 'Sabato', day: 9, weather: 'sole', traffic: 1, comp: 20, stress: 25, formation: 'tavoli', unlock: ['form', 'tactic', 'dd'],
@@ -833,40 +833,39 @@ const LEVELS = [
     lesson: 'Il sabato servono due Point per non perdere gente all\'ingresso e la tattica Qualità per far stare bene chi entra. Le pause date al momento giusto tengono basso lo stress.' },
   { name: 'Piove', day: 4, weather: 'pioggia', traffic: 1, comp: 20, stress: 25, formation: 'accoglienza', unlock: ['form', 'tactic', 'dd'],
     from: 'Market Leader', msg: 'Piove su Milano: meno curiosi, ma chi entra è nervoso e c\'è qualche cliente scortese in più. Proteggi l\'esperienza.',
-    goal: { key: 'nps', stars: [42, 56, 68] },
+    goal: { key: 'nps', stars: [48, 64, 68] },
     hint: 'Con meno gente in giro puoi permetterti di rallentare.',
     lesson: 'Con la pioggia entra meno gente: si può rallentare (Qualità) senza allungare le file, e i clienti nervosi si calmano quando hanno tutto il tempo che serve. Vendita, oggi, li irrita.' },
   { name: 'Accessori', day: 8, weather: 'nuvoloso', traffic: 1, comp: 20, stress: 25, formation: 'essenziale', unlock: ['form', 'tactic', 'dd'],
     from: 'Market Leader', msg: 'Gli accessori sono sotto obiettivo da tre settimane. Oggi pareti, Express e tavoli: ogni vendita deve avere il suo accessorio.',
-    goal: { key: 'accessori', stars: [80, 100, 118] },
+    goal: { key: 'accessori', stars: [95, 110, 122] },
     hint: 'Gli accessori si vendono in tre posti diversi.',
     lesson: 'Gli accessori si vendono alle pareti (servono persone lì: Accoglienza ne mette due), all\'Express e al tavolo. Il DD Business sugli accessori e la tattica Vendita alzano l\'attach.' },
   { name: 'Genius Bar sotto pressione', day: 5, weather: 'nuvoloso', traffic: 1, comp: 15, stress: 25, formation: 'accoglienza', unlock: ['form', 'tactic', 'dd'],
     sick: { bar: 2 }, mix: { genius: 0.33, buy: 0.3 }, repairs: [0.3, 0.35, 0.35],
-    gate: { key: 'npsBar', min: 30 },
     from: 'Market Leader', msg: 'Due Technical Specialist a casa malati e tante riparazioni complesse in agenda. Il Genius Bar deve tenere: oggi conto gli errori.',
-    goal: { key: 'errBar', stars: [30, 22, 15] },
-    hint: 'Gli errori al Genius Bar pesano tantissimo sui commenti.',
-    lesson: 'Il DD Support sulle riparazioni complesse riduce gli errori dove servono, e un Genius Bar con meno errori lascia clienti molto più contenti.' },
+    goal: { key: 'errBar', stars: [18, 12, 9] },
+    hint: 'Gli errori nascono dalla competenza, e la competenza si può preparare la mattina.',
+    lesson: 'Il DD Support riduce gli errori al Genius Bar, molto di più sul tipo di riparazione scelto: oggi le complesse. Il formato approfondito prepara meglio, ma il Bar apre alle 10:15 con la coda già lunga: oggi conviene quello breve. Le tattiche del floor qui non contano.' },
   { name: 'Squadra stanca', day: 7, weather: 'nuvoloso', traffic: 1, comp: 25, stress: 55, formation: 'accoglienza', unlock: ['form', 'tactic', 'dd'],
     gate: { key: 'nps', min: 30 },
     from: 'Market Leader', msg: 'Dopo il weekend la squadra è a pezzi. Oggi voglio arrivare a sera senza nessuno al limite, senza che i clienti se ne accorgano.',
-    goal: { key: 'stanchi', stars: [8, 4, 1] },
+    goal: { key: 'stanchi', stars: [9, 6, 3] },
     hint: 'Ogni leva ha un costo in stress. Le pause e i complimenti sono tue.',
     lesson: 'Un DD Fun abbassa lo stress di tutti già dal mattino, la tattica Qualità è la meno stressante, e le pause vanno date a chi sale sopra 60 prima che arrivi a 70.' },
   { name: 'Today at Apple', day: 3, weather: 'nuvoloso', traffic: 1, comp: 25, stress: 25, formation: 'accoglienza', unlock: ['form', 'tactic', 'dd'],
     mix: { look: 0.22, buy: 0.33 },
     from: 'Market Leader', msg: 'Domenica con tre sessioni Today at Apple. Voglio che le lezioni portino clienti: chi partecipa deve uscire con un prodotto.',
-    goal: { key: 'lezioni', stars: [4, 7, 10] },
+    goal: { key: 'lezioni', stars: [2, 6, 9] },
     hint: 'Chi tiene le lezioni?',
     lesson: 'Sono i Creative a trasformare i partecipanti in clienti: il DD Creative sulle lezioni li prepara a farlo, e chi si ferma al Today at Apple entra in vendita.' },
   { name: 'Lancio iPhone', day: 9, weather: 'pioggia', traffic: 1.1, comp: 30, stress: 30, formation: 'accoglienza', unlock: ['form', 'tactic', 'dd'],
     sick: { floor: 3 }, mix: { buy: 0.48 }, products: ['iphone', 'iphone', 'iphone', 'iphone', 'ipad', 'mac', 'watch'],
     gate: { key: 'nps', min: 35 },
     from: 'Market Leader', msg: 'Sabato di lancio, piove e tre persone della vendita sono a casa. Tutti vogliono il nuovo iPhone: conversion alta, ma senza rovinare l\'esperienza.',
-    goal: { key: 'conv', stars: [52, 58, 63] },
-    hint: 'Una sola leva non basta: cambia strategia alle 13 e alle 16 se serve.',
-    lesson: 'Il lancio chiede tutto insieme: DD Product sull\'iPhone, abbastanza Specialist ai tavoli e una tattica che venda senza far crollare l\'NPS. Le pause delle 13 e delle 16 servono a correggere.' },
+    goal: { key: 'conv', stars: [60, 66, 70] },
+    hint: 'Una sola leva non basta: guarda l\'NPS alle 13 e alle 16 e correggi.',
+    lesson: 'Il lancio chiede tutto insieme: il DD Product sull\'iPhone fa emergere il bisogno, la tattica Vendita chiude di più ma con la squadra sotto pressione l\'NPS crolla. Si vince alternando: Vendita finché l\'NPS regge, Qualità quando scende, o un DD Fun che regge lo stress.' },
 ];
 const SAVE_KEY = 'plgame.levels';
 let progress = {};
@@ -995,7 +994,9 @@ document.getElementById('openStore').addEventListener('click', () => startDay({ 
 const CHECKPOINTS = [13 * 60, 16 * 60];
 function goalStatus(L) {
   const k = L.goal.key, v = objValue(k), o = OBJ[k];
-  const frac = Math.max(0.05, (game.time - OPEN) / (CLOSE - OPEN));
+  // quota della giornata già passata, pesata sull'affluenza prevista ora per ora (il pomeriggio è più pieno)
+  const load = t => { let x = 0; for (let m = OPEN; m < Math.min(t, LAST_ENTRY); m += 5) x += RATE[Math.floor(m / 60)] || 6; return x; };
+  const frac = Math.max(0.05, load(game.time) / load(LAST_ENTRY));
   const proj = o.count ? Math.round(v / frac) : v;
   const st = starsFor(L, proj);
   return `<div class="goalBox"><b>🎯 ${o.label}: ${objFmt(k, v)}</b>${o.count ? ` finora, a questo ritmo circa <b>${objFmt(k, proj)}</b> a fine giornata` : ''} → <b class="stars">${starStr(st)}</b>
