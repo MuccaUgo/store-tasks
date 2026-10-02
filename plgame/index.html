@@ -99,6 +99,17 @@
   .hot { color: var(--bad); }
   .cands { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 12px; max-height: 50vh; overflow: auto; }
   .card .cands button { flex-shrink: 0; text-align: left; min-height: 40px; font-size: 13px; padding: 6px 10px; background: #33333f; }
+  #intro { z-index: 12; background: var(--bg); }
+  .introBox { width: min(560px, 100%); display: flex; flex-direction: column; gap: 10px; align-items: stretch; text-align: center; }
+  #introArt { width: 100%; height: auto; max-height: none; aspect-ratio: 192 / 120; image-rendering: pixelated; image-rendering: crisp-edges; border: 2px solid var(--line); border-radius: 4px; background: #000; }
+  .introTitle { font-size: 28px; font-weight: 700; letter-spacing: 4px; }
+  .introSay { min-height: 66px; text-align: left; font-size: 14px; padding: 10px 12px; background: var(--panel); border: 2px solid var(--line); border-radius: 6px; }
+  .caret { animation: blink 1s steps(2) infinite; color: var(--accent); }
+  @keyframes blink { 50% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .caret { animation: none; } }
+  .introBox button { min-height: 48px; font-size: 16px; }
+  .brSay { display: flex; gap: 10px; align-items: center; margin: 10px 0 0; font-size: 13px; }
+  .ava { width: 28px; height: 40px; image-rendering: pixelated; flex: 0 0 auto; }
   .brTeam { font-size: 12px; margin: 10px 0; padding: 8px; background: #1f1f27; border-radius: 4px; }
   .opt { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; }
   .opt .top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -144,10 +155,20 @@
   <div class="stage">
     <div class="scroller" id="scroller"><canvas id="game" width="288" height="380"></canvas></div>
     <div class="tip" id="tip" hidden><div class="tipText"></div><div class="acts"></div></div>
+    <div class="overlay show" id="intro">
+      <div class="introBox">
+        <canvas id="introArt" width="192" height="120"></canvas>
+        <div class="introTitle">PLGame</div>
+        <div class="sub">Apple Piazza Liberty · Milano</div>
+        <div class="introSay"><span id="introText"></span><span class="caret">▌</span></div>
+        <button class="on" id="introGo">Apriamo lo store</button>
+      </div>
+    </div>
     <div class="overlay" id="brief">
       <div class="card">
         <h2>Apertura</h2>
         <div class="sub" id="brDate"></div>
+        <div class="brSay" id="brSay"></div>
         <div class="brTeam" id="brTeam"></div>
         <div id="brOpts"></div>
         <div class="sub" id="brLeft"></div>
@@ -689,10 +710,6 @@ function ddPreview(d) {
 }
 const avgTeam = k => Math.round(game.staff.reduce((a, x) => a + x.stats[k], 0) / game.staff.length);
 function showBrief() {
-  if (!game.dd) {
-    const experts = game.staff.filter(x => ['E', 'P', 'TE', 'G', 'CP'].includes(x.tier));
-    game.dd = { topic: 'product', target: 'iphone', format: 'breve', who: 'tutti', by: (experts.length ? pick(experts) : game.staff[0]).name, coach: '' };
-  }
   document.getElementById('brDate').textContent = `${WEEKDAYS[game.date.getDay()]} ${game.day} gennaio${game.date.getDay() === 6 ? ' · sabato, il giorno più pieno' : game.weekend ? ' · domenica, tanta gente' : ''}`;
   const stressed = game.staff.filter(x => x.stats.stress > 60).map(x => x.name).slice(0, 8);
   document.getElementById('brTeam').innerHTML =
@@ -703,24 +720,14 @@ function showBrief() {
     (game.sick.length ? `<br>In malattia: <b>${game.sick.join(', ')}</b>` : '') +
     (game.vacation.length ? `<br>In ferie: <b>${game.vacation.join(', ')}</b>` : '') +
     (stressed.length ? `<br>Molto stressati: <b>${stressed.join(', ')}</b>` : '');
-  const t = DD_TOPICS.find(x => x.key === game.dd.topic), d = game.dd;
-  const chips = (key, list, cur) => `<div class="chips">${list.map(([k, l]) => `<button data-${key}="${k}" class="${k === cur ? 'on' : ''}">${l}</button>`).join('')}</div>`;
-  const seniors = game.staff.filter(x => ['E', 'P', 'TE', 'G', 'CP'].includes(x.tier));
-  const juniors = game.staff.filter(x => ['S', 'TS', 'C'].includes(x.tier)).sort((a, b) => a.stats.comp - b.stats.comp);
+  // chi è al Point apre la giornata con una battuta
+  const host = game.staff.find(x => x.post === POINT_IN) || game.staff[0];
+  const n = game.staff.length, dow = game.date.getDay();
+  const mood = dow === 6 ? 'Oggi è sabato: sarà pieno, teniamoci pronti.' : dow === 0 ? 'Domenica, arriverà tanta gente.' :
+    game.sick.length + game.vacation.length > 3 ? 'Siamo un po\' corti, organizziamoci bene.' : 'Giornata tranquilla, per ora.';
+  document.getElementById('brSay').innerHTML = `<canvas class="ava" width="7" height="10"></canvas><div><b>${host.name}</b> <span class="sub">${TIER[host.tier].label}</span><br>«Stiamo aprendo! Oggi siamo in ${n}. ${mood}»</div>`;
+  drawAvatar(document.querySelector('#brSay .ava'), host.look);
   document.getElementById('brOpts').innerHTML = `
-    <h3>DD del mattino</h3>
-    <div class="sub">Argomento</div>
-    <div class="chips">${DD_TOPICS.map(x => `<button data-dd="${x.key}" class="${x.key === d.topic ? 'on' : ''}">${x.name}</button>`).join('')}</div>
-    <div class="ddDesc">${t.desc}</div>
-    <div class="sub">Su cosa</div>${chips('ddt', t.targets, d.target)}
-    <div class="sub">Formato</div>${chips('ddf', DD_FORMATS, d.format)}
-    <div class="ddDesc">${DD_FORMATS.find(x => x[0] === d.format)[2]}</div>
-    <div class="sub">Chi partecipa</div>${chips('ddw', DD_WHO, d.who)}
-    <label class="sub" for="ddBy">Lo facilita (competenza e motivazione su)</label>
-    <select id="ddBy">${game.staff.map(x => `<option value="${x.name}"${x.name === d.by ? ' selected' : ''}>${x.name} · ${TIER[x.tier].label}</option>`).join('')}</select>
-    <label class="sub" for="ddCoach">Durante il DD affianca un collega meno esperto (competenza su per lui)</label>
-    <select id="ddCoach"><option value="">Nessuno</option>${juniors.map(x => `<option value="${x.name}"${x.name === d.coach ? ' selected' : ''}>${x.name} · ${TIER[x.tier].label} · competenza ${Math.round(x.stats.comp)}</option>`).join('')}</select>
-    <div class="ddDesc"><b>Oggi:</b> ${ddPreview(d)}</div>
     <h3>Formazione</h3>
     <div class="sub">In vendita oggi siete in ${game.staff.filter(x => x.rota === 'floor').length}.</div>
     <div class="chips">${FORMATION_ORDER.map(k => `<button data-form="${k}" class="${k === game.formation ? 'on' : ''}">${FORMATIONS[k].name}</button>`).join('')}</div>
@@ -732,18 +739,10 @@ function showBrief() {
 }
 document.getElementById('brOpts').addEventListener('click', ev => {
   const b = ev.target.closest('button'); if (!b) return;
-  if (b.dataset.dd) { game.dd.topic = b.dataset.dd; game.dd.target = DD_TOPICS.find(x => x.key === b.dataset.dd).targets[0][0]; showBrief(); return; }
-  if (b.dataset.ddt) { game.dd.target = b.dataset.ddt; showBrief(); return; }
-  if (b.dataset.ddf) { game.dd.format = b.dataset.ddf; showBrief(); return; }
-  if (b.dataset.ddw) { game.dd.who = b.dataset.ddw; showBrief(); return; }
   if (b.dataset.form) { changeFormation(b.dataset.form, 'open'); showBrief(); return; }
   if (b.dataset.post) { openPicker('open', b.dataset.rota, +b.dataset.post); }
 });
-document.getElementById('brOpts').addEventListener('change', ev => {
-  if (ev.target.id === 'ddBy') game.dd.by = ev.target.value;
-  if (ev.target.id === 'ddCoach') { game.dd.coach = ev.target.value; showBrief(); }
-});
-document.getElementById('openStore').addEventListener('click', () => startDay({ dd: game.dd }));
+document.getElementById('openStore').addEventListener('click', () => startDay({}));
 
 function startDay(opts = {}) {
   game.focus = { op: opts.op || 0, sales: opts.sales || 0, cel: opts.cel || 0 };   // i gettoni restano solo per le simulazioni di prova
@@ -1753,7 +1752,6 @@ function endDay() {
     ['Andati a casa malati', s.sickNow],
     ['Formazione a fine giornata', FORMATIONS[game.formation].name],
     ['Attesa media', s.waitN ? (s.waitSum / s.waitN).toFixed(1) + ' min' : '–'],
-    ['DD del mattino', game.dd ? `${DD_TOPICS.find(x => x.key === game.dd.topic).name} · ${DD_TOPICS.find(x => x.key === game.dd.topic).targets.find(x => x[0] === game.dd.target)[1]} · ${game.dd.format}` : '–'],
     ...teamDelta(),
   ]);
   document.getElementById('dbLessons').innerHTML = game.lessons.length
@@ -2109,9 +2107,119 @@ function frame(now) {
   acc += real * game.speed / REAL_SEC_PER_MIN;
   while (acc >= FIXED) { step(FIXED); acc -= FIXED; }
   render();
+  if (intro.on) drawIntro(real);
   if (now - lastPanel > 250) { updatePanel(); lastPanel = now; }
   requestAnimationFrame(frame);
 }
+
+// ─────────────────────────────────────────────────────────────
+// Schermata di presentazione: la piazza in pixel art e un membro del team che annuncia l'apertura
+// ─────────────────────────────────────────────────────────────
+function drawAvatar(cv, look) {
+  const g = cv.getContext('2d');
+  g.clearRect(0, 0, cv.width, cv.height);
+  const r = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
+  r(2, 0, 3, 1, look.hair); r(1, 1, 5, 1, look.hair);
+  r(1, 2, 1, 1, look.hair); r(2, 2, 3, 1, look.skin); r(5, 2, 1, 1, look.hair);
+  r(2, 3, 3, 1, look.skin); r(1, 4, 5, 3, look.shirt); r(1, 6, 1, 1, look.skin); r(5, 6, 1, 1, look.skin);
+  r(3, 5, 1, 1, '#ffffff'); r(2, 7, 3, 1, look.pants); r(2, 8, 1, 2, look.pants); r(4, 8, 1, 2, look.pants);
+}
+const intro = { t: 0, typed: 0, on: true, people: [] };
+const INTRO_LINE = 'Buongiorno! Sono le 9:58 e tra poco apriamo le porte di Piazza Liberty. La squadra è pronta e i primi clienti aspettano già in piazza: tocca a te guidare la giornata.';
+const introLook = { skin: '#f1c7a3', hair: '#2b1d14', shirt: STAFF_SHIRT, pants: '#23232b' };
+// passanti sul livello della piazza, ai lati della fontana, e gente seduta sulla gradinata
+for (let i = 0; i < 8; i++) {
+  const left = i % 2 === 0;
+  intro.people.push({ x: left ? rand(4, 58) : rand(134, 188), y: rand(60, 66), v: rand(3, 6) * (Math.random() < 0.5 ? -1 : 1), left, shirt: pick(SHIRTS), hair: pick(HAIR) });
+}
+intro.seated = [];
+for (let i = 0; i < 16; i++) {
+  const row = randi(0, 5), y = 92 + row * 5, half = 30 + row * 12;
+  intro.seated.push({ x: 96 + rand(-half, half), y, shirt: pick(SHIRTS), hair: pick(HAIR) });
+}
+function drawIntro(dt) {
+  const cv = document.getElementById('introArt'), g = cv.getContext('2d');
+  const r = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(Math.round(x), Math.round(y), w, h); };
+  intro.t += dt;
+  const t = intro.t;
+  // cielo della sera, blu che sfuma
+  ['#22355f', '#2b4170', '#344d80', '#41608f', '#5272a0', '#6886b0', '#7f99bd'].forEach((c, i) => r(0, i * 7, 192, 7, c));
+  for (const [cx, cy] of [[60, 8], [150, 14]]) { const x = (cx + t * 2) % 230 - 30; r(x, cy, 22, 2, '#8ea6c8'); r(x + 5, cy - 2, 12, 2, '#8ea6c8'); }
+  // a sinistra il palazzo in pietra scura
+  r(0, 4, 40, 60, '#6d665c'); r(38, 4, 2, 60, '#5c564d');
+  for (let x = 3; x < 36; x += 8) for (let y = 8; y < 56; y += 9) { r(x, y, 4, 6, '#3f3b36'); r(x, y + 5, 4, 1, '#857d71'); }
+  // al centro il palazzo neoclassico con il tetto in coppi, le statue e le colonne
+  r(44, 10, 80, 54, '#ddd6c6'); r(42, 8, 84, 3, '#9b5a3c'); r(44, 11, 80, 1, '#c4bba8');
+  for (let x = 50; x < 122; x += 9) r(x, 5, 2, 3, '#c9c1b2');                       // statue sul tetto
+  r(44, 24, 80, 2, '#c4bba8'); r(44, 40, 80, 2, '#c4bba8');
+  for (let x = 47; x < 122; x += 8) { r(x, 14, 4, 7, '#7c7f86'); r(x, 28, 4, 9, '#7c7f86'); }
+  for (let x = 58; x < 92; x += 7) r(x, 26, 3, 30, '#ece7db');                       // colonne
+  r(72, 44, 12, 12, '#56524b'); r(73, 42, 10, 3, '#ece7db');
+  // a destra l'edificio moderno a griglia e il palazzo Liberty con i balconi
+  r(126, 14, 34, 50, '#8d928c'); r(126, 14, 34, 2, '#6f746e');
+  for (let x = 128; x < 158; x += 5) for (let y = 18; y < 52; y += 6) r(x, y, 3, 4, '#4c5a63');
+  r(126, 50, 34, 4, '#5f8d7d');
+  r(160, 0, 32, 64, '#b3a894');
+  for (let x = 163; x < 190; x += 9) for (let y = 4; y < 56; y += 11) { r(x, y, 5, 8, '#4f4a43'); r(x - 1, y + 8, 7, 1, '#d6ccb8'); }
+  // la piazza e i parapetti di vetro
+  r(0, 62, 192, 26, '#b9b6ae'); r(0, 62, 192, 1, '#d6d3cb'); r(0, 88, 192, 32, '#c9c6be');
+  // alberi illuminati dal basso, ai due lati
+  const tree = (x, y, w) => {
+    r(x - 1, y + 10, 2, 9, '#4d3a26');
+    r(x - w, y, w * 2, 10, '#5f8c3f'); r(x - w + 2, y - 3, w * 2 - 4, 4, '#76a64e'); r(x - w + 1, y + 6, w * 2 - 2, 3, '#9cc46b');
+  };
+  for (const [x, y, w] of [[6, 38, 7], [20, 42, 8], [36, 44, 7], [156, 44, 7], [172, 42, 8], [187, 38, 7]]) tree(x, y, w);
+  r(0, 66, 58, 1, '#e5f2f8'); r(134, 66, 58, 1, '#e5f2f8');                            // parapetti
+  // passanti sopra
+  for (const p of intro.people) {
+    p.x += p.v * dt;
+    const lo = p.left ? 2 : 132, hi = p.left ? 58 : 190;
+    if (p.x > hi) p.x = lo; if (p.x < lo) p.x = hi;
+    const step = Math.floor(t * 6 + p.y) % 2;
+    r(p.x, p.y - 6, 2, 2, p.hair); r(p.x, p.y - 4, 2, 3, p.shirt); r(p.x + step, p.y - 1, 1, 2, '#2c3e50');
+  }
+  // la fontana: un cubo di vetro con l'acqua che cade, sopra una lastra scura
+  r(64, 30, 64, 34, '#b9cfdb');
+  for (let x = 65; x < 127; x++) {
+    const phase = (x * x * 7 + x * 3) % 17, speed = 22 + ((x * 13) % 5) * 3;
+    for (let y = 31; y < 63; y++) if (((y - Math.floor(t * speed) + phase) % 9 + 9) % 9 < 6) r(x, y, 1, 1, x % 4 ? '#eef5f8' : '#ffffff');
+  }
+  r(64, 30, 64, 1, '#ffffff'); r(64, 30, 1, 34, '#d8e6ee'); r(127, 30, 1, 34, '#d8e6ee');
+  r(64, 62, 64, 2, '#fff7df');                                                         // luce alla base dell'acqua
+  r(60, 64, 72, 4, '#2b2b2f'); r(58, 68, 76, 2, '#d9d6cf');
+  // la discesa: muri laterali con le luci calde, e la vetrata dello store illuminata
+  for (let k = 0; k < 18; k++) { r(58 - k * 3, 70 + k, 3, 18 - k, '#d6d3cb'); r(131 + k * 3, 70 + k, 3, 18 - k, '#d6d3cb'); }
+  r(4, 87, 54, 1, '#f3d9a0'); r(134, 87, 54, 1, '#f3d9a0');
+  r(60, 70, 72, 18, '#f5dfae'); r(60, 70, 72, 1, '#ffffff');
+  for (let x = 60; x <= 132; x += 12) r(x, 70, 1, 18, '#ffffff');
+  for (let k = 0; k < 6; k++) r(100 + k * 3, 84 - k * 2, 3, 1, '#e8d1a0');            // la scala interna
+  // la gradinata che si allarga verso di noi, con i corrimano
+  for (let k = 0; k < 7; k++) {
+    const y = 88 + k * 5, half = 36 + k * 12;
+    r(96 - half, y, half * 2, 5, k % 2 ? '#c9c6be' : '#d8d5ce'); r(96 - half, y, half * 2, 1, '#eeece6');
+  }
+  for (const x of [40, 62, 130, 152]) { r(x, 82, 1, 10, '#8a8d90'); r(x - 6, 82, 7, 1, '#8a8d90'); }
+  for (const p of intro.seated) { r(p.x, p.y - 4, 2, 2, p.hair); r(p.x, p.y - 2, 2, 2, p.shirt); }
+  // il membro del team in primo piano
+  const bx = 6, by = 82, sc = 4, L = introLook;
+  const R = (x, y, w, h, c) => r(bx + x * sc, by + y * sc, w * sc, h * sc, c);
+  R(2, 0, 3, 1, L.hair); R(1, 1, 5, 1, L.hair); R(1, 2, 1, 1, L.hair); R(2, 2, 3, 1, L.skin); R(5, 2, 1, 1, L.hair);
+  if (Math.floor(t * 2) % 7 !== 0) { R(2, 2, 1, 1, '#1d1d24'); R(4, 2, 1, 1, '#1d1d24'); }
+  R(2, 3, 3, 1, L.skin); R(1, 4, 5, 3, L.shirt); R(3, 5, 1, 1, '#ffffff');
+  R(0, 4 + (Math.floor(t * 3) % 2), 1, 1, L.skin); R(6, 3, 1, 1, L.skin); R(6, 4, 1, 1, L.shirt);     // saluta con la mano
+  R(2, 7, 3, 1, L.pants); R(2, 8, 1, 1, L.pants); R(4, 8, 1, 1, L.pants);
+  // il testo che si scrive da solo
+  if (intro.typed < INTRO_LINE.length) {
+    intro.typed = Math.min(INTRO_LINE.length, intro.typed + dt * 40);
+    document.getElementById('introText').textContent = INTRO_LINE.slice(0, Math.floor(intro.typed));
+  }
+}
+document.getElementById('introGo').addEventListener('click', () => {
+  intro.on = false;
+  document.getElementById('intro').classList.remove('show');
+});
+if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) intro.typed = INTRO_LINE.length - 1;
+if (window.autoCoach) { intro.on = false; document.getElementById('intro').classList.remove('show'); }
 
 newDay(7);
 requestAnimationFrame(frame);

@@ -43,12 +43,7 @@ cosa vuole paga alla cassa Express in B1) o solo un'occhiata. I tavoli si
 chiamano A1–A5, B1–B5, C1–C5 contando da destra, e D2–D4 per il Genius Bar
 (i nomi non sono scritti, si vedono toccando il tavolo).
 
-Ogni giorno si apre con l'**Apertura**: costruisci il **DD del mattino**
-scegliendo argomento (Product, Support, Business, Creative, Fun), su cosa
-concentrarlo, formato (breve, oppure approfondito: più effetto ma chi
-partecipa entra in sala alle 10:15), chi partecipa, chi lo facilita e chi
-affianca un collega meno esperto; ripetere lo stesso argomento più giorni
-di fila fa crescere di più la competenza. Poi e decidi il **piano dei ruoli**: chi va
+Il gioco si apre con una schermata di presentazione in pixel art della piazza, con un membro del team che annuncia l'apertura. Ogni giorno si apre con l'**Apertura**: vedi chi è in turno per ruolo, chi è in ferie o malato, e decidi il **piano dei ruoli**: chi va
 al Point, all'Express, agli accessori e al Point del Genius Bar. A ogni
 cambio ruoli il gioco propone la rotazione e tu puoi cambiarla. Come una
 squadra di calcio scegli anche la **formazione** del floor (Accoglienza,
