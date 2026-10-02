@@ -88,6 +88,9 @@
   .lessons { font-size: 12px; margin: -6px 0 14px; }
   .lessons div { padding: 4px 0; border-top: 1px dashed #33333d; }
   .card h3 { margin: 14px 0 6px; }
+  .choices { display: flex; flex-direction: column; gap: 8px; margin: 6px 0 12px; }
+  .card .choices button { text-align: left; padding: 10px 12px; font-size: 14px; line-height: 1.35; }
+  .card .choices .sub { font-size: 12px; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
   .card .chips button { width: auto; min-height: 34px; padding: 0 10px; font-size: 12px; }
   .ddDesc { font-size: 12px; color: var(--muted); margin: 6px 0; }
@@ -495,6 +498,16 @@ const attachChance = s => (0.15 + 0.45 * s.stats.comp / 100) * (1 + 0.25 * F().s
 // stress → esperienza peggiore; spingere le vendite senza competenza si sente
 const care = s => 12 - 0.22 * s.stats.stress - 2 * F().sales * (1 - s.stats.comp / 100) - (pushed(s) ? 3 : 0);
 
+// Il tempo del giorno: a gennaio a Milano piove spesso. Con la pioggia i clienti sono più nervosi
+// (più scortesi, meno pazienti, partono da un'esperienza più bassa) e chi passa solo a guardare resta a casa.
+const WEATHER = {
+  sole:     { name: 'sole', icon: '☀️', say: 'C\'è il sole, in piazza passerà tanta gente.' },
+  nuvoloso: { name: 'nuvoloso', icon: '☁️', say: 'Cielo grigio, niente di speciale.' },
+  pioggia:  { name: 'pioggia', icon: '🌧️', say: 'Piove: meno gente che passa a curiosare, ma chi entra sarà più nervoso.' },
+};
+const rainy = () => game.weather === 'pioggia';
+function pickWeather() { const r = Math.random(); return r < 0.35 ? 'sole' : r < 0.68 ? 'nuvoloso' : 'pioggia'; }
+
 function newDay(dayOfMonth) {
   const date = new Date(2027, 0, dayOfMonth);
   const weekend = date.getDay() === 0 || date.getDay() === 6;
@@ -503,7 +516,7 @@ function newDay(dayOfMonth) {
   BAR.forEach(s => s.taken = null);
   QUEUE.forEach(s => s.taken = null);
   game = {
-    day: dayOfMonth, date, weekend,
+    day: dayOfMonth, date, weekend, weather: pickWeather(),
     time: OPEN - 2, speed: game ? game.speed : 1,
     customers: [], staff: [], nextId: 1, lineIn: [], lineGB: [], lineEx: [],
     spawnAcc: 0, selected: null, over: false,
@@ -518,7 +531,7 @@ function newDay(dayOfMonth) {
     stats: { sickNow: 0, calledIn: 0, helped: 0, todayConv: 0, entered: 0, buyers: 0, sold: 0, accessories: 0, services: 0, errors: 0, breaks: 0, rude: 0, express: 0, wallSales: 0, lost: 0, browsed: 0, genius: 0, looked: 0, today: 0, waitSum: 0, waitN: 0 },
   };
   game.focus = { op: 0, sales: 0, cel: 0 };
-  game.dd = null; game.planning = false;
+  game.dd = null; game.brMode = null; game.planning = false;
   game.briefing = true;
   document.getElementById('debrief').classList.remove('show');
   makeStaff();
@@ -716,7 +729,8 @@ function ddPreview(d) {
 }
 const avgTeam = k => Math.round(game.staff.reduce((a, x) => a + x.stats[k], 0) / game.staff.length);
 function showBrief() {
-  document.getElementById('brDate').textContent = `${WEEKDAYS[game.date.getDay()]} ${game.day} gennaio${game.date.getDay() === 6 ? ' · sabato, il giorno più pieno' : game.weekend ? ' · domenica, tanta gente' : ''}`;
+  const w = WEATHER[game.weather];
+  document.getElementById('brDate').textContent = `${WEEKDAYS[game.date.getDay()]} ${game.day} gennaio · ${w.icon} ${w.name}${game.date.getDay() === 6 ? ' · sabato, il giorno più pieno' : game.weekend ? ' · domenica, tanta gente' : ''}`;
   const stressed = game.staff.filter(x => x.stats.stress > 60).map(x => x.name).slice(0, 8);
   document.getElementById('brTeam').innerHTML =
     `In turno <b>${game.staff.length}</b> su ${Object.keys(TEAM).length} · a riposo ${game.offToday}<br>` +
@@ -726,29 +740,77 @@ function showBrief() {
     (game.sick.length ? `<br>In malattia: <b>${game.sick.join(', ')}</b>` : '') +
     (game.vacation.length ? `<br>In ferie: <b>${game.vacation.join(', ')}</b>` : '') +
     (stressed.length ? `<br>Molto stressati: <b>${stressed.join(', ')}</b>` : '');
-  // chi è al Point apre la giornata con una battuta
+  // chi è al Point apre la giornata con una battuta, anche sul tempo
   const host = game.staff.find(x => x.post === POINT_IN) || game.staff[0];
   const n = game.staff.length, dow = game.date.getDay();
   const mood = dow === 6 ? 'Oggi è sabato: sarà pieno, teniamoci pronti.' : dow === 0 ? 'Domenica, arriverà tanta gente.' :
     game.sick.length + game.vacation.length > 3 ? 'Siamo un po\' corti, organizziamoci bene.' : 'Giornata tranquilla, per ora.';
-  document.getElementById('brSay').innerHTML = `<canvas class="ava" width="14" height="20"></canvas><div><b>${host.name}</b> <span class="sub">${TIER[host.tier].label}</span><br>«Stiamo aprendo! Oggi siamo in ${n}. ${mood}»</div>`;
+  document.getElementById('brSay').innerHTML = `<canvas class="ava" width="14" height="20"></canvas><div><b>${host.name}</b> <span class="sub">${TIER[host.tier].label}</span><br>«Stiamo aprendo! Oggi siamo in ${n}. ${mood} ${w.say}»</div>`;
   drawAvatar(document.querySelector('#brSay .ava'), host.look);
-  document.getElementById('brOpts').innerHTML = `
-    <h3>Formazione</h3>
-    <div class="sub">In vendita oggi siete in ${game.staff.filter(x => x.rota === 'floor').length}.</div>
-    <div class="chips">${FORMATION_ORDER.map(k => `<button data-form="${k}" class="${k === game.formation ? 'on' : ''}">${FORMATIONS[k].name}</button>`).join('')}</div>
-    <div class="ddDesc">${FORMATIONS[game.formation].desc}</div>
-    <h3>Piano dei ruoli</h3>
-    ${planHtml('open')}`;
+  const opts = document.getElementById('brOpts'), go = document.getElementById('openStore');
+  go.style.display = game.brMode ? '' : 'none';
+  if (!game.brMode) {
+    // prima scelta del giorno: su cosa ti concentri tu, il resto lo fa la squadra da sola
+    opts.innerHTML = `
+      <h3>Su cosa ti concentri stamattina?</h3>
+      <div class="choices">
+        <button data-mode="floor"><b>Strategia del floor</b><br><span class="sub">Scegli la formazione e chi va al Point, all'Express, agli accessori e al Point del Genius Bar. Oggi niente DD.</span></button>
+        <button data-mode="dd"><b>Comunicazione del DD</b><br><span class="sub">Prepari il DD del mattino: argomento, formato, chi partecipa e chi lo facilita. Formazione e ruoli li decide la squadra.</span></button>
+      </div>`;
+  } else if (game.brMode === 'floor') {
+    opts.innerHTML = `
+      <h3>Formazione</h3>
+      <div class="sub">In vendita oggi siete in ${game.staff.filter(x => x.rota === 'floor').length}.</div>
+      <div class="chips">${FORMATION_ORDER.map(k => `<button data-form="${k}" class="${k === game.formation ? 'on' : ''}">${FORMATIONS[k].name}</button>`).join('')}</div>
+      <div class="ddDesc">${FORMATIONS[game.formation].desc}</div>
+      <h3>Piano dei ruoli</h3>
+      ${planHtml('open')}
+      <button data-mode="">Indietro</button>`;
+  } else {
+    const t = DD_TOPICS.find(x => x.key === game.dd.topic), d = game.dd;
+    const chips = (key, list, cur) => `<div class="chips">${list.map(([k, l]) => `<button data-${key}="${k}" class="${k === cur ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+    const juniors = game.staff.filter(x => ['S', 'TS', 'C'].includes(x.tier)).sort((a, b) => a.stats.comp - b.stats.comp);
+    opts.innerHTML = `
+      <h3>DD del mattino</h3>
+      <div class="sub">Argomento</div>
+      <div class="chips">${DD_TOPICS.map(x => `<button data-dd="${x.key}" class="${x.key === d.topic ? 'on' : ''}">${x.name}</button>`).join('')}</div>
+      <div class="ddDesc">${t.desc}</div>
+      <div class="sub">Su cosa</div>${chips('ddt', t.targets, d.target)}
+      <div class="sub">Formato</div>${chips('ddf', DD_FORMATS, d.format)}
+      <div class="ddDesc">${DD_FORMATS.find(x => x[0] === d.format)[2]}</div>
+      <div class="sub">Chi partecipa</div>${chips('ddw', DD_WHO, d.who)}
+      <label class="sub" for="ddBy">Lo facilita (competenza e motivazione su)</label>
+      <select id="ddBy">${game.staff.map(x => `<option value="${x.name}"${x.name === d.by ? ' selected' : ''}>${x.name} · ${TIER[x.tier].label}</option>`).join('')}</select>
+      <label class="sub" for="ddCoach">Durante il DD affianca un collega meno esperto (competenza su per lui)</label>
+      <select id="ddCoach"><option value="">Nessuno</option>${juniors.map(x => `<option value="${x.name}"${x.name === d.coach ? ' selected' : ''}>${x.name} · ${TIER[x.tier].label} · competenza ${Math.round(x.stats.comp)}</option>`).join('')}</select>
+      <div class="ddDesc"><b>Oggi:</b> ${ddPreview(d)}</div>
+      <button data-mode="">Indietro</button>`;
+  }
   document.getElementById('brLeft').textContent = '';
   document.getElementById('brief').classList.add('show');
 }
 document.getElementById('brOpts').addEventListener('click', ev => {
   const b = ev.target.closest('button'); if (!b) return;
+  if (b.dataset.mode !== undefined) {
+    game.brMode = b.dataset.mode || null;
+    if (game.brMode === 'dd') {
+      const experts = game.staff.filter(x => ['E', 'P', 'TE', 'G', 'CP'].includes(x.tier));
+      game.dd = game.dd || { topic: 'product', target: 'iphone', format: 'breve', who: 'tutti', by: (experts.length ? pick(experts) : game.staff[0]).name, coach: '' };
+    } else game.dd = null;
+    showBrief(); document.querySelector('#brief .card').scrollTop = 0; return;
+  }
+  if (b.dataset.dd) { game.dd.topic = b.dataset.dd; game.dd.target = DD_TOPICS.find(x => x.key === b.dataset.dd).targets[0][0]; showBrief(); return; }
+  if (b.dataset.ddt) { game.dd.target = b.dataset.ddt; showBrief(); return; }
+  if (b.dataset.ddf) { game.dd.format = b.dataset.ddf; showBrief(); return; }
+  if (b.dataset.ddw) { game.dd.who = b.dataset.ddw; showBrief(); return; }
   if (b.dataset.form) { changeFormation(b.dataset.form, 'open'); showBrief(); return; }
   if (b.dataset.post) { openPicker('open', b.dataset.rota, +b.dataset.post); }
 });
-document.getElementById('openStore').addEventListener('click', () => startDay({}));
+document.getElementById('brOpts').addEventListener('change', ev => {
+  if (ev.target.id === 'ddBy') game.dd.by = ev.target.value;
+  if (ev.target.id === 'ddCoach') { game.dd.coach = ev.target.value; showBrief(); }
+});
+document.getElementById('openStore').addEventListener('click', () => startDay({ dd: game.brMode === 'dd' ? game.dd : null }));
 
 function startDay(opts = {}) {
   game.focus = { op: opts.op || 0, sales: opts.sales || 0, cel: opts.cel || 0 };   // i gettoni restano solo per le simulazioni di prova
@@ -922,7 +984,7 @@ function spawnCustomer(kind, extra = {}) {
     x: DOOR.x + rand(-30, 30), y: DOOR.y, path: [], state: 'inLine', t: 0,
     look: { skin: pick(SKIN), hair: pick(HAIR), shirt: pick(SHIRTS), pants: pick(PANTS) },
     facing: 'down', walk: 0, bubble: null, staff: null, slot: null, wait: 0, lineIdx: -1,
-    exp: rand(64, 76), waited: 0, servedBy: null, rude: Math.random() < 0.08,
+    exp: rainy() ? rand(61, 73) : rand(64, 76), waited: 0, servedBy: null, rude: Math.random() < (rainy() ? 0.13 : 0.08),
     product: kind === 'buy' ? pick(['iphone', 'iphone', 'iphone', 'ipad', 'watch', 'mac', 'mac']) : null,
     ...extra,
   };
@@ -1134,7 +1196,7 @@ function updateCustomer(c, dt) {
       }
       break;
     case 'toTable':
-      if (arrived) { c.state = 'waiting'; c.patience = rand(5, 12); c.wait = 0; c.facing = c.slot.x < c.slot.table.x ? 'right' : 'left'; say(c, 'question', 2); }
+      if (arrived) { c.state = 'waiting'; c.patience = rand(5, 12) * (rainy() ? 0.8 : 1); c.wait = 0; c.facing = c.slot.x < c.slot.table.x ? 'right' : 'left'; say(c, 'question', 2); }
       break;
     case 'waiting':
       c.wait += dt; c.patience -= dt;
@@ -1155,7 +1217,7 @@ function updateCustomer(c, dt) {
       if (arrived) {
         c.facing = c.side === 'L' ? 'left' : 'right';
         if (c.quick) { c.state = 'pickWall'; c.t = rand(1, 3); }
-        else { c.state = 'waitWall'; c.patience = rand(6, 10); c.wait = 0; say(c, 'question', 2); }
+        else { c.state = 'waitWall'; c.patience = rand(6, 10) * (rainy() ? 0.8 : 1); c.wait = 0; say(c, 'question', 2); }
       }
       break;
     case 'pickWall':
@@ -1675,6 +1737,13 @@ function pickKind() {
   const r = Math.random();
   return r < 0.38 ? 'buy' : r < 0.44 ? 'help' : r < 0.62 ? 'acc' : r < 0.87 ? 'genius' : 'look';
 }
+// con la pioggia due curiosi su tre restano a casa; col sole ne arriva qualcuno in più
+function arrive() {
+  const k = pickKind();
+  if (k === 'look' && rainy() && Math.random() < 0.65) return;
+  spawnCustomer(k);
+  if (k === 'look' && game.weather === 'sole' && Math.random() < 0.3) spawnCustomer('look');
+}
 function spawnArrivals(dt) {
   if (game.time < OPEN || game.time >= LAST_ENTRY) return;
   // il sabato è il giorno più pieno, poi la domenica
@@ -1682,7 +1751,7 @@ function spawnArrivals(dt) {
   game.spawnAcc += perHour / 60 * dt;
   while (game.spawnAcc >= 1) {
     game.spawnAcc -= 1 + rand(-0.4, 0.4);
-    spawnCustomer(pickKind());
+    arrive();
   }
 }
 
@@ -1692,7 +1761,7 @@ function step(dt) {
   game.time += dt;
   if (before < OPEN && game.time >= OPEN) {
     const n = randi(5, 10);
-    for (let i = 0; i < n; i++) spawnCustomer(pickKind());
+    for (let i = 0; i < n; i++) arrive();
     log(`Porte aperte: entrano ${n} clienti che aspettavano fuori`);
   }
   if (game.time >= game.nextRotation && game.time < CLOSE - 30) planRotation();
@@ -1734,7 +1803,7 @@ function teamDelta() {
 function endDay() {
   game.over = true;
   const s = game.stats;
-  document.getElementById('dbDate').textContent = `${WEEKDAYS[game.date.getDay()]} ${game.day} gennaio`;
+  document.getElementById('dbDate').textContent = `${WEEKDAYS[game.date.getDay()]} ${game.day} gennaio · ${WEATHER[game.weather].icon} ${WEATHER[game.weather].name}`;
   document.getElementById('dbStats').innerHTML = rows([
     ['Clienti entrati', s.entered],
     ['Vendite', s.sold],
@@ -1848,6 +1917,16 @@ function drawScreen() {
   for (let i = 0; i < w; i += 8) rect(x + i, y, Math.min(8, w - i), h, SCREEN_COLORS[(Math.floor(i / 8) + t) % SCREEN_COLORS.length]);
 }
 function drawStool(s) { PLGraphics.drawStool(ctx, s, SCALE); }
+// pioggia: gocce fuori dallo store e un po' di bagnato sull'ingresso
+function drawRain() {
+  const inside = (x, y) => x >= px(63) && x < px(1352) && y >= px(60) && y < px(1880);
+  rect(px(1189), px(60), px(1305) - px(1189), 6, 'rgba(90,140,200,0.22)');
+  const t = game.time * 40;
+  for (let i = 0; i < 420; i++) {
+    const x = (i * 97 + (i >> 3)) % canvas.width, y = Math.floor((i * 53 + t * (1 + (i % 3) * 0.3)) % canvas.height);
+    if (!inside(x, y) && !inside(x - 2, y + 6)) { rect(x, y, 1, 3, 'rgba(170,205,255,0.75)'); rect(x - 1, y + 3, 1, 3, 'rgba(170,205,255,0.5)'); }
+  }
+}
 
 function render() {
   drawFloor();
@@ -1868,6 +1947,7 @@ function render() {
     ...game.staff.filter(s => !s.hidden).map(s => ({ y: s.y, draw: () => drawPerson(s) })),
   ].sort((a, b) => a.y - b.y);
   drawables.forEach(d => d.draw());
+  if (rainy()) drawRain();
   // fuori orario si abbassano le luci
   if (game.time < OPEN || game.time > CLOSE) rect(0, 0, canvas.width, canvas.height, 'rgba(10,10,30,0.25)');
 }
@@ -1895,7 +1975,7 @@ function updatePanel() {
   document.getElementById('clock').textContent = fmt(Math.max(OPEN - 2, game.time));
   const open = game.time >= OPEN && game.time < CLOSE;
   document.getElementById('date').textContent =
-    `${WEEKDAYS[game.date.getDay()].slice(0, 3)} ${game.day} gen · ${open ? 'aperto' : game.time < OPEN ? 'in apertura' : 'chiuso'}`;
+    `${WEEKDAYS[game.date.getDay()].slice(0, 3)} ${game.day} gen · ${WEATHER[game.weather].icon} · ${open ? 'aperto' : game.time < OPEN ? 'in apertura' : 'chiuso'}`;
   const s = game.stats, inStore = game.customers.length;
   const waiting = game.customers.filter(c => c.state === 'waiting').length;
   const queue = game.customers.filter(c => c.state === 'queued').length + game.lineGB.length;
