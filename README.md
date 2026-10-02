@@ -43,8 +43,16 @@ cosa vuole paga alla cassa Express in B1) o solo un'occhiata. I tavoli si
 chiamano A1–A5, B1–B5, C1–C5 contando da destra, e D2–D4 per il Genius Bar
 (i nomi non sono scritti, si vedono toccando il tavolo).
 
-Il gioco si apre con una schermata di presentazione in pixel art della piazza, con un membro del team che annuncia l'apertura. Ogni giorno si apre con l'**Apertura**: vedi chi è in turno per ruolo, chi è in ferie o malato, e decidi il **piano dei ruoli**: chi va
-al Point, all'Express, agli accessori e al Point del Genius Bar. A ogni
+Il gioco si apre con una schermata di presentazione in pixel art della piazza. Ogni giorno si apre con l'**Apertura**: vedi che tempo fa, chi è in turno per ruolo, chi è in ferie o malato, e scegli su cosa
+concentrarti: la **strategia del floor** o la **comunicazione del DD**. Con il DD
+prepari il DD del mattino (argomento, formato, chi partecipa, chi lo facilita) e
+formazione e ruoli li decide la squadra; con la strategia del floor oggi non c'è
+DD e decidi il **piano dei ruoli**: chi va al Point, all'Express, agli accessori
+e al Point del Genius Bar.
+Il **tempo** cambia ogni giorno (sole, nuvoloso, pioggia): con la pioggia
+entrano meno curiosi che non vogliono comprare, e chi entra è più nervoso (più
+clienti scortesi, meno pazienza, esperienza che parte più bassa); col sole
+passa qualche curioso in più. A ogni
 cambio ruoli il gioco propone la rotazione e tu puoi cambiarla. Come una
 squadra di calcio scegli anche la **formazione** del floor (Accoglienza,
 Tavoli, Essenziale), perché non sempre ci sono tutti: qualcuno è in ferie,
@@ -78,8 +86,8 @@ l'NPS è la somma diviso il numero di commenti, per 100, diviso anche tra
 Vendita e Genius Bar (un team formato e ben gestito sta intorno a 80, come
 la media di Piazza Liberty). A 1× una giornata dura circa 7 minuti. Il Today at Apple per ora è sfondo: chi guarda a
 volte si ferma lì. A fine giornata c'è il debrief.
-È un file solo, senza dipendenze: si apre com'è, anche da GitHub Pages
-(`…/plgame/`). Non tocca il database.
+Non ha dipendenze esterne: `index.html` più la grafica in `graphics-*.js` e
+`assets/`, e si apre anche da GitHub Pages (`…/plgame/`). Non tocca il database.
 
 ## Setup (una volta sola)
 
