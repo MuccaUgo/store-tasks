@@ -31,6 +31,43 @@ il lavoro fatto non si perde e la sezione si può riaccendere.
 Frontend statico (GitHub Pages) + database e login su Supabase (piano gratuito).
 
 ### PLGame, il gioco (prototipo)
+La schermata iniziale offre due modalità:
+
+- **Osservazione**: il floor lavora in autonomia. Puoi seguire clienti,
+  colleghi e risultati dello store, regolare la velocità e mettere in pausa.
+  Il riepilogo a fine giornata mostra i risultati dello store.
+- **Carriera · Specialist**: giochi il tuo turno personale. Per ora la carriera
+  parte e resta nel ruolo di Specialist.
+
+**Cambia modalità** riapre la scelta e sospende la simulazione. **Torna al gioco**
+riprende la giornata; selezionare una modalità ne avvia una nuova. Il giorno
+successivo mantiene la modalità scelta. Le statistiche del personaggio restano
+sospese durante l'osservazione.
+
+In Carriera il personaggio **Tu**,
+segnato in azzurro sul floor, prende in carico una persona con **Segui il prossimo
+cliente**. Consulenza, acquisto, accessori, Trade In, finanziamento e consegna
+avanzano automaticamente; gli altri colleghi continuano a gestire lo store.
+Il pulsante resta disabilitato mentre segui un cliente. Puoi ritrovare il tuo
+personaggio con **Mostrami sul floor** e richiedere una pausa di 15 minuti,
+che comincia quando sei libero.
+
+Il pannello personale distingue visite concluse, dispositivi consegnati,
+accessori, servizi e visite ancora aperte. Un ordine in backstage non è ancora
+una consegna; il Setup conta solo dopo il trasferimento dei dati. Puoi seguire
+un nuovo cliente durante il Setup: l'eventuale ritorno per il Trade In resta
+collegato a te e non genera una seconda vendita. Alle 20:00 i percorsi non
+conclusi rimangono distinti nel riepilogo. I risultati personali si azzerano al
+turno successivo, mentre motivazione, stress e competenza restano nel team.
+
+Questa versione verifica la meccanica: conversazioni con scelte e crescita verso
+Expert o Pro arriveranno dopo. In entrambe le modalità i momenti da leader
+sono disattivati e il team copre automaticamente le assenze. Il codice della
+precedente modalità gestionale descritto sotto resta nel progetto, con le
+strategie disattivate tramite `STRATEGY_ON`.
+
+Verifica della meccanica: `node --test plgame/tests/specialist-mechanics.test.cjs`.
+
 In `plgame/index.html` c'è la simulazione in pixel art dello store di
 Piazza Liberty, vista dall'alto. Tavoli: iPhone da A2 ad A5 e in B4–B5, iPad
 in A1 e B2, Watch in B3 e C3, Mac in C2 e C4, cassa Express in B1; C1 e C5

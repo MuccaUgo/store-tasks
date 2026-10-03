@@ -158,6 +158,8 @@
     .side { width: 100%; }
   }
 </style>
+<link rel="stylesheet" href="specialist-ui.css">
+<link rel="stylesheet" href="game-modes.css">
 </head>
 <body>
 <div class="app">
@@ -175,6 +177,7 @@
       </div>
     </div>
     <div class="npsRow" id="npsRow"></div>
+    <div class="modeBar"><span id="modeBadge"></span><button id="changeMode">Cambia modalità</button></div>
     <div class="goalRow" id="goalRow" hidden></div>
   </div>
   <div class="stage">
@@ -186,7 +189,8 @@
         <div class="introTitle">PLGame</div>
         <div class="sub">Apple Piazza Liberty · Milano</div>
         <div class="introSay"><span id="introText"></span><span class="caret">▌</span></div>
-        <button class="on" id="introGo">Apriamo lo store</button>
+        <div id="modeChoices"></div>
+        <button id="introBack" hidden>Torna al gioco</button>
       </div>
     </div>
     <div class="overlay" id="brief">
@@ -232,11 +236,14 @@
     </div>
     <div class="overlay" id="debrief">
       <div class="card">
-        <h2>Debrief di giornata</h2>
+        <h2 id="dbTitle">Il tuo turno è finito</h2>
         <div class="sub" id="dbDate"></div>
+        <div class="stats" id="dbPlayerStats"></div>
+        <details id="dbStoreResults"><summary>Risultati dello store</summary>
         <div id="dbGoal"></div>
         <div class="stats" id="dbStats"></div>
         <div class="lessons" id="dbLessons"></div>
+        </details>
         <div class="dbBtns" id="dbLevelBtns">
           <button class="on" id="dbNextLv">Livello successivo</button>
           <button id="dbRetry">Riprova il livello</button>
@@ -247,6 +254,7 @@
     </div>
   </div>
   <div class="side">
+    <div class="box playerPanel" id="playerPanel"></div>
     <div class="box">
       <h3>Oggi</h3>
       <div class="stats" id="stats"></div>
@@ -276,7 +284,7 @@
       <div class="legend">
         <div class="sw" style="background:#2a6ad8"></div><div>Team (maglia blu). Il puntino sul petto dice il livello: bianco Specialist/TS, giallo Expert/TE, arancione Pro/Genius, rosa Creative</div>
         <div class="sw" style="background:#e05a47"></div><div>Clienti (colori vari)</div>
-        <div class="sw" style="background:#c9955c"></div><div>Tavoli A (iPhone) · B (iPad, Watch in B2, Express in B1) · C (Mac) · D2–D4 (Genius Bar). Si contano da destra</div>
+        <div class="sw" style="background:#c9955c"></div><div>iPhone: A2–A5, B4–B5 · iPad: A1, B2 · Watch: B3, C3 · Mac: C2, C4 · Express: B1 · Genius Bar: D2–D4. Si contano da destra</div>
         <div class="sw" style="background:#8a8f99"></div><div>Pareti accessori</div>
         <div class="sw" style="background:#57c05e"></div><div>Alberi</div>
         <div class="sw" style="background:#1d1d24;border:1px solid #555"></div><div>Schermo Today at Apple</div>
@@ -288,6 +296,9 @@
 <script src="graphics-interior.js"></script>
 <script src="graphics-walls.js"></script>
 <script src="graphics-people.js"></script>
+<script src="specialist-mode.js"></script>
+<script src="specialist-ui.js"></script>
+<script src="game-modes.js"></script>
 <script>
 'use strict';
 
@@ -484,6 +495,9 @@ const SESSION_TITLES = ['Foto con iPhone', 'Disegno su iPad', 'Musica con Garage
 const RATE = { 10: 18, 11: 24, 12: 28, 13: 28, 14: 26, 15: 27, 16: 29, 17: 33, 18: 34, 19: 22 };   // uno store pieno quasi tutto il giorno
 
 let game;
+let chosenMode = window.PL_SPECIALIST_MODE === false ? 'observation' : 'career';
+let SPECIALIST_ON = chosenMode === 'career';
+let modePicking = false;
 
 // La squadra: 43 persone, tutte full time, 5 giorni su 7. Ogni livello ha un tetto di competenza,
 // una resistenza allo stress e un vantaggio proprio (vendita, riparazioni, conversione dal Today at Apple).
@@ -526,7 +540,8 @@ const onVacation = (name, day) => TEAM[name].vacWeek === Math.floor((day - 1) / 
 // La notte si riposa: lo stress scende, la motivazione torna verso la media
 // Stress alto a fine giornata: il giorno dopo si rischia la malattia
 function overnight(focus = { op: 0 }) {
-  for (const t of Object.values(TEAM)) {
+  for (const [name, t] of Object.entries(TEAM)) {
+    if (name === 'Tu' && !SPECIALIST_ON) continue;
     if (t.sick) { t.sick = false; t.sickTomorrow = false; t.stress = 20; continue; }
     if (t.sickTomorrow || (t.stress > 70 && Math.random() < (t.stress - 70) / 60)) t.sick = true;
     t.sickTomorrow = false;
@@ -558,6 +573,11 @@ const pace = s => (1.3 - 0.6 * s.stats.mot / 100) * (pushed(s) ? 0.8 : 1) * (s.r
 // al Genius Bar si sbaglia circa una riparazione su venti; meno con più competenza
 const errorChance = (s, c) => (s.role === 'genius' ? 0.045 * (1.3 - s.stats.comp / 100) : 0.1 * (1 - s.stats.comp / 100)) * (1 - 0.25 * F().op) * ddSupport(s, c); // competenza e DD Support → meno errori
 // DD Support: meno errori al Bar, molti meno sul tipo di riparazione scelto
+function tryProposal(c, key, chance) {
+  if (c[key]) return false;
+  c[key] = true;
+  return Math.random() < chance;
+}
 function ddSupport(s, c) {
   if (!ddOn('support') || s.role !== 'genius' || !ddInvolved(s)) return 1;
   const match = c && c.repair !== undefined && (game.dd.target === 'complesse' ? c.repair === 2 : c.repair <= 1);
@@ -585,7 +605,7 @@ function newDay(dayOfMonth, opts = {}) {
   BAR.forEach(s => s.taken = null);
   QUEUE.forEach(s => s.taken = null);
   game = {
-    day: dayOfMonth, date, weekend, weather: opts.weather || pickWeather(), level: opts.level || null, levelIndex: opts.levelIndex,
+    mode: chosenMode, day: dayOfMonth, date, weekend, weather: opts.weather || pickWeather(), level: opts.level || null, levelIndex: opts.levelIndex,
     time: OPEN - 2, speed: game ? game.speed : 1,
     customers: [], staff: [], nextId: 1, lineIn: [], lineGB: [], lineEx: [],
     spawnAcc: 0, selected: null, over: false,
@@ -600,12 +620,14 @@ function newDay(dayOfMonth, opts = {}) {
     stats: { walkinBooked: 0, walkinLater: 0, apptStarted: 0, apptDelay: 0, apptLate: 0, errRepair: 0, escorts: 0, setups: 0, tradeAfter: 0, tradeIns: 0, finance: 0, batched: 0, byKind: {}, orders: 0, delivered: 0, deliverySum: 0, fromWall: 0, errBar: 0, buyDone: 0, buyWon: 0, lostLine: 0, sickNow: 0, calledIn: 0, helped: 0, todayConv: 0, entered: 0, buyers: 0, sold: 0, accessories: 0, services: 0, errors: 0, breaks: 0, rude: 0, express: 0, wallSales: 0, lost: 0, browsed: 0, genius: 0, looked: 0, today: 0, waitSum: 0, waitN: 0 },
   };
   game.focus = { op: 0, sales: 0, cel: 0 };
+  game.stats.setupsStarted = 0; game.stats.unfinished = 0;
   game.orders = [];
   game.dd = null; game.tactic = 'equilibrio'; game.planning = false; game.checkpoint = false; game.history = [];
   game.arrivals = buildArrivals(opts.seed !== undefined ? opts.seed : Math.floor(nativeRandom() * 1e9), opts);
   game.briefing = true;
   document.getElementById('debrief').classList.remove('show');
   makeStaff();
+  if (playerMode) playerMode.newDay(game);
   buildAgenda((opts.seed !== undefined ? opts.seed : Math.floor(nativeRandom() * 1e9)) + 7);
   if (STRATEGY_ON && opts.formation && opts.formation !== game.formation) changeFormation(opts.formation, 'open');
   showBrief();
@@ -661,7 +683,7 @@ const slotProps = (rota, i) => {
 };
 
 function makeStaff() {
-  const dow = game.date.getDay(), names = Object.keys(TEAM);
+  const dow = game.date.getDay(), names = Object.keys(TEAM).filter(name => name !== 'Tu');
   const off = n => TEAM[n].off.includes(dow);
   game.offToday = names.filter(off).length;
   game.vacation = names.filter(n => onVacation(n, game.day));
@@ -962,7 +984,7 @@ function strategyHtml(phase) {
 }
 function showBrief() {
   const w = WEATHER[game.weather], L = game.level;
-  document.getElementById('brTitle').textContent = L ? `Livello ${game.levelIndex + 1} · ${L.name}` : 'Apertura';
+  document.getElementById('brTitle').textContent = SPECIALIST_ON ? 'Carriera · Specialist' : 'Osservazione · Apertura';
   document.getElementById('brDate').textContent = `${WEEKDAYS[game.date.getDay()]} ${game.day} gennaio · ${w.icon} ${w.name}${game.date.getDay() === 6 ? ' · sabato, il giorno più pieno' : game.weekend ? ' · domenica, tanta gente' : ''}`;
   document.getElementById('brGoal').innerHTML = L ? `
     <div class="brSay"><canvas class="ava" width="14" height="20"></canvas><div><b>${L.from}</b> <span class="sub">dalla leadership</span><br>«${L.msg}»</div></div>
@@ -970,7 +992,7 @@ function showBrief() {
   if (L) drawAvatar(document.querySelector('#brGoal .ava'), LEADER_LOOK);
   const stressed = game.staff.filter(x => x.stats.stress > 60).map(x => x.name).slice(0, 8);
   document.getElementById('brTeam').innerHTML =
-    `In turno <b>${game.staff.length}</b> su ${Object.keys(TEAM).length}` + (game.offToday ? ` · a riposo ${game.offToday}` : '') + '<br>' +
+    `In turno <b>${game.staff.length}</b> su ${Object.keys(TEAM).filter(name => SPECIALIST_ON || name !== 'Tu').length}` + (game.offToday ? ` · a riposo ${game.offToday}` : '') + '<br>' +
     [['floor', 'Vendita'], ['bar', 'Genius Bar'], ['creative', 'Creative'], ['ops', 'Operations']].map(([a, l]) => `${l}: ` +
       Object.keys(TIER).filter(k => TIER[k].area === a).map(k => `${game.staff.filter(x => x.tier === k).length} ${TIER[k].label}`).join(', ')).join('<br>') + '<br>' +
     `Team: motivazione <b>${avgTeam('mot')}</b> · stress <b>${avgTeam('stress')}</b> · competenza <b>${avgTeam('comp')}</b>` +
@@ -986,7 +1008,8 @@ function showBrief() {
   drawAvatar(document.querySelector('#brSay .ava'), host.look);
   const strat = strategyHtml('open');
   document.getElementById('brOpts').innerHTML = strat ? `<h3 class="big">Strategia iniziale</h3>${strat}` : '';
-  document.getElementById('brLeft').textContent = '';
+  document.getElementById('brLeft').textContent = SPECIALIST_ON ? 'Sei la persona con il segno azzurro sul floor. Segui il prossimo cliente: consulenza, acquisto e consegna avanzano automaticamente. Il resto dello store continua a lavorare.' : 'Il team segue tutti i clienti in autonomia. Osserva il floor, seleziona le persone e guarda come cambiano i risultati dello store.';
+  document.getElementById('openStore').textContent = SPECIALIST_ON ? 'Entra sul floor' : 'Osserva il floor';
   document.getElementById('brief').classList.add('show');
 }
 const bestBy = () => (game.staff.filter(x => ['E', 'P', 'TE', 'G', 'CP'].includes(x.tier)).sort((a, b) => b.stats.comp - a.stats.comp)[0] || game.staff[0]).name;
@@ -1463,6 +1486,8 @@ function leave(c, outcome) {
   for (const line of [game.lineIn, game.lineGB, game.lineEx]) { const i = line.indexOf(c); if (i >= 0) { line.splice(i, 1); line.forEach(x => x.lineIdx = -1); } }
   if (c.point && c.point.customer === c) { c.point.customer = null; c.point.state = 'idle'; }
   c.outcome = outcome;
+  c.playerReserved = false;
+  if (playerMode) playerMode.recordLeave(c, outcome);
   const s = game.stats;
   { const a = agendaOf(c); if (a) a.status = outcome === 'fixed' ? 'fatto' : 'non servito'; }
   if (c.kind === 'buy') { s.buyDone++; if (outcome === 'bought') s.buyWon++; }
@@ -1573,7 +1598,7 @@ function updateCustomer(c, dt) {
     case 'setup':
       c.t -= dt;
       if (c.t <= 0) {
-        c.setupDone = true; c.bubble = null;
+        c.setupDone = true; c.bubble = null; game.stats.setups++;
         if (c.setup === 'transferThenTrade') backForTrade(c);
         else { say(c, 'heart', 1.5); leave(c, 'bought'); }
       }
@@ -1592,7 +1617,7 @@ function updateCustomer(c, dt) {
 // ─────────────────────────────────────────────────────────────
 // Team
 // ─────────────────────────────────────────────────────────────
-const canSell = s => s.role === 'specialist';
+const canSell = s => s.role === 'specialist' && !s.isPlayer;
 function sessionSoon(mins) {
   return game.sessions.some(x => x.state !== 'done' && x.start - game.time < mins && game.time < x.end);
 }
@@ -1607,8 +1632,9 @@ function wander(s) {
 }
 
 function dispatch() {
+  if (playerMode) playerMode.reserveNext();
   // vendita: chi aspetta da più tempo viene servito per primo, dal più vicino libero
-  const waiting = game.customers.filter(c => c.state === 'waiting' && !c.staff).sort((a, b) => a.tQueue - b.tQueue);   // in ordine di arrivo al tavolo
+  const waiting = game.customers.filter(c => c.state === 'waiting' && !c.staff && !c.playerReserved && c.ownerId !== 'PLAYER').sort((a, b) => a.tQueue - b.tQueue);   // in ordine di arrivo al tavolo
   for (const c of waiting) {
     const free = game.staff.filter(s => canSell(s) && s.state === 'idle' || canSell(s) && s.state === 'wander');
     if (!free.length) break;
@@ -1619,11 +1645,11 @@ function dispatch() {
     game.stats.waitSum += c.wait; game.stats.waitN++;
   }
   // Pareti accessori: prima lo Specialist di quel lato, se è occupato quello dell'altro
-  const atWall = game.customers.filter(c => c.state === 'waitWall' && !c.staff).sort((a, b) => b.wait - a.wait);
+  const atWall = game.customers.filter(c => c.state === 'waitWall' && !c.staff && !c.playerReserved && c.ownerId !== 'PLAYER').sort((a, b) => b.wait - a.wait);
   for (const c of atWall) {
     // i Creative liberi danno una mano agli accessori
     const noAcc = !game.staff.some(s => s.role === 'accessori');
-    const free = game.staff.filter(s => (s.role === 'accessori' || (s.role === 'creative' && !presentsSoon(s)) || (noAcc && s.role === 'specialist')) && (s.state === 'idle' || s.state === 'wander'));
+    const free = game.staff.filter(s => !s.isPlayer && (s.role === 'accessori' || (s.role === 'creative' && !presentsSoon(s)) || (noAcc && s.role === 'specialist')) && (s.state === 'idle' || s.state === 'wander'));
     if (!free.length) break;
     const s = free.find(x => x.role === 'accessori' && x.side === c.side) || free.find(x => x.role === 'accessori') || free.sort((a, b) => dist(a, c) - dist(b, c))[0];
     s.customer = c; c.staff = s; s.state = 'toWallCustomer';
@@ -1725,6 +1751,7 @@ const REPAIR_NAME = ['rapida', 'media', 'complessa'];
 const BUSY = new Set(['toAccWall', 'atAccWall', 'backToTable', 'tradeOnly', 'toBack', 'picking', 'delivering', 'handing', 'probe', 'demo', 'checkout', 'repair', 'advise', 'listening', 'escort', 'presenting', 'toCustomer', 'toWallCustomer', 'toBar']);
 // Point ed Express stressano più della vendita e degli accessori
 const ROLE_STRESS = { point: 1.3, express: 1.3, specialist: 1, accessori: 0.9, genius: 0.8, creative: 0.8, ops: 1 };
+BUSY.add('tradeIn'); BUSY.add('financing');
 function updateStaff(s, dt) {
   const arrived = moveAlong(s, dt);
   const c = s.customer;
@@ -1848,23 +1875,31 @@ function updateStaff(s, dt) {
       if (s.t <= 0) {
         // prima l'accessorio, poi il servizio (AppleCare, permuta, configurazione)
         // l'accessorio legato al bisogno funziona molto più di uno generico
-        if (!c.accTried && Math.random() < attachChance(s) + (c.needKnown ? 0.15 : 0)) {
-          c.accTried = true; c.accName = c.needKnown ? c.need.acc : 'una custodia';
+        if (tryProposal(c, 'accTried', attachChance(s) + (c.needKnown ? 0.15 : 0))) {
+          c.accName = c.needKnown ? c.need.acc : 'una custodia';
           // lo Specialist accompagna il cliente alla parete accessori più vicina, scelgono lì e poi tornano al tavolo
           const side = c.x < 700 ? 'L' : 'R', y = Math.max(side === 'L' ? 200 : 440, Math.min(1600, c.y + rand(-120, 120)));
           c.state = 'escorted'; goTo(c, { x: WALL_SPOT[side], y });
           s.state = 'toAccWall'; s.accSide = side; goTo(s, { x: WALL_SPOT[side] + (side === 'L' ? 34 : -34), y: y + 20 });
           say(s, 'bag', 2); game.stats.escorts++;
-        } else if (!c.svcTried && Math.random() < attachChance(s) * 0.7 * (ddOn('business', 'applecare') ? 1 + 1.0 * ddMult() : 1)) {
-          c.svcTried = true; s.t = rand(1.5, 3) * pace(s); say(s, 'shield', s.t);
+        } else if (tryProposal(c, 'svcTried', attachChance(s) * 0.7 * (ddOn('business', 'applecare') ? 1 + 1.0 * ddMult() : 1))) {
+          s.t = rand(1.5, 3) * pace(s); say(s, 'shield', s.t);
           c.service = Math.random() < 0.5 + (ddOn('business', 'applecare') ? 0.2 * ddMult() : 0);
         } else if (c.tradeIn && !c.tradeDone && c.setup !== 'transferThenTrade') {
-          c.tradeDone = true; s.t = rand(6, 12) * pace(s); say(s, 'trade', s.t); say(c, 'iphone', 2);
+          s.state = 'tradeIn'; s.t = rand(6, 12) * pace(s); say(s, 'trade', s.t); say(c, 'iphone', 2);
           log(`${s.name} valuta il vecchio dispositivo del cliente per il Trade In`);
         } else if (c.finance && !c.financeDone) {
-          c.financeDone = true; s.t = rand(8, 15) * pace(s); say(s, 'card', s.t); say(c, 'dots', s.t);
+          s.state = 'financing'; s.t = rand(8, 15) * pace(s); say(s, 'card', s.t); say(c, 'dots', s.t);
           log(`${s.name} prepara la pratica di finanziamento`);
         } else finishSale(s, c, true);
+      }
+      break;
+    case 'tradeIn':
+    case 'financing':
+      s.t -= dt;
+      if (s.t <= 0) {
+        if (s.state === 'tradeIn') c.tradeDone = true; else c.financeDone = true;
+        s.state = 'checkout'; s.t = 0.5;
       }
       break;
     case 'toBar':
@@ -1995,7 +2030,7 @@ function updateStaff(s, dt) {
 // una grande vendita, un errore serio) il gioco si ferma e decidi tu come intervenire.
 // ─────────────────────────────────────────────────────────────
 // ogni tipo di momento al massimo una volta al giorno, così le situazioni cambiano
-const leaderReady = type => !game.moment && game.momentsDone < game.momentsMax && !game.momentTypes.includes(type) &&
+const leaderReady = type => STRATEGY_ON && !SPECIALIST_ON && !game.moment && game.momentsDone < game.momentsMax && !game.momentTypes.includes(type) &&
   game.time >= OPEN + 15 && game.time < CLOSE - 15 && game.time - game.lastMoment >= 45;
 function openMoment(m) {
   game.moment = m; game.lastMoment = game.time;
@@ -2033,7 +2068,7 @@ function fallIll(s) {
   s.state = 'leavingSick'; say(s, 'oops', 3); goTo(s, { x: DOOR.x, y: DOOR.y - 20 });
   game.sick.push(s.name);
   log(`${s.name} non si sente bene e va a casa`);
-  if (!game.moment && !window.noSickMoment) sickMoment(s, was);
+  if (STRATEGY_ON && !SPECIALIST_ON && !game.moment && !window.noSickMoment) sickMoment(s, was);
   else coverPost(was);
 }
 // il posto scoperto lo prende uno Specialist (o un tecnico, al Bar) dai tavoli
@@ -2197,8 +2232,8 @@ function afterPurchase(c) {
   const spot = seat || { x: rand(470, 930), y: rand(1440, 1700) };   // se gli sgabelli sono pieni si resta in piedi lì vicino
   if (seat) { seat.taken = c; c.slot = seat; } else c.standing = true;
   c.state = 'toSetup'; c.bubble = null; goTo(c, spot);
-  game.stats.setups++;
-  log(`Un cliente va al Today at Apple per ${c.setup === 'icloud' ? 'recuperare i dati da iCloud' : 'trasferire i dati sul nuovo iPhone'}`);
+  game.stats.setupsStarted++;
+  log(`Un cliente avvia il setup per ${c.setup === 'icloud' ? 'recuperare i dati da iCloud' : 'trasferire i dati sul nuovo iPhone'}`);
 }
 function backForTrade(c) {
   releaseSlot(c);
@@ -2331,7 +2366,7 @@ function spawnArrivals() {
 }
 
 function step(dt) {
-  if (game.over || game.briefing || game.moment || game.planning || game.checkpoint) return;
+  if (modePicking || game.over || game.briefing || game.moment || game.planning || game.checkpoint) return;
   const before = game.time;
   game.time += dt;
   if (before < OPEN && game.time >= OPEN) log(`Porte aperte: entrano ${spawnArrivals()} clienti che aspettavano fuori`);
@@ -2342,7 +2377,7 @@ function step(dt) {
   }
   // ogni mezz'ora qualcuno può sentirsi male, più facilmente se è stressato
   if (Math.floor(game.time / 30) !== Math.floor(before / 30) && game.time > OPEN + 30 && game.time < CLOSE - 60 && game.stats.sickNow < 2) {
-    for (const x of game.staff.filter(y => !onBreak(y) && !y.hidden && y.rota !== 'out')) {
+    for (const x of game.staff.filter(y => !y.isPlayer && !onBreak(y) && !y.hidden && y.rota !== 'out')) {
       if (Math.random() < 0.0015 + Math.max(0, x.stats.stress - 50) / 600) { fallIll(x); break; }
     }
   }
@@ -2358,6 +2393,7 @@ function step(dt) {
   dispatch();
   game.customers.forEach(c => updateCustomer(c, dt));
   game.staff.forEach(s => updateStaff(s, dt));
+  if (playerMode) playerMode.step(dt);
   game.customers = game.customers.filter(c => !c.gone);
   game.staff = game.staff.filter(x => !x.gone);
   [...game.customers, ...game.staff].forEach(e => { if (e.bubble && game.time > e.bubble.until) e.bubble = null; });
@@ -2365,13 +2401,14 @@ function step(dt) {
   if (game.time >= CLOSE) closeStore();
 }
 
-// Alle 20 il negozio chiude e la giornata finisce: chi ha comprato esce col prodotto (i dati li finisce
-// a casa), una vendita che sta chiudendo si conta, una riparazione in corso si chiude, gli altri escono.
+// Alle 20 la giornata finisce. I percorsi ancora aperti restano incompleti:
+// la chiusura non trasforma un ordine o una pratica in corso in una consegna o un servizio concluso.
 function closeStore() {
   const st = game.stats;
+  if (playerMode) playerMode.beforeClose();
   for (const c of game.customers) {
     if (c.state === 'leaving' || c.outcome) continue;
-    if (c.kind === 'buy' && c.bought && !c.saleCounted) {
+    if (STRATEGY_ON && !SPECIALIST_ON && c.kind === 'buy' && c.bought && !c.saleCounted) {
       c.saleCounted = true; st.sold++;
       if (c.accessory) st.accessories++;
       if (c.service) st.services++;
@@ -2379,8 +2416,9 @@ function closeStore() {
       if (c.financeDone) st.finance++;
     }
     const repairing = c.kind === 'genius' && c.staff && c.staff.state === 'repair';
-    if (repairing) st.genius++;
-    leave(c, c.bought || c.tradeOnly ? 'bought' : repairing ? 'fixed' : c.kind === 'look' ? 'looked' : 'browsed');
+    if (STRATEGY_ON && !SPECIALIST_ON && repairing) st.genius++;
+    if (!STRATEGY_ON || SPECIALIST_ON) { st.unfinished++; leave(c, 'unfinished'); }
+    else leave(c, c.bought || c.tradeOnly ? 'bought' : repairing ? 'fixed' : c.kind === 'look' ? 'looked' : 'browsed');
   }
   for (const x of game.staff) { x.customer = null; x.order = null; x.batch = []; }
   game.orders = []; game.customers = [];
@@ -2396,6 +2434,17 @@ function teamDelta() {
 
 function endDay() {
   game.over = true;
+  document.getElementById('dbTitle').textContent = SPECIALIST_ON ? 'Il tuo turno è finito' : 'La giornata è finita';
+  document.getElementById('dbPlayerStats').hidden = !playerMode;
+  document.getElementById('dbStoreResults').open = !playerMode;
+  if (playerMode) {
+    const p = playerMode.view().stats;
+    document.getElementById('dbPlayerStats').innerHTML = rows([
+      ['Clienti conclusi', p.served], ['Dispositivi consegnati', p.sales],
+      ['Accessori', p.accessories], ['Servizi', p.services], ['Persone aiutate', p.helped],
+      ['Setup completati', p.setups], ['Visite ancora aperte', p.open],
+    ]);
+  } else document.getElementById('dbPlayerStats').innerHTML = '';
   const s = game.stats, L = game.level;
   document.getElementById('dbRetry').hidden = !L;
   document.getElementById('nextDay').hidden = !!L;
@@ -2428,7 +2477,8 @@ function endDay() {
     ['Con accessorio', s.accessories],
     ['Servizi (AppleCare)', s.services],
     ['Trade In · finanziamenti', `${s.tradeIns} · ${s.finance}`],
-    ['Dati trasferiti al Today at Apple', s.setups],
+    ['Setup avviati · completati', `${s.setupsStarted} · ${s.setups}`],
+    ['Percorsi ancora aperti alla chiusura', s.unfinished],
     ['…poi tornati per il Trade In', s.tradeAfter],
     ['Accessori all\'Express (B1)', s.express],
     ['Accessori alle pareti', s.wallSales],
@@ -2510,6 +2560,12 @@ function drawPerson(e) {
     waiting: !e.isStaff && ['waiting', 'waitWall', 'queued', 'inLine'].includes(e.state) && e.wait >= 5,
     drawIcon,
   });
+  if (e.isPlayer) {
+    const x = px(e.x), y = px(e.y) - 23;
+    rect(x - 4, y, 9, 2, '#a2f5fb'); rect(x - 2, y + 2, 5, 2, '#43d9ed'); rect(x, y + 4, 1, 2, '#43d9ed');
+  } else if (e.playerReserved || e.ownerId === 'PLAYER') {
+    rect(px(e.x) - 2, px(e.y) - 23, 5, 3, '#43d9ed');
+  }
 }
 
 const FONT = {
@@ -2604,12 +2660,17 @@ const STATE_LABEL = {
 huddle: 'momento di squadra', training: 'in formazione', toBreak: 'va in pausa', onBreak: 'in pausa', fromBreak: 'torna dalla pausa',
   toStage: 'va allo schermo', onStage: 'prepara la sessione', presenting: 'tiene la sessione',
 };
-const roleShort = x => x.state === 'leavingSick' ? 'va a casa' : onBreak(x) ? 'pausa' : x.slot !== undefined ? rotaOf(x)[x.slot].name : x.role === 'ops' ? OPS_LABEL[x.state] || 'Operations' : 'Today at Apple';
+const roleShort = x => x.isPlayer ? 'il tuo turno' : x.state === 'leavingSick' ? 'va a casa' : onBreak(x) ? 'pausa' : x.slot !== undefined ? rotaOf(x)[x.slot].name : x.role === 'ops' ? OPS_LABEL[x.state] || 'Operations' : 'Today at Apple';
+STATE_LABEL.tradeIn = 'valuta il dispositivo per il Trade In';
+STATE_LABEL.financing = 'prepara il finanziamento';
+STATE_LABEL.unfinished = 'visita rimasta aperta alla chiusura';
 const OPS_LABEL = { idle: 'in backstage', toBack: 'va in backstage', picking: 'prende un prodotto in backstage', delivering: 'consegna un prodotto', handing: 'consegna un prodotto', returning: 'torna al backstage' };
 const ROLE_LABEL = { point: 'Point', express: 'Cassa Express', accessori: 'Specialist accessori', specialist: 'Specialist', genius: 'Genius', creative: 'Creative', ops: 'Operations' };
 
 let lastPanel = 0;
 function updatePanel() {
+  window.PLSpecialistUI.render(playerMode ? playerMode.view() : { enabled: false });
+  window.PLGameModes.render(chosenMode);
   document.getElementById('clock').textContent = fmt(Math.max(OPEN - 2, game.time));
   const open = game.time >= OPEN && game.time < CLOSE;
   document.getElementById('date').textContent =
@@ -2675,6 +2736,7 @@ function updatePanel() {
 }
 
 function staffActions(e) {
+  if (!STRATEGY_ON || SPECIALIST_ON) return { acts: '', key: '' };
   if (game.briefing || game.planning || game.over || game.time >= CLOSE) return { acts: '', key: '' };
   let pause, pk;
   if (onBreak(e)) { pause = `<button disabled>In pausa${e.state === 'onBreak' ? ' fino alle ' + fmt(e.until) : ''}</button>`; pk = 'b' + e.state; }
@@ -2694,7 +2756,7 @@ function selectionView(e) {
 
 document.addEventListener('click', ev => {
   const b = ev.target.closest('[data-act]');
-  if (!b || b.disabled) return;
+  if (!b || b.disabled || !STRATEGY_ON || SPECIALIST_ON) return;
   const x = game.staff.find(y => y.id === b.dataset.id);
   if (!x) return;
   if (b.dataset.act === 'break') { x.wantsBreak = true; if (!isAvailable(x)) log(`${x.name} andrà in pausa appena finisce`); }
@@ -2782,26 +2844,67 @@ function drawAvatar(cv, look) {
   }, 1, { badge: '#ffffff' });
 }
 const intro = { typed: 0, on: true };
-const INTRO_LINE = 'Buongiorno! Sono le 9:58 e tra poco apriamo le porte di Piazza Liberty. La squadra è pronta e i primi clienti aspettano già in piazza: tocca a te guidare la giornata.';
+const INTRO_LINE = 'Benvenuto a Piazza Liberty. Osserva il negozio mentre il team segue i clienti, oppure entra sul floor e inizia il tuo percorso da Specialist.';
 function drawIntro(dt) {
   if (intro.typed < INTRO_LINE.length) {
     intro.typed = Math.min(INTRO_LINE.length, intro.typed + dt * 40);
     document.getElementById('introText').textContent = INTRO_LINE.slice(0, Math.floor(intro.typed));
   }
 }
-document.getElementById('introGo').addEventListener('click', () => {
+function showModes() {
+  modePicking = true;
+  intro.on = true;
+  intro.typed = INTRO_LINE.length;
+  document.getElementById('introText').textContent = INTRO_LINE;
+  document.getElementById('introBack').hidden = false;
+  document.getElementById('intro').classList.add('show');
+  window.PLGameModes.render(chosenMode);
+}
+function closeModes() {
+  modePicking = false;
   intro.on = false;
   document.getElementById('intro').classList.remove('show');
-  if (STRATEGY_ON) showLevels(); else { seedRandom(null); newDay(7); }
-});
+}
+document.getElementById('changeMode').addEventListener('click', showModes);
+document.getElementById('introBack').addEventListener('click', closeModes);
 if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) intro.typed = INTRO_LINE.length - 1;
 if (window.autoCoach) { intro.on = false; document.getElementById('intro').classList.remove('show'); }
 
+function createPlayerMode() {
+  return window.PLPlayerMode.create({
+    getGame: () => game, OPEN, CLOSE, TEAM, PRODUCT_NAME, STATE_LABEL, goTo, isAvailable, onBreak, serve, log, rand,
+  });
+}
+let playerMode = SPECIALIST_ON ? createPlayerMode() : null;
+window.PLSpecialistUI.bind({
+  next: () => { if (playerMode) playerMode.takeNext(); updatePanel(); },
+  pause: () => { if (playerMode) playerMode.requestBreak(); updatePanel(); },
+  focus: () => { if (playerMode) playerMode.focus(); updatePanel(); },
+});
+function selectMode(mode) {
+  if (!['observation', 'career'].includes(mode)) return false;
+  chosenMode = mode;
+  SPECIALIST_ON = mode === 'career';
+  playerMode = SPECIALIST_ON ? createPlayerMode() : null;
+  closeModes();
+  document.getElementById('introBack').hidden = true;
+  for (const id of ['levels', 'check', 'moment', 'plan']) document.getElementById(id).classList.remove('show');
+  seedRandom(null);
+  newDay(7);
+  game.speed = 1;
+  acc = 0;
+  document.querySelectorAll('#speed button').forEach(b => b.classList.toggle('on', b.dataset.s === '1'));
+  updatePanel();
+  return true;
+}
+window.PLGameModes.bind({ choose: selectMode });
 newDay(7);
 if (!window.autoCoach) { game.briefing = true; document.getElementById('brief').classList.remove('show'); }
+updatePanel();
 requestAnimationFrame(frame);
 // per i test: avanza la simulazione senza aspettare
-window.__sim = { step, startDay, get game() { return game; } };
+window.__sim = { step, startDay, newDay, selectMode, showModes, closeModes,
+  get mode() { return chosenMode; }, get playerMode() { return playerMode; }, get game() { return game; } };
 </script>
 </body>
 </html>
