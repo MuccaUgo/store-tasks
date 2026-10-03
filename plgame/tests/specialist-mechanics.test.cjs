@@ -496,7 +496,7 @@ test('switching both modes starts a fresh day and never duplicates the player or
   assert.equal(env.view().stats.helped, 1);
   const personalStats = env.evaluate('JSON.stringify(TEAM.Tu)');
   const npcRosterSize = env.evaluate("Object.keys(TEAM).filter(name => name !== 'Tu').length");
-  assert.equal(npcRosterSize, 49);
+  assert.equal(npcRosterSize, 52);   // 49 + i 3 Lead
   assert.match(env.get('brTeam').innerHTML, new RegExp('su ' + (npcRosterSize + 1) + '(?:\\D|$)'));
   env.evaluate("game.speed = 4; window.__sim.selectMode('observation'); updatePanel()");
   assert.equal(env.evaluate('window.__sim.mode'), 'observation');

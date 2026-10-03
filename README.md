@@ -60,6 +60,15 @@ collegato a te e non genera una seconda vendita. Alle 20:00 i percorsi non
 conclusi rimangono distinti nel riepilogo. I risultati personali si azzerano al
 turno successivo, mentre motivazione, stress e competenza restano nel team.
 
+Valgono in entrambe le modalità: circa il 5% dei clienti per un prodotto ha
+**esigenze più elevate**. Lo Specialist, finite le domande, chiede supporto a un
+**Expert** o a un **Pro** libero (anche da un posto fisso, se è fermo), che lo
+affianca durante una demo più lunga e fa emergere il bisogno; la vendita resta
+allo Specialist. Se in 8 minuti non arriva nessuno, prosegue da solo e
+l'esperienza ne risente. Sul floor ci sono anche **3 Lead** (con i loro giorni
+liberi): non vendono, girano per il negozio e osservano i clienti; per ora non
+fanno altro, sono pronti per le prossime meccaniche.
+
 Questa versione verifica la meccanica: conversazioni con scelte e crescita verso
 Expert o Pro arriveranno dopo. In entrambe le modalità i momenti da leader
 sono disattivati e il team copre automaticamente le assenze. Il codice della
@@ -154,7 +163,7 @@ Allora decidi se coprire il suo posto, cambiare formazione o chiedere alla
 squadra di andare più veloce per due ore, con più stress.
 Ognuno nel team ha motivazione (velocità), stress (esperienza del cliente)
 e competenza (errori e attach); con troppo stress il giorno dopo si è in
-malattia. La squadra è di 49 persone, tutte full time: in vendita 12 Specialist,
+malattia. La squadra è di 52 persone, tutte full time (3 Lead): in vendita 12 Specialist,
 6 Expert e 3 Pro; al Genius Bar 10 Technical Specialist, 5 Technical Expert
 e 2 Genius; al Today at Apple 3 Creative e 2 Creative Pro; in Operations 6 persone. Ognuno ha due
 giorni liberi in settimana, nel weekend lavorano tutti (il sabato è il
