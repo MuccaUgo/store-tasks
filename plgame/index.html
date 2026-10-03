@@ -2078,7 +2078,7 @@ document.getElementById('mBody').addEventListener('click', ev => {
 // richiede 30–60 minuti: c'è chi lo fa al Today at Apple. Chi ha rimandato il Trade In, finito il
 // trasferimento torna da uno Specialist con il vecchio telefono.
 function afterPurchase(c) {
-  if (!c.setup || c.setupDone) { leave(c, 'bought'); return; }
+  if (!c.setup || c.setupDone || game.time > CLOSE - 35) { leave(c, 'bought'); return; }
   releaseSlot(c);
   const seat = STOOLS.find(x => !x.taken);
   const spot = seat || { x: rand(470, 930), y: rand(1440, 1700) };   // se gli sgabelli sono pieni si resta in piedi lì vicino
@@ -2101,7 +2101,7 @@ function finishSale(s, c, bought) {
   const st = game.stats;
   s.served++;
   if (bought) {
-    st.sold++;
+    st.sold++; c.saleCounted = true;
     if (c.accessory) st.accessories++;
     if (c.service) st.services++;
     if (c.tradeDone) st.tradeIns++;
@@ -2244,11 +2244,30 @@ function step(dt) {
   game.staff = game.staff.filter(x => !x.gone);
   [...game.customers, ...game.staff].forEach(e => { if (e.bubble && game.time > e.bubble.until) e.bubble = null; });
 
-  if (before < CLOSE && game.time >= CLOSE) {
-    log('Chiusura: si finisce con chi è dentro');
-    game.customers.filter(c => ['waiting', 'queued', 'inLine', 'looking', 'toLook', 'seated', 'toWall', 'pickWall', 'waitWall'].includes(c.state)).forEach(c => leave(c, c.kind === 'look' ? 'looked' : c.tradeOnly ? 'bought' : 'browsed'));
+  if (game.time >= CLOSE) closeStore();
+}
+
+// Alle 20 il negozio chiude e la giornata finisce: chi ha comprato esce col prodotto (i dati li finisce
+// a casa), una vendita che sta chiudendo si conta, una riparazione in corso si chiude, gli altri escono.
+function closeStore() {
+  const st = game.stats;
+  for (const c of game.customers) {
+    if (c.state === 'leaving' || c.outcome) continue;
+    if (c.kind === 'buy' && c.bought && !c.saleCounted) {
+      c.saleCounted = true; st.sold++;
+      if (c.accessory) st.accessories++;
+      if (c.service) st.services++;
+      if (c.tradeDone) st.tradeIns++;
+      if (c.financeDone) st.finance++;
+    }
+    const repairing = c.kind === 'genius' && c.staff && c.staff.state === 'repair';
+    if (repairing) st.genius++;
+    leave(c, c.bought || c.tradeOnly ? 'bought' : repairing ? 'fixed' : c.kind === 'look' ? 'looked' : 'browsed');
   }
-  if (game.time >= CLOSE && game.customers.length === 0) endDay();
+  for (const x of game.staff) { x.customer = null; x.order = null; x.batch = []; }
+  game.orders = []; game.customers = [];
+  log('Chiusura alle 20:00');
+  endDay();
 }
 
 function teamDelta() {
