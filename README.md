@@ -74,6 +74,14 @@ sgabelli o in piedi se sono pieni): c'è chi trasferisce i dati e poi torna da u
 Specialist con il vecchio telefono per il Trade In, chi fa subito il Trade In e
 recupera da iCloud in negozio, e chi va a casa. Alle 20 il negozio chiude e la
 giornata finisce: chi sta ancora trasferendo i dati li finisce a casa.
+Chi si siede con uno Specialist compra quasi sempre (circa uno su dieci ci
+ripensa). Chi viene per un prodotto cerca nel 50% dei casi un iPhone, nel 20% un
+Watch, nel 15% un iPad e nel 15% un Mac. Quando si propone l'accessorio, lo
+Specialist accompagna il cliente alla parete accessori più vicina, scelgono lì e
+poi tornano al tavolo a chiudere. I clienti per accessori e per il Genius Bar sono
+di più: il Genius Bar ha 12 posti, il Point fa il check-in e il cliente va al posto
+da solo; nel weekend gli appuntamenti al Bar non crescono quanto l'affluenza.
+Al Genius Bar si sbaglia circa una riparazione su venti.
 Il **team Operations** (6 persone, due giorni liberi in settimana come gli altri)
 porta i prodotti dal **backstage**, dietro la porta in basso a destra, e li
 consegna allo **Specialist**, che resta col cliente ad aspettare (clessidra) e poi
