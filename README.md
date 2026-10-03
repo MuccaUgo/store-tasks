@@ -63,14 +63,16 @@ Per ora le scelte di strategia (formazione, tattica, DD, pause delle 13 e delle
 16) e i livelli sono nascosti: dopo la presentazione si apre direttamente la
 giornata. Il codice resta, si riaccendono con `STRATEGY_ON`.
 Il **team Operations** (6 persone, due giorni liberi in settimana come gli altri)
-porta i prodotti dal **backstage**, dietro la porta in alto a sinistra. Quando un
-cliente decide di comprare, il prodotto parte dal magazzino e il cliente lo
-aspetta al tavolo (clessidra): in media 2–3 minuti per l'iPhone, al massimo
-circa 5 per gli altri prodotti. Un accessorio a volte è sulla parete, a volte va
-preso in backstage: se l'ordine del prodotto non è ancora partito viaggia
-insieme, altrimenti serve un secondo giro e il cliente aspetta di nuovo. Anche
-alle pareti accessori a volte il pezzo arriva dal backstage. Se mancano persone
-in Operations le attese si allungano, e i clienti lo scrivono nei commenti.
+porta i prodotti dal **backstage**, dietro la porta in basso a sinistra, e li
+consegna allo **Specialist**, che resta col cliente ad aspettare (clessidra) e poi
+glielo dà: intanto non può seguire altri clienti. In media 2–3 minuti per l'iPhone,
+al massimo circa 5 per gli altri prodotti. Gli ordini arrivati nello stesso minuto
+viaggiano insieme: chi è ancora in backstage ne prende fino a 3 e li consegna in
+un solo giro, dal più vicino. Un accessorio a volte è sulla parete, a volte va
+preso in backstage: se l'ordine del prodotto non è ancora partito viaggia insieme,
+altrimenti serve un secondo giro. Anche alle pareti accessori a volte il pezzo
+arriva dal backstage. Se mancano persone in Operations le attese si allungano, e
+i clienti lo scrivono nei commenti.
 Il Point all'ingresso è un collo di bottiglia vero: con un solo Point nelle ore di
 punta la fila si allunga e chi aspetta troppo se ne va.
 Il **tempo** cambia ogni giorno (sole, nuvoloso, pioggia): con la pioggia
