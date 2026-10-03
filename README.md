@@ -78,10 +78,16 @@ Chi si siede con uno Specialist compra quasi sempre (circa uno su dieci ci
 ripensa). Chi viene per un prodotto cerca nel 50% dei casi un iPhone, nel 20% un
 Watch, nel 15% un iPad e nel 15% un Mac. Quando si propone l'accessorio, lo
 Specialist accompagna il cliente alla parete accessori più vicina, scelgono lì e
-poi tornano al tavolo a chiudere. I clienti per accessori e per il Genius Bar sono
-di più: il Genius Bar ha 12 posti, il Point fa il check-in e il cliente va al posto
-da solo; nel weekend gli appuntamenti al Bar non crescono quanto l'affluenza.
+poi tornano al tavolo a chiudere. I clienti per accessori sono di più; il Genius Bar ha 12 posti.
 Al Genius Bar si sbaglia circa una riparazione su venti.
+Il **Genius Bar lavora su appuntamento**, con un'**agenda** della giornata a fasce
+di 15 minuti (nel pannello si vedono i prossimi orari e i ritardi). Metà dei
+clienti ha prenotato: arriva intorno all'orario (qualcuno prima, qualcuno in
+ritardo, circa uno su dieci non si presenta), va dritto al Point del Bar e viene
+chiamato in ordine di appuntamento. L'altra metà arriva senza: al Point del Bar
+riceve il primo orario libero e torna a quell'ora, o un altro giorno se l'agenda è
+piena. Un appuntamento dura da 10 a 45 minuti, quindi a volte si slitta.
+L'agenda prenota un po' più dei tecnici in turno, mai più dei 12 posti.
 Il **team Operations** (6 persone, due giorni liberi in settimana come gli altri)
 porta i prodotti dal **backstage**, dietro la porta in basso a destra, e li
 consegna allo **Specialist**, che resta col cliente ad aspettare (clessidra) e poi
