@@ -85,6 +85,11 @@ preso in backstage: se l'ordine del prodotto non è ancora partito viaggia insie
 altrimenti serve un secondo giro. Anche alle pareti accessori a volte il pezzo
 arriva dal backstage. Se mancano persone in Operations le attese si allungano, e
 i clienti lo scrivono nei commenti.
+Entrano più clienti, soprattutto per comprare: nelle ore di punta gli Specialist
+sono quasi sempre occupati. Chi arriva al tavolo e non trova nessuno libero
+aspetta lì (o in piedi vicino, se i posti sono pieni), e gli Specialist vanno a
+prendere i clienti in ordine di arrivo. Si aspetta fino a 20 minuti, ma qualcuno se
+ne va prima.
 Il Point all'ingresso è un collo di bottiglia vero: con un solo Point nelle ore di
 punta la fila si allunga e chi aspetta troppo se ne va.
 Il **tempo** cambia ogni giorno (sole, nuvoloso, pioggia): con la pioggia

@@ -1257,12 +1257,20 @@ function updateLine(line, post, also = []) {
   }
 }
 
+function standSpot(product) {
+  const t = pick(TABLES.filter(x => x.product === product));
+  const below = t.y === ROWS[0] || Math.random() < 0.5;
+  const x = t.x + rand(5, t.w - 5), y = below ? t.y + t.h + rand(28, 60) : t.y - rand(28, 50);
+  return { table: t, x, y, sx: x + (x < t.x + t.w / 2 ? -22 : 22), sy: y + 30, taken: null, standing: true };
+}
+
 // Dopo il Point: al tavolo giusto, in fila al Genius Bar o a guardarsi intorno
 function proceed(c) {
   if (c.kind === 'buy' || c.kind === 'help') {
     const free = SLOTS.filter(s => !s.taken && s.table.product === (c.kind === 'help' ? 'help' : c.product));
-    const slot = free.length ? pick(free) : null;
-    if (!slot) { say(c, 'dots'); leave(c, 'browsed'); return; }
+    let slot = free.length ? pick(free) : null;
+    // posti pieni: si aspetta in piedi vicino a un tavolo giusto, e uno Specialist verrà a prenderlo
+    if (!slot) slot = standSpot(c.kind === 'help' ? 'help' : c.product);
     slot.taken = c; c.slot = slot;
     c.state = 'toTable'; goTo(c, slot);
   } else if (c.kind === 'genius') {
@@ -1412,7 +1420,7 @@ function updateCustomer(c, dt) {
     case 'toPoint':
       if (arrived) {
         const p = c.point;
-        c.state = 'talking'; c.t = (p.post === EXPRESS ? rand(0.5, 1) : p.post === POINT_GB ? rand(0.8, 1.4) : rand(0.9, 1.7)) * pace(p);
+        c.state = 'talking'; c.t = (p.post === EXPRESS ? rand(0.5, 1) : p.post === POINT_GB ? rand(0.8, 1.4) : rand(0.4, 0.9)) * pace(p);
         face(c, p); face(p, c);
         say(p, 'question', c.t / 2); say(c, needIcon(c), c.t);
       }
@@ -1437,7 +1445,7 @@ function updateCustomer(c, dt) {
       }
       break;
     case 'toTable':
-      if (arrived) { c.state = 'waiting'; c.patience = c.tradeOnly ? rand(20, 30) : rand(5, 12) * (rainy() ? 0.8 : 1); c.wait = 0; c.facing = c.slot.x < c.slot.table.x ? 'right' : 'left'; say(c, 'question', 2); }
+      if (arrived) { c.state = 'waiting'; c.tQueue = game.time; c.patience = c.tradeOnly ? rand(20, 30) : (Math.random() < 0.7 ? rand(12, 20) : rand(4, 12)) * (rainy() ? 0.85 : 1); c.wait = 0; c.facing = c.slot.standing ? (c.slot.y < c.slot.table.y ? 'down' : 'up') : c.slot.x < c.slot.table.x ? 'right' : 'left'; say(c, 'question', 2); }
       break;
     case 'waiting':
       c.wait += dt; c.patience -= dt;
@@ -1525,7 +1533,7 @@ function wander(s) {
 
 function dispatch() {
   // vendita: chi aspetta da più tempo viene servito per primo, dal più vicino libero
-  const waiting = game.customers.filter(c => c.state === 'waiting' && !c.staff).sort((a, b) => b.wait - a.wait);
+  const waiting = game.customers.filter(c => c.state === 'waiting' && !c.staff).sort((a, b) => a.tQueue - b.tQueue);   // in ordine di arrivo al tavolo
   for (const c of waiting) {
     const free = game.staff.filter(s => canSell(s) && s.state === 'idle' || canSell(s) && s.state === 'wander');
     if (!free.length) break;
@@ -2167,7 +2175,8 @@ function convertFromToday(c) {
 // ─────────────────────────────────────────────────────────────
 // Gli arrivi della giornata si decidono all'apertura, con un seme a parte: nei livelli i clienti sono sempre
 // gli stessi, qualunque strategia si scelga. Il sabato è il giorno più pieno, poi la domenica.
-const KIND_MIX = { buy: 0.38, help: 0.06, acc: 0.18, genius: 0.25, look: 0.13 };
+let TRAFFIC = 1.65;                   // quanti clienti entrano: moltiplica l'affluenza oraria
+const KIND_MIX = { buy: 0.48, help: 0.06, acc: 0.17, genius: 0.2, look: 0.09 };
 function buildArrivals(seed, opts = {}) {
   const r = mulberry(seed), R = (a, b) => a + r() * (b - a), P = arr => arr[Math.floor(r() * arr.length)];
   const mix = { ...KIND_MIX, ...(opts.mix || {}) }, tot = Object.values(mix).reduce((a, b) => a + b, 0);
@@ -2201,7 +2210,7 @@ function buildArrivals(seed, opts = {}) {
   const dayMult = [1.6, 1, 1, 1, 1, 1.1, 2][game.date.getDay()] * (opts.traffic || 1);
   let accum = 0;
   for (let t = OPEN; t < LAST_ENTRY; t += 0.25) {
-    accum += (RATE[Math.floor(t / 60)] || 6) * 1.25 * dayMult / 60 * 0.25;
+    accum += (RATE[Math.floor(t / 60)] || 6) * TRAFFIC * dayMult / 60 * 0.25;
     while (accum >= 1) { accum -= 1 + R(-0.4, 0.4); one(t + R(0, 0.25)); }
   }
   return list.sort((a, b) => a.t - b.t);
