@@ -43,27 +43,49 @@ cosa vuole paga alla cassa Express in B1) o solo un'occhiata. I tavoli si
 chiamano A1–A5, B1–B5, C1–C5 contando da destra, e D2–D4 per il Genius Bar
 (i nomi non sono scritti, si vedono toccando il tavolo).
 
-Il gioco si apre con una schermata di presentazione in pixel art della piazza. Ogni giorno si apre con l'**Apertura**: vedi che tempo fa, chi è in turno per ruolo, chi è in ferie o malato, e scegli su cosa
-concentrarti: la **strategia del floor** o la **comunicazione del DD**. Con il DD
-prepari il DD del mattino (argomento, formato, chi partecipa, chi lo facilita) e
-formazione e ruoli li decide la squadra; con la strategia del floor oggi non c'è
-DD e decidi il **piano dei ruoli**: chi va al Point, all'Express, agli accessori
-e al Point del Genius Bar.
+Il gioco si apre con una schermata di presentazione in pixel art della piazza, poi
+si sceglie un **livello**. Ogni livello è una giornata in cui la **leadership detta
+un focus** con un obiettivo da 1 a 3 stelle (clienti persi, conversion, AppleCare,
+accessori, NPS, NPS del Genius Bar, stress della squadra, clienti dalle lezioni):
+tocca a te trovare la strategia giusta. Si parte facile, con una sola leva, e poi
+le leve e le difficoltà crescono (sabato, pioggia, malati, squadra stanca, lancio).
+Un livello si sblocca con almeno una stella nel precedente, e lo stesso livello ha
+sempre gli stessi clienti: rigiocandolo con un'altra strategia si vede quanto conta.
+All'**Apertura** scegli la **strategia iniziale**: la **formazione** (Accoglienza,
+Tavoli, Essenziale), la **tattica del floor** (Equilibrio, Vendita, Qualità,
+Velocità), il **DD del mattino** (argomento, su cosa, formato) e, se vuoi, il
+**piano dei ruoli**. Alle **13** e alle **16** il gioco si ferma per il punto della
+situazione: come va l'obiettivo e a che ritmo, e puoi cambiare formazione, tattica
+e ruoli, o continuare così. A fine giornata il debrief dà le stelle, ricorda la tua
+strategia e spiega cosa ha contato. C'è anche il **gioco libero**, giorno dopo
+giorno, senza obiettivi.
+Per ora le scelte di strategia (formazione, tattica, DD, pause delle 13 e delle
+16) e i livelli sono nascosti: dopo la presentazione si apre direttamente la
+giornata. Il codice resta, si riaccendono con `STRATEGY_ON`.
+Il **team Operations** (6 persone, due giorni liberi in settimana come gli altri)
+porta i prodotti dal **backstage**, dietro la porta in alto a sinistra. Quando un
+cliente decide di comprare, il prodotto parte dal magazzino e il cliente lo
+aspetta al tavolo (clessidra): in media 2–3 minuti per l'iPhone, al massimo
+circa 5 per gli altri prodotti. Un accessorio a volte è sulla parete, a volte va
+preso in backstage: se l'ordine del prodotto non è ancora partito viaggia
+insieme, altrimenti serve un secondo giro e il cliente aspetta di nuovo. Anche
+alle pareti accessori a volte il pezzo arriva dal backstage. Se mancano persone
+in Operations le attese si allungano, e i clienti lo scrivono nei commenti.
+Il Point all'ingresso è un collo di bottiglia vero: con un solo Point nelle ore di
+punta la fila si allunga e chi aspetta troppo se ne va.
 Il **tempo** cambia ogni giorno (sole, nuvoloso, pioggia): con la pioggia
 entrano meno curiosi che non vogliono comprare, e chi entra è più nervoso (più
 clienti scortesi, meno pazienza, esperienza che parte più bassa); col sole
-passa qualche curioso in più. A ogni
-cambio ruoli il gioco propone la rotazione e tu puoi cambiarla. Come una
-squadra di calcio scegli anche la **formazione** del floor (Accoglienza,
-Tavoli, Essenziale), perché non sempre ci sono tutti: qualcuno è in ferie,
+passa qualche curioso in più. I ruoli ruotano da soli ogni 1–2 ore; la
+**formazione** del floor serve anche perché non sempre ci sono tutti: qualcuno è in ferie,
 qualcuno in malattia, e qualcuno può sentirsi male durante la giornata.
 Allora decidi se coprire il suo posto, cambiare formazione o chiedere alla
 squadra di andare più veloce per due ore, con più stress.
 Ognuno nel team ha motivazione (velocità), stress (esperienza del cliente)
 e competenza (errori e attach); con troppo stress il giorno dopo si è in
-malattia. La squadra è di 43 persone, tutte full time: in vendita 12 Specialist,
+malattia. La squadra è di 49 persone, tutte full time: in vendita 12 Specialist,
 6 Expert e 3 Pro; al Genius Bar 10 Technical Specialist, 5 Technical Expert
-e 2 Genius; al Today at Apple 3 Creative e 2 Creative Pro. Ognuno ha due
+e 2 Genius; al Today at Apple 3 Creative e 2 Creative Pro; in Operations 6 persone. Ognuno ha due
 giorni liberi in settimana, nel weekend lavorano tutti (il sabato è il
 giorno più pieno). I livelli più alti arrivano a più competenza, vendono o
 riparano meglio e reggono meglio lo stress; al Genius Bar le riparazioni
