@@ -62,6 +62,12 @@ giorno, senza obiettivi.
 Per ora le scelte di strategia (formazione, tattica, DD, pause delle 13 e delle
 16) e i livelli sono nascosti: dopo la presentazione si apre direttamente la
 giornata. Il codice resta, si riaccendono con `STRATEGY_ON`.
+Le **vendite** hanno durate molto diverse, come nella realtà: chi sa già cosa
+vuole chiude in 5–8 minuti; una vendita normale (domande, demo, pagamento) dura
+circa un quarto d'ora; il **Trade In** aggiunge la valutazione dell'usato (6–12
+minuti, circa un iPhone su tre) e il **finanziamento** la pratica (8–15 minuti,
+soprattutto Mac e iPhone). In media una vendita con lo Specialist dura circa 15–16
+minuti, da 4 fino a circa 45.
 Il **team Operations** (6 persone, due giorni liberi in settimana come gli altri)
 porta i prodotti dal **backstage**, dietro la porta in basso a sinistra, e li
 consegna allo **Specialist**, che resta col cliente ad aspettare (clessidra) e poi
