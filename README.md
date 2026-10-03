@@ -75,7 +75,7 @@ Specialist con il vecchio telefono per il Trade In, chi fa subito il Trade In e
 recupera da iCloud in negozio, e chi va a casa. Alle 20 il negozio chiude e la
 giornata finisce: chi sta ancora trasferendo i dati li finisce a casa.
 Il **team Operations** (6 persone, due giorni liberi in settimana come gli altri)
-porta i prodotti dal **backstage**, dietro la porta in basso a sinistra, e li
+porta i prodotti dal **backstage**, dietro la porta in basso a destra, e li
 consegna allo **Specialist**, che resta col cliente ad aspettare (clessidra) e poi
 glielo dà: intanto non può seguire altri clienti. In media 2–3 minuti per l'iPhone,
 al massimo circa 5 per gli altri prodotti. Gli ordini arrivati nello stesso minuto
@@ -85,8 +85,9 @@ preso in backstage: se l'ordine del prodotto non è ancora partito viaggia insie
 altrimenti serve un secondo giro. Anche alle pareti accessori a volte il pezzo
 arriva dal backstage. Se mancano persone in Operations le attese si allungano, e
 i clienti lo scrivono nei commenti.
-Entrano più clienti, soprattutto per comprare: nelle ore di punta gli Specialist
-sono quasi sempre occupati. Chi arriva al tavolo e non trova nessuno libero
+Lo store è pieno quasi tutto il giorno, soprattutto di clienti che vogliono
+comprare: gli Specialist sono quasi sempre occupati e in tutto il negozio ci sono
+di solito 5–10 clienti in attesa di essere seguiti (di più nel weekend). Chi arriva al tavolo e non trova nessuno libero
 aspetta lì (o in piedi vicino, se i posti sono pieni), e gli Specialist vanno a
 prendere i clienti in ordine di arrivo. Si aspetta fino a 20 minuti, ma qualcuno se
 ne va prima.
@@ -122,7 +123,7 @@ grande vendita, un errore serio) il gioco si ferma su un **momento da
 leader**: scegli come intervenire e vedi l'effetto su persone e clienti.
 All'apertura entrano 5–10 clienti che aspettavano fuori, e alcuni clienti
 sono scortesi e alzano lo stress di chi li serve. Alcuni clienti
-lasciano un commento da 1 a 5: 5 vale +1, 4 vale 0, da 3 a 1 vale −1, e
+lasciano un commento da 1 a 5 (come nella realtà, solo chi compra o conclude una riparazione): 5 vale +1, 4 vale 0, da 3 a 1 vale −1, e
 l'NPS è la somma diviso il numero di commenti, per 100, diviso anche tra
 Vendita e Genius Bar (un team formato e ben gestito sta intorno a 80, come
 la media di Piazza Liberty). A 1× una giornata dura circa 7 minuti. Il Today at Apple per ora è sfondo: chi guarda a

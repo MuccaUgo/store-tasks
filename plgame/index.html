@@ -355,9 +355,9 @@ const STOOLS = [
 ].map(([x, y]) => ({ x: x + 26, y: y + 31, taken: null }));
 const SCREEN = { x: 405, y: 1810, w: 588, h: 36 };
 const STAGE = { x: 700, y: 1795 };
-// Backstage: il magazzino dietro la porta in basso a sinistra. Il team Operations aspetta lì dentro,
+// Backstage: il magazzino dietro la porta in basso a destra. Il team Operations aspetta lì dentro,
 // esce solo per portare il prodotto allo Specialist, che lo consegna al cliente
-const BACK_DOOR = { x: 160, y: 1872 };
+const BACK_DOOR = { x: 1250, y: 1872 };
 const PICK_TIME = { iphone: [0.3, 0.8], ipad: [0.9, 1.6], watch: [0.9, 1.6], mac: [1.1, 1.9], acc: [0.5, 1.1] };
 const OPS_HOMES = [BACK_DOOR];
 
@@ -474,7 +474,7 @@ const STAFF_SHIRT = '#2a6ad8';
 const WEEKDAYS = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
 const SESSION_TITLES = ['Foto con iPhone', 'Disegno su iPad', 'Musica con GarageBand', 'Video con iPhone', 'Primi passi su Mac'];
 // Gennaio: poca gente. Arrivi l'ora, per ora del giorno.
-const RATE = { 10: 12, 11: 18, 12: 24, 13: 24, 14: 18, 15: 20, 16: 24, 17: 32, 18: 36, 19: 20 };
+const RATE = { 10: 18, 11: 24, 12: 28, 13: 28, 14: 26, 15: 27, 16: 29, 17: 33, 18: 34, 19: 22 };   // uno store pieno quasi tutto il giorno
 
 let game;
 
@@ -1164,7 +1164,7 @@ function log(msg) {
 // ─────────────────────────────────────────────────────────────
 function goTo(e, target) { e.path = findPath(e, target); e.dest = target; }
 function moveAlong(e, dt) {
-  let budget = WALK * (e.role === 'ops' ? 2.8 : e.isStaff ? 1.15 : 1) * dt;
+  let budget = WALK * (e.role === 'ops' ? 3.3 : e.isStaff ? 1.15 : 1) * dt;
   let moved = false;
   while (budget > 0 && e.path.length) {
     const p = e.path[0], d = dist(e, p);
@@ -1346,9 +1346,12 @@ function serve(s, c, weight = 1, errMul = 1) {
 }
 
 // Il commento: non tutti lo lasciano. 5 positivo (+1), 4 passivo (0), da 3 a 1 negativo (−1)
+// Come nella realtà, il feedback arriva solo da chi compra (e al Genius Bar da chi conclude una
+// riparazione). Chi se ne va senza essere seguito finisce tra i persi.
 function survey(c) {
   if (c.outcome === 'lost') c.exp = Math.min(c.exp, 30);
-  if (Math.random() > (c.outcome === 'lost' ? 0.45 : 0.3)) return;
+  if (!['bought', 'fixed'].includes(c.outcome)) return;
+  if (Math.random() > 0.3) return;
   const e = c.exp;
   const score = e >= 72 ? 5 : e >= 58 ? 4 : e >= 45 ? 3 : e >= 32 ? 2 : 1;
   const value = score === 5 ? 1 : score === 4 ? 0 : -1;
@@ -1405,7 +1408,7 @@ function leave(c, outcome) {
   goTo(c, { x: DOOR.x + rand(-30, 30), y: DOOR.y - 20 });
 }
 
-const WAIT_COST = { waitDelivery: 0.6, inLine: 0.6, waiting: 1.5, waitWall: 1.5, queued: 0.5, atBar: 0.8 };
+const WAIT_COST = { waitDelivery: 0.6, inLine: 0.6, waiting: 0.5, waitWall: 1.5, queued: 0.5, atBar: 0.8 };
 function updateCustomer(c, dt) {
   const arrived = moveAlong(c, dt);
   const cost = WAIT_COST[c.state];
@@ -1420,7 +1423,7 @@ function updateCustomer(c, dt) {
     case 'toPoint':
       if (arrived) {
         const p = c.point;
-        c.state = 'talking'; c.t = (p.post === EXPRESS ? rand(0.5, 1) : p.post === POINT_GB ? rand(0.8, 1.4) : rand(0.4, 0.9)) * pace(p);
+        c.state = 'talking'; c.t = (p.post === EXPRESS ? rand(0.5, 1) : p.post === POINT_GB ? rand(0.8, 1.4) : rand(0.3, 0.6)) * pace(p);
         face(c, p); face(p, c);
         say(p, 'question', c.t / 2); say(c, needIcon(c), c.t);
       }
@@ -2175,8 +2178,8 @@ function convertFromToday(c) {
 // ─────────────────────────────────────────────────────────────
 // Gli arrivi della giornata si decidono all'apertura, con un seme a parte: nei livelli i clienti sono sempre
 // gli stessi, qualunque strategia si scelga. Il sabato è il giorno più pieno, poi la domenica.
-let TRAFFIC = 1.65;                   // quanti clienti entrano: moltiplica l'affluenza oraria
-const KIND_MIX = { buy: 0.48, help: 0.06, acc: 0.17, genius: 0.2, look: 0.09 };
+let TRAFFIC = 1.95;                   // quanti clienti entrano: moltiplica l'affluenza oraria
+const KIND_MIX = { buy: 0.56, help: 0.07, acc: 0.15, genius: 0.15, look: 0.07 };
 function buildArrivals(seed, opts = {}) {
   const r = mulberry(seed), R = (a, b) => a + r() * (b - a), P = arr => arr[Math.floor(r() * arr.length)];
   const mix = { ...KIND_MIX, ...(opts.mix || {}) }, tot = Object.values(mix).reduce((a, b) => a + b, 0);
@@ -2419,7 +2422,7 @@ function drawWall(w) { PLGraphics.drawAccessoryWall(ctx, w, SCALE); }
 function drawTree(t) { PLGraphics.drawTree(ctx, t, SCALE); }
 function drawFloor() { PLGraphics.drawFloor(ctx, { width: canvas.width, height: canvas.height, scale: SCALE }); }
 
-// la porta del backstage, in basso a sinistra
+// la porta del backstage, in basso a destra
 function drawBackstage() {
   const x = px(BACK_DOOR.x - 40), y = px(1850), w = px(BACK_DOOR.x + 40) - x, h = px(1880) - y;
   rect(x, y, w, h, '#3a3f47');
