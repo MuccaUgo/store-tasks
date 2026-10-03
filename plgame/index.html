@@ -355,6 +355,11 @@ const STOOLS = [
 ].map(([x, y]) => ({ x: x + 26, y: y + 31, taken: null }));
 const SCREEN = { x: 405, y: 1810, w: 588, h: 36 };
 const STAGE = { x: 700, y: 1795 };
+// Backstage: il magazzino dietro la porta in alto a sinistra, vicino ai tavoli iPhone.
+// Il team Operations aspetta lì dentro ed esce solo per consegnare
+const BACK_DOOR = { x: 160, y: 66 };
+const PICK_TIME = { iphone: [0.6, 1.2], ipad: [0.9, 1.6], watch: [0.9, 1.6], mac: [1.1, 1.9], acc: [0.5, 1.1] };
+const OPS_HOMES = [BACK_DOOR];
 
 // Posti attorno ai tavoli prodotto: cliente accanto al tavolo, dipendente sotto di lui
 const SLOTS = [];
@@ -484,6 +489,7 @@ const TIER = {
   G:  { label: 'Genius', area: 'bar', cap: 100, stress: 0.7, skill: 2, badge: '#e67e22' },
   C:  { label: 'Creative', area: 'creative', cap: 80, stress: 0.9, convert: 0.2, badge: '#e36bb5' },
   CP: { label: 'Creative Pro', area: 'creative', cap: 95, stress: 0.75, convert: 0.35, badge: '#e36bb5' },
+  OP: { label: 'Operations', area: 'ops', cap: 90, stress: 0.9, badge: '#6ab04c' },
 };
 const ROSTER = {
   S: ['Luca', 'Giulia', 'Marco', 'Elena', 'Anna', 'Valentina', 'Simone', 'Matteo', 'Alessia', 'Federico', 'Irene', 'Tommaso'],
@@ -494,9 +500,10 @@ const ROSTER = {
   G: ['Massimo', 'Veronica'],
   C: ['Davide', 'Greta', 'Filippo'],
   CP: ['Arianna', 'Leonardo'],
+  OP: ['Fabio', 'Carla', 'Mattia', 'Giada', 'Alberto', 'Serena'],
 };
 // si parte da un team poco esperto: chi è a un livello più alto parte più avanti
-const COMP_START = { S: [15, 35], E: [45, 60], P: [60, 72], TS: [15, 35], TE: [45, 60], G: [62, 72], C: [25, 40], CP: [50, 62] };
+const COMP_START = { S: [15, 35], E: [45, 60], P: [60, 72], TS: [15, 35], TE: [45, 60], G: [62, 72], C: [25, 40], CP: [50, 62], OP: [35, 55] };
 // due giorni liberi a testa, solo in settimana (1 = lunedì … 5 = venerdì): nel weekend lavorano tutti
 const OFF_PAIRS = [[1, 2], [2, 3], [3, 4], [4, 5], [5, 1]];
 const TEAM = {};
@@ -582,15 +589,16 @@ function newDay(dayOfMonth, opts = {}) {
     ].map(s => ({ ...s, end: s.start + 45, state: 'planned' })),
     reviews: [],
     kudos: 3, moment: null, momentTypes: [], momentsDone: 0, momentsMax: randi(2, 3), lastMoment: -999, lessons: [],
-    stats: { errBar: 0, buyDone: 0, buyWon: 0, lostLine: 0, sickNow: 0, calledIn: 0, helped: 0, todayConv: 0, entered: 0, buyers: 0, sold: 0, accessories: 0, services: 0, errors: 0, breaks: 0, rude: 0, express: 0, wallSales: 0, lost: 0, browsed: 0, genius: 0, looked: 0, today: 0, waitSum: 0, waitN: 0 },
+    stats: { byKind: {}, orders: 0, delivered: 0, deliverySum: 0, fromWall: 0, errBar: 0, buyDone: 0, buyWon: 0, lostLine: 0, sickNow: 0, calledIn: 0, helped: 0, todayConv: 0, entered: 0, buyers: 0, sold: 0, accessories: 0, services: 0, errors: 0, breaks: 0, rude: 0, express: 0, wallSales: 0, lost: 0, browsed: 0, genius: 0, looked: 0, today: 0, waitSum: 0, waitN: 0 },
   };
   game.focus = { op: 0, sales: 0, cel: 0 };
+  game.orders = [];
   game.dd = null; game.tactic = 'equilibrio'; game.planning = false; game.checkpoint = false; game.history = [];
   game.arrivals = buildArrivals(opts.seed !== undefined ? opts.seed : Math.floor(nativeRandom() * 1e9), opts);
   game.briefing = true;
   document.getElementById('debrief').classList.remove('show');
   makeStaff();
-  if (opts.formation && opts.formation !== game.formation) changeFormation(opts.formation, 'open');
+  if (STRATEGY_ON && opts.formation && opts.formation !== game.formation) changeFormation(opts.formation, 'open');
   showBrief();
 }
 
@@ -664,6 +672,7 @@ function makeStaff() {
     ...floor.map((p, i) => ({ name: p.name, ...slotProps('floor', i) })),
     ...barOrder.map((name, i) => ({ name, ...slotProps('bar', i) })),
     ...here('creative').map((name, i) => ({ name, role: 'creative', home: CREATIVE_HOMES[i % CREATIVE_HOMES.length] })),
+    ...here('ops').map((name, i) => ({ name, role: 'ops', home: OPS_HOMES[i % OPS_HOMES.length] })),
   ];
   game.staff = people.map((p, i) => ({
     id: 'S' + i, ...p, tier: TEAM[p.name].tier, isStaff: true,
@@ -672,6 +681,7 @@ function makeStaff() {
     facing: p.post ? p.post.face : 'down', walk: 0, bubble: null, customer: null, served: 0, sessions: 0,
     stats: TEAM[p.name], start: { ...TEAM[p.name] },
   }));
+  game.staff.filter(x => x.role === 'ops').forEach(x => { x.hidden = true; x.x = BACK_DOOR.x; x.y = BACK_DOOR.y; });
   game.cover = [];
   game.nextRotation = OPEN + rand(60, 120);
 }
@@ -872,7 +882,8 @@ let progress = {};
 try { progress = JSON.parse(localStorage.getItem(SAVE_KEY)) || {}; } catch (e) { progress = {}; }
 const saveProgress = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(progress)); } catch (e) {} };
 const unlocked = i => i === 0 || (progress[i - 1] && progress[i - 1].stars > 0);
-const lever = k => !game.level || game.level.unlock.includes(k);
+const STRATEGY_ON = false;          // per ora niente scelte di strategia: formazione, tattica, DD e pause delle 13 e delle 16
+const lever = k => STRATEGY_ON && (!game.level || game.level.unlock.includes(k));
 
 // la squadra del livello: stessa partenza a ogni tentativo
 function presetTeam(L, r) {
@@ -951,7 +962,7 @@ function showBrief() {
   const stressed = game.staff.filter(x => x.stats.stress > 60).map(x => x.name).slice(0, 8);
   document.getElementById('brTeam').innerHTML =
     `In turno <b>${game.staff.length}</b> su ${Object.keys(TEAM).length}` + (game.offToday ? ` · a riposo ${game.offToday}` : '') + '<br>' +
-    [['floor', 'Vendita'], ['bar', 'Genius Bar'], ['creative', 'Creative']].map(([a, l]) => `${l}: ` +
+    [['floor', 'Vendita'], ['bar', 'Genius Bar'], ['creative', 'Creative'], ['ops', 'Operations']].map(([a, l]) => `${l}: ` +
       Object.keys(TIER).filter(k => TIER[k].area === a).map(k => `${game.staff.filter(x => x.tier === k).length} ${TIER[k].label}`).join(', ')).join('<br>') + '<br>' +
     `Team: motivazione <b>${avgTeam('mot')}</b> · stress <b>${avgTeam('stress')}</b> · competenza <b>${avgTeam('comp')}</b>` +
     (game.sick.length ? `<br>In malattia: <b>${game.sick.join(', ')}</b>` : '') +
@@ -964,7 +975,8 @@ function showBrief() {
     game.sick.length + game.vacation.length > 3 ? 'Siamo un po\' corti, organizziamoci bene.' : 'Giornata tranquilla, per ora.';
   document.getElementById('brSay').innerHTML = `<canvas class="ava" width="14" height="20"></canvas><div><b>${host.name}</b> <span class="sub">${TIER[host.tier].label}</span><br>«Stiamo aprendo! Oggi siamo in ${n}. ${mood} ${w.say}»</div>`;
   drawAvatar(document.querySelector('#brSay .ava'), host.look);
-  document.getElementById('brOpts').innerHTML = `<h3 class="big">Strategia iniziale</h3>${strategyHtml('open')}`;
+  const strat = strategyHtml('open');
+  document.getElementById('brOpts').innerHTML = strat ? `<h3 class="big">Strategia iniziale</h3>${strat}` : '';
   document.getElementById('brLeft').textContent = '';
   document.getElementById('brief').classList.add('show');
 }
@@ -1035,7 +1047,7 @@ function startDay(opts = {}) {
   game.dd = opts.dd ? { target: DD_TOPICS.find(x => x.key === opts.dd.topic).targets[0][0], format: 'breve', who: 'tutti', coach: '', ...opts.dd } : game.dd || null;
   game.briefing = false;
   document.getElementById('brief').classList.remove('show');
-  game.history = [`Apertura: ${[stratText(), game.dd ? `DD ${DD_TOPICS.find(x => x.key === game.dd.topic).name} (${DD_TOPICS.find(x => x.key === game.dd.topic).targets.find(x => x[0] === game.dd.target)[1]}, ${game.dd.format})` : (lever('dd') ? 'senza DD' : '')].filter(Boolean).join(', ')}`];
+  game.history = [`Apertura: ${[stratText() || 'formazione e ruoli decisi dalla squadra', game.dd ? `DD ${DD_TOPICS.find(x => x.key === game.dd.topic).name} (${DD_TOPICS.find(x => x.key === game.dd.topic).targets.find(x => x[0] === game.dd.target)[1]}, ${game.dd.format})` : (lever('dd') ? 'senza DD' : '')].filter(Boolean).join(', ')}`];
   const focus = game.focus;
   if (game.dd) {
     const d = game.dd, t = DD_TOPICS.find(x => x.key === d.topic), m = ddMult();
@@ -1152,7 +1164,7 @@ function log(msg) {
 // ─────────────────────────────────────────────────────────────
 function goTo(e, target) { e.path = findPath(e, target); e.dest = target; }
 function moveAlong(e, dt) {
-  let budget = WALK * (e.isStaff ? 1.15 : 1) * dt;
+  let budget = WALK * (e.role === 'ops' ? 1.9 : e.isStaff ? 1.15 : 1) * dt;
   let moved = false;
   while (budget > 0 && e.path.length) {
     const p = e.path[0], d = dist(e, p);
@@ -1338,10 +1350,12 @@ function survey(c) {
   else if (score === 5 && c.needKnown && n) text = pick([`${n} ha capito subito cosa mi serviva`, `${n} mi ha fatto provare proprio quello che cercavo`]);
   else if (score === 5) text = n ? pick([`Esperienza top, grazie a ${n}`, `${n} mi ha fatto provare tutto con calma`, `Seguito subito, grazie ${n}`])
     : 'Bel negozio, trovato tutto';
+  else if (score === 4 && c.dWait > 6) text = 'Bene, ma il prodotto ci ha messo un po\' ad arrivare';
   else if (score === 4) text = pick(['Tutto ok, niente di speciale', 'Bene, ma un po\' di attesa', 'Ho trovato quello che cercavo']);
   else if (c.outcome === 'lost') text = 'Ho aspettato e nessuno mi ha seguito';
   else if (c.error && c.recovered) text = 'Hanno sbagliato, ma hanno rimediato subito';
   else if (c.error) text = `${n} ha sbagliato qualcosa con me`;
+  else if (c.dWait > 8) text = 'Ho pagato e poi ho aspettato tanto il prodotto';
   else if (c.waited > 8) text = 'Troppa attesa';
   else if (c.rushed) text = `${n} andava di fretta`;
   else if (c.need && !c.needKnown) text = 'Mi hanno mostrato il prodotto, ma nessuno mi ha chiesto cosa mi serviva';
@@ -1378,16 +1392,17 @@ function leave(c, outcome) {
   c.exp += { bought: 10, fixed: 12, session: 5, helped: 8 }[outcome] || 0;
   if (c.servedBy && (outcome === 'bought' || outcome === 'fixed')) bump(c.servedBy, 'mot', 1);
   survey(c);
-  if (c.staff) { c.staff.customer = null; c.staff = null; }
+  if (c.staff) { if (c.staff.customer === c) c.staff.customer = null; c.staff = null; }
   c.state = 'leaving';
   goTo(c, { x: DOOR.x + rand(-30, 30), y: DOOR.y - 20 });
 }
 
-const WAIT_COST = { inLine: 0.6, waiting: 1.5, waitWall: 1.5, queued: 0.5, atBar: 0.8 };
+const WAIT_COST = { waitDelivery: 0.6, inLine: 0.6, waiting: 1.5, waitWall: 1.5, queued: 0.5, atBar: 0.8 };
 function updateCustomer(c, dt) {
   const arrived = moveAlong(c, dt);
   const cost = WAIT_COST[c.state];
   if (cost && !(c.state === 'atBar' && c.staff && c.staff.state === 'repair')) { c.exp -= cost * dt; c.waited += dt; }
+  if (c.state === 'waitDelivery') c.dWait = (c.dWait || 0) + dt;
   if (c.state === 'inLine' && game.lineIn.includes(c)) {
     if (c.linePatience === undefined) c.linePatience = rand(10, 18) * (rainy() ? 0.8 : 1);
     c.linePatience -= dt;
@@ -1516,6 +1531,7 @@ function dispatch() {
     s.customer = c; c.staff = s; s.state = 'toWallCustomer';
     goTo(s, { x: c.x + (c.side === 'L' ? 28 : -28), y: c.y + 30 });
   }
+  dispatchOps();
   // Genius Bar: chi aspetta tra gli alberi prende il primo posto libero
   const queued = game.customers.filter(c => c.state === 'queued').sort((a, b) => b.wait - a.wait);
   for (const c of queued) {
@@ -1538,11 +1554,50 @@ function dispatch() {
   }
 }
 
+// ── Consegne dal backstage. Quando un cliente compra, il prodotto arriva dal magazzino: lo porta il team
+// Operations. Se l'ordine non è ancora partito, un accessorio chiesto dopo viaggia insieme al prodotto;
+// se è già partito serve un secondo giro, e il cliente aspetta di nuovo.
+const opsOn = () => game.staff.filter(x => x.role === 'ops');
+function requestItem(c, what) {
+  c.pending = (c.pending || 0) + 1;
+  const open = game.orders.find(o => o.c === c && !o.ops && !o.done);
+  if (open) { open.items.push(what); return; }
+  game.orders.push({ c, items: [what], t0: game.time, ops: null, done: false });
+  game.stats.orders++;
+}
+function delivered(o) {
+  const c = o.c;
+  o.done = true;
+  game.stats.delivered++; game.stats.deliverySum += game.time - o.t0;
+  const k = !o.items.includes('product') ? 'acc' : o.c.product === 'iphone' ? 'iphone' : 'altri';
+  const d = game.stats.byKind[k] = game.stats.byKind[k] || { n: 0, sum: 0, max: 0 };
+  d.n++; d.sum += game.time - o.t0; d.max = Math.max(d.max, game.time - o.t0);
+  if (c.gone || c.outcome) return;
+  c.pending = Math.max(0, c.pending - o.items.length);
+  if (c.pending === 0 && c.state === 'waitDelivery') leave(c, 'bought');
+}
+function dispatchOps() {
+  game.orders = game.orders.filter(o => !o.done);
+  const queued = game.orders.filter(o => !o.ops);
+  if (!queued.length) return;
+  // se oggi in Operations non c'è più nessuno, il prodotto lo prende chi vende
+  if (!opsOn().length) { queued.forEach(delivered); return; }
+  for (const o of queued) {
+    const free = opsOn().filter(x => (x.state === 'idle' || x.state === 'wander' || x.state === 'returning') && !onBreak(x) && !x.wantsBreak);
+    if (!free.length) break;
+    // prima chi è già in backstage, poi chi sta tornando
+    free.sort((a, b) => b.hidden - a.hidden || dist(a, BACK_DOOR) - dist(b, BACK_DOOR));
+    const x = free[0];
+    o.ops = x; x.order = o; x.state = 'toBack';
+    if (x.hidden) x.path = []; else goTo(x, BACK_DOOR);
+  }
+}
+
 const REPAIR_TIME = [[6, 12], [12, 22], [25, 40]];
 const REPAIR_NAME = ['rapida', 'media', 'complessa'];
-const BUSY = new Set(['probe', 'demo', 'checkout', 'repair', 'advise', 'listening', 'escort', 'presenting', 'toCustomer', 'toWallCustomer', 'toBar']);
+const BUSY = new Set(['toBack', 'picking', 'delivering', 'handing', 'probe', 'demo', 'checkout', 'repair', 'advise', 'listening', 'escort', 'presenting', 'toCustomer', 'toWallCustomer', 'toBar']);
 // Point ed Express stressano più della vendita e degli accessori
-const ROLE_STRESS = { point: 1.3, express: 1.3, specialist: 1, accessori: 0.9, genius: 0.8, creative: 0.8 };
+const ROLE_STRESS = { point: 1.3, express: 1.3, specialist: 1, accessori: 0.9, genius: 0.8, creative: 0.8, ops: 1 };
 function updateStaff(s, dt) {
   const arrived = moveAlong(s, dt);
   const c = s.customer;
@@ -1597,8 +1652,14 @@ function updateStaff(s, dt) {
         if (Math.random() < 0.6 + 0.3 * s.stats.comp / 100 + (ddOn('business', 'accessori') ? 0.08 * ddMult() : 0) + (s.role === 'creative' && ddOn('creative', 'accessori') ? 0.15 * ddMult() : 0)) {
           s.served++; game.stats.wallSales++;
           say(s, 'check', 1); say(c, 'check', 1);
-          log(`${s.name} vende un accessorio alla parete ${c.side === 'L' ? 'sinistra' : 'destra'}`);
-          s.customer = null; leave(c, 'bought');
+          s.customer = null;
+          if (Math.random() < 0.35) {
+            log(`${s.name} vende un accessorio alla parete ${c.side === 'L' ? 'sinistra' : 'destra'}: arriva dal backstage`);
+            c.staff = null; requestItem(c, 'acc'); c.state = 'waitDelivery'; say(c, 'wait', 999);
+          } else {
+            log(`${s.name} vende un accessorio alla parete ${c.side === 'L' ? 'sinistra' : 'destra'}`);
+            leave(c, 'bought');
+          }
         } else { s.customer = null; leave(c, 'browsed'); }
         s.state = 'idle'; s.t = rand(1, 3);
       }
@@ -1640,6 +1701,7 @@ function updateStaff(s, dt) {
         const p = 0.4 + 0.15 * s.stats.comp / 100 + (c.needKnown ? 0.15 : 0) + (TIER[s.tier].sales || 0) + T(s).buy + (ddOn('product', c.product) ? 0.08 * ddMult() : 0) - Math.min(0.3, c.wait * 0.03);
         if (Math.random() < p) {
           s.state = 'checkout'; s.t = rand(2, 4) * pace(s); c.bought = true;
+          requestItem(c, 'product');
           say(s, 'check', s.t); say(c, 'check', s.t);
         } else {
           log(`Il cliente di ${s.name} ci pensa ancora`);
@@ -1656,6 +1718,8 @@ function updateStaff(s, dt) {
           c.accTried = true; s.t = rand(1.5, 3) * pace(s); say(s, 'bag', s.t);
           c.accName = c.needKnown ? c.need.acc : 'una custodia';
           c.accessory = Math.random() < (c.needKnown ? 0.8 : 0.4) + (ddOn('business', 'accessori') ? 0.1 * ddMult() : 0);
+          // a volte l'accessorio è sulla parete, a volte va preso in backstage
+          if (c.accessory) { if (Math.random() < 0.5) { game.stats.fromWall++; s.t += 1; } else requestItem(c, 'acc'); }
         } else if (!c.svcTried && Math.random() < attachChance(s) * 0.7 * (ddOn('business', 'applecare') ? 1 + 1.0 * ddMult() : 1)) {
           c.svcTried = true; s.t = rand(1.5, 3) * pace(s); say(s, 'shield', s.t);
           c.service = Math.random() < 0.5 + (ddOn('business', 'applecare') ? 0.2 * ddMult() : 0);
@@ -1682,6 +1746,43 @@ function updateStaff(s, dt) {
         leave(c, 'fixed');
         s.state = 'idle'; s.t = rand(1, 3); goTo(s, s.home);
       }
+      break;
+    case 'toBack':
+      if (arrived) {
+        // in magazzino l'iPhone è a portata di mano; iPad, Watch e Mac richiedono di più; un accessorio in più aggiunge poco
+        const c = s.order.c, main = s.order.items.includes('product') ? (PICK_TIME[c.product] || PICK_TIME.acc) : PICK_TIME.acc;
+        s.hidden = true; s.state = 'picking'; s.t = (rand(...main) + 0.4 * (s.order.items.length - 1)) * pace(s);
+      }
+      break;
+    case 'picking':
+      s.t -= dt;
+      if (s.t <= 0) {
+        const o = s.order, c = o.c;
+        s.hidden = false; s.x = BACK_DOOR.x; s.y = BACK_DOOR.y;
+        if (c.gone || c.outcome) { o.done = true; s.order = null; s.state = 'returning'; goTo(s, s.home); break; }
+        s.state = 'delivering'; say(s, 'bag', 99);
+        goTo(s, { x: c.x + (c.x > 700 ? -26 : 26), y: c.y + 22 });
+      }
+      break;
+    case 'delivering': {
+      const o = s.order, c = o.c;
+      if (c.gone || c.outcome) { o.done = true; s.order = null; s.bubble = null; s.state = 'returning'; goTo(s, s.home); break; }
+      if (arrived) {
+        if (dist(s, c) > 60) { goTo(s, { x: c.x + (c.x > 700 ? -26 : 26), y: c.y + 22 }); break; }
+        face(s, c); face(c, s); say(s, 'check', 1); if (c.pending > o.items.length) say(c, 'wait', 999); else say(c, 'heart', 1.5);
+        log(`${s.name} consegna ${o.items.includes('product') ? PRODUCT_NAME[c.product] || 'il prodotto' : 'l\'accessorio'}${o.items.length > 1 ? ' e l\'accessorio' : ''} dopo ${Math.round(game.time - o.t0)} minuti`);
+        s.served++; s.order = null;
+        delivered(o);
+        s.state = 'handing'; s.t = 0.5;
+      }
+      break;
+    }
+    case 'handing':
+      s.t -= dt;
+      if (s.t <= 0) { s.state = 'returning'; goTo(s, s.home); }
+      break;
+    case 'returning':
+      if (arrived) { s.state = 'idle'; s.hidden = true; }
       break;
     case 'toStage':
       if (arrived) { s.state = 'onStage'; s.facing = 'up'; }
@@ -1730,6 +1831,8 @@ function fallIll(s) {
     if (c.state === 'servedWall') { c.state = 'waitWall'; c.patience = 8; }
   }
   s.customer = null;
+  if (s.order) { s.order.ops = null; s.order = null; s.bubble = null; }
+  if (s.hidden && !onBreak(s)) { s.hidden = false; s.x = BACK_DOOR.x; s.y = BACK_DOOR.y; }
   if (s.seat) { s.seat.taken = null; s.seat = null; }
   // se doveva tenere una lezione, la prende un altro Creative
   for (const ses of game.sessions.filter(z => z.presenter === s && z.state !== 'done')) {
@@ -1902,8 +2005,9 @@ function finishSale(s, c, bought) {
     st.sold++;
     if (c.accessory) st.accessories++;
     if (c.service) st.services++;
-    log(`${s.name} vende ${PRODUCT_NAME[c.product]}${c.accessory ? ' + ' + c.accName : ''}${c.service ? ' + AppleCare' : ''}`);
-    leave(c, 'bought');
+    log(`${s.name} vende ${PRODUCT_NAME[c.product]}${c.accessory ? ' + ' + c.accName : ''}${c.service ? ' + AppleCare' : ''}${c.pending ? ': il cliente aspetta dal backstage' : ''}`);
+    if (c.pending) { c.state = 'waitDelivery'; c.staff = null; say(c, 'wait', 999); }
+    else leave(c, 'bought');
     if (c.accessory && c.service && leaderReady('sale') && Math.random() < 0.6) saleMoment(s, c);
   } else leave(c, 'browsed');
   s.customer = null; s.state = 'idle'; s.t = rand(1, 3);
@@ -2000,7 +2104,7 @@ function step(dt) {
   game.time += dt;
   if (before < OPEN && game.time >= OPEN) log(`Porte aperte: entrano ${spawnArrivals()} clienti che aspettavano fuori`);
   if (game.time >= game.nextRotation && game.time < CLOSE - 30) planRotation();
-  if (CHECKPOINTS.some(t => before < t && game.time >= t)) {
+  if (STRATEGY_ON && CHECKPOINTS.some(t => before < t && game.time >= t)) {
     if (window.autoCheckpoint) window.autoCheckpoint(game);       // per i test: la strategia cambia da sola
     else if (!window.autoCoach) { showCheckpoint(); return; }
   }
@@ -2074,6 +2178,9 @@ function endDay() {
     ['Servizi (AppleCare)', s.services],
     ['Accessori all\'Express (B1)', s.express],
     ['Accessori alle pareti', s.wallSales],
+    ['Consegne dal backstage', s.delivered],
+    ['Attesa media del prodotto', s.delivered ? (s.deliverySum / s.delivered).toFixed(1) + ' min' : '–'],
+    ['Accessori presi dalla parete', s.fromWall],
     ['Risolti al Genius Bar', s.genius],
     ['Aiutati ai tavoli C1 e C5', s.helped],
     ['Solo a guardare', s.looked + s.today],
@@ -2120,6 +2227,7 @@ const ICONS = {
   oops:     ['..r..', '..r..', '..r..', '.....', '..r..'],
   angry:    ['r...r', '.r.r.', '.....', '.rrr.', 'r...r'],
   shield:   ['bbbbb', 'bwwwb', 'bwbwb', '.bwb.', '..b..'],
+  wait:     ['kkkkk', '.kyk.', '..k..', '.kyk.', 'kkkkk'],
 };
 function drawIcon(name, x, y, size = 1) {
   if (name[0] === 'r' && FONT[name[1]]) {
@@ -2162,6 +2270,14 @@ function drawWall(w) { PLGraphics.drawAccessoryWall(ctx, w, SCALE); }
 function drawTree(t) { PLGraphics.drawTree(ctx, t, SCALE); }
 function drawFloor() { PLGraphics.drawFloor(ctx, { width: canvas.width, height: canvas.height, scale: SCALE }); }
 
+// la porta del backstage, in alto a sinistra
+function drawBackstage() {
+  const x = px(BACK_DOOR.x - 40), y = px(30), w = px(BACK_DOOR.x + 40) - x, h = px(62) - y;
+  rect(x, y, w, h, '#3a3f47');
+  rect(x, y + h - 1, w, 1, '#8a8f99');
+  rect(x + Math.floor(w / 2), y, 1, h - 1, '#23262c');
+  rect(x + 2, y + 2, 3, 2, '#6ab04c');
+}
 function drawScreen() {
   const s = SCREEN, x = px(s.x), y = px(s.y), w = px(s.x + s.w) - x, h = px(s.y + s.h) - y;
   rect(x - 2, y - 2, w + 4, h + 4, '#10151d');
@@ -2193,6 +2309,7 @@ function render() {
   SUPPORT.forEach(drawTable);
   STOOLS.forEach(drawStool);
   drawScreen();
+  drawBackstage();
   if (game.selected && game.selected.isTable) {
     const t = game.selected.table;
     ctx.strokeStyle = '#43d9ed'; ctx.lineWidth = 2;
@@ -2216,7 +2333,7 @@ function render() {
 const rows = list => list.map(([k, v]) => `<span>${k}</span><b>${v}</b>`).join('');
 const STATE_LABEL = {
   inLine: 'in fila per il Point', toPoint: 'va dal Point', talking: 'dice al Point cosa cerca', toTable: 'va al tavolo', waiting: 'aspetta qualcuno',
-  served: 'viene seguito', toQueue: 'va in attesa', queued: 'in coda per il Genius Bar', toBar: 'va al Genius Bar',
+  served: 'viene seguito', waitDelivery: 'aspetta il prodotto dal backstage', toQueue: 'va in attesa', queued: 'in coda per il Genius Bar', toBar: 'va al Genius Bar',
   atBar: 'al Genius Bar', toSession: 'va al Today at Apple', seated: 'si ferma al Today at Apple', toLook: 'va a guardare', looking: 'guarda i prodotti',
   toWall: 'va alla parete accessori', pickWall: 'sceglie un accessorio', waitWall: 'aspetta qualcuno alla parete', servedWall: 'viene consigliato',
   toWallCustomer: 'va da un cliente alla parete', advise: 'consiglia un accessorio', leaving: 'esce',
@@ -2225,8 +2342,9 @@ const STATE_LABEL = {
 huddle: 'momento di squadra', training: 'in formazione', toBreak: 'va in pausa', onBreak: 'in pausa', fromBreak: 'torna dalla pausa',
   toStage: 'va allo schermo', onStage: 'prepara la sessione', presenting: 'tiene la sessione',
 };
-const roleShort = x => x.state === 'leavingSick' ? 'va a casa' : onBreak(x) ? 'pausa' : x.slot !== undefined ? rotaOf(x)[x.slot].name : 'Today at Apple';
-const ROLE_LABEL = { point: 'Point', express: 'Cassa Express', accessori: 'Specialist accessori', specialist: 'Specialist', genius: 'Genius', creative: 'Creative' };
+const roleShort = x => x.state === 'leavingSick' ? 'va a casa' : onBreak(x) ? 'pausa' : x.slot !== undefined ? rotaOf(x)[x.slot].name : x.role === 'ops' ? OPS_LABEL[x.state] || 'Operations' : 'Today at Apple';
+const OPS_LABEL = { idle: 'in backstage', toBack: 'va in backstage', picking: 'prende un prodotto in backstage', delivering: 'consegna un prodotto', handing: 'consegna un prodotto', returning: 'torna al backstage' };
+const ROLE_LABEL = { point: 'Point', express: 'Cassa Express', accessori: 'Specialist accessori', specialist: 'Specialist', genius: 'Genius', creative: 'Creative', ops: 'Operations' };
 
 let lastPanel = 0;
 function updatePanel() {
@@ -2252,6 +2370,9 @@ function updatePanel() {
     ['Solo a guardare', s.looked + s.today],
     ['Fermi al Today', s.today],
     ['Persi', s.lost],
+    ['Aspettano il prodotto', game.customers.filter(c => c.state === 'waitDelivery').length],
+    ['Ordini in backstage', game.orders.filter(o => !o.done).length],
+    ['Attesa media del prodotto', s.delivered ? (s.deliverySum / s.delivered).toFixed(1) + ' min' : '–'],
   ]);
   document.getElementById('npsRow').innerHTML =
     `<span>NPS <span class="big">${fmtNps(nps())}</span></span><span>Vendita <b>${fmtNps(nps('vendita'))}</b></span><span>Bar <b>${fmtNps(nps('bar'))}</b></span><span>${game.reviews.length} commenti</span>`;
@@ -2261,7 +2382,7 @@ function updatePanel() {
   document.getElementById('reviews').innerHTML = game.reviews.slice(0, 8)
     .map(r => `<div><span class="score s${r.score}">${r.score}</span>${r.text} <span class="sub">${fmt(r.t)}</span></div>`).join('');
   const bar = (cls, v) => `<div class="bar ${cls}"><i style="width:${Math.round(v)}%"></i></div>`;
-  const AREAS = [['floor', 'Vendita'], ['bar', 'Genius Bar'], ['creative', 'Creative']];
+  const AREAS = [['floor', 'Vendita'], ['bar', 'Genius Bar'], ['creative', 'Creative'], ['ops', 'Operations']];
   document.getElementById('team').innerHTML = AREAS.map(([a, label]) => `<span class="tHead">${label}</span>` + game.staff.filter(x => TIER[x.tier].area === a)
     .map(x => `<span>${x.name} <span class="sub">${x.tier} · ${roleShort(x)}</span></span>${bar('bm', x.stats.mot)}${bar('bs', x.stats.stress)}${bar('bc', x.stats.comp)}`).join('')).join('') +
     `<span class="tHead sub">A riposo oggi: ${game.offToday}${game.vacation.length ? ' · in ferie: ' + game.vacation.join(', ') : ''}${game.sick.length ? ' · malati: ' + game.sick.join(', ') : ''} · formazione ${FORMATIONS[game.formation].name}</span>`;
@@ -2319,7 +2440,7 @@ function updateInfo(e, info) {
   if (!e || (!e.isStaff && !game.customers.includes(e))) { game.selected = null; info.innerHTML = ''; return; }
   if (e.isStaff) {
     info.innerHTML = `<b>${e.name}</b> · ${TIER[e.tier].label} · ${roleShort(e)}${e.nextSlot !== undefined ? ` <span class="sub">→ ${rotaOf(e)[e.nextSlot].name}</span>` : ''}<br>
-      <span class="sub">${STATE_LABEL[e.state] || e.state} · clienti seguiti oggi: ${e.served}</span><br>
+      <span class="sub">${(e.role === 'ops' && OPS_LABEL[e.state]) || STATE_LABEL[e.state] || e.state} · ${e.role === 'ops' ? 'consegne oggi' : 'clienti seguiti oggi'}: ${e.served}</span><br>
       <span class="sub">Motivazione <b>${Math.round(e.stats.mot)}</b> · Stress <b>${Math.round(e.stats.stress)}</b> · Competenza <b>${Math.round(e.stats.comp)}</b></span>`;
   } else {
     info.innerHTML = `<b>Cliente #${e.id}</b> · ${describe(e).replace('cliente ', '')}<br>
@@ -2351,6 +2472,7 @@ document.getElementById('speed').addEventListener('click', ev => {
 document.getElementById('dbRetry').addEventListener('click', () => { document.getElementById('debrief').classList.remove('show'); startLevel(game.levelIndex); });
 document.getElementById('dbNextLv').addEventListener('click', () => { document.getElementById('debrief').classList.remove('show'); startLevel(game.levelIndex + 1); });
 document.getElementById('dbLevels').addEventListener('click', showLevels);
+document.getElementById('dbLevels').hidden = !STRATEGY_ON;
 document.getElementById('nextDay').addEventListener('click', () => {
   document.getElementById('debrief').classList.remove('show');
   overnight(game.focus);
@@ -2394,7 +2516,7 @@ function drawIntro(dt) {
 document.getElementById('introGo').addEventListener('click', () => {
   intro.on = false;
   document.getElementById('intro').classList.remove('show');
-  showLevels();
+  if (STRATEGY_ON) showLevels(); else { seedRandom(null); newDay(7); }
 });
 if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) intro.typed = INTRO_LINE.length - 1;
 if (window.autoCoach) { intro.on = false; document.getElementById('intro').classList.remove('show'); }
