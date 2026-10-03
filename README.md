@@ -62,6 +62,18 @@ giorno, senza obiettivi.
 Per ora le scelte di strategia (formazione, tattica, DD, pause delle 13 e delle
 16) e i livelli sono nascosti: dopo la presentazione si apre direttamente la
 giornata. Il codice resta, si riaccendono con `STRATEGY_ON`.
+Le **vendite** hanno durate molto diverse, come nella realtà: chi sa già cosa
+vuole chiude in 5–8 minuti; una vendita normale (domande, demo, pagamento) dura
+circa un quarto d'ora; il **Trade In** aggiunge la valutazione dell'usato (6–12
+minuti, circa un iPhone su tre) e il **finanziamento** la pratica (8–15 minuti,
+soprattutto Mac e iPhone). In media una vendita con lo Specialist dura circa 15–16
+minuti, da 4 fino a circa 45.
+Dopo l'acquisto di un iPhone alcuni clienti si fermano al **Today at Apple** per
+il **trasferimento dei dati** o il recupero da **iCloud** (30–60 minuti, sugli
+sgabelli o in piedi se sono pieni): c'è chi trasferisce i dati e poi torna da uno
+Specialist con il vecchio telefono per il Trade In, chi fa subito il Trade In e
+recupera da iCloud in negozio, e chi va a casa. Alle 20 il negozio chiude e la
+giornata finisce: chi sta ancora trasferendo i dati li finisce a casa.
 Il **team Operations** (6 persone, due giorni liberi in settimana come gli altri)
 porta i prodotti dal **backstage**, dietro la porta in basso a sinistra, e li
 consegna allo **Specialist**, che resta col cliente ad aspettare (clessidra) e poi
