@@ -589,7 +589,7 @@ function newDay(dayOfMonth, opts = {}) {
     ].map(s => ({ ...s, end: s.start + 45, state: 'planned' })),
     reviews: [],
     kudos: 3, moment: null, momentTypes: [], momentsDone: 0, momentsMax: randi(2, 3), lastMoment: -999, lessons: [],
-    stats: { tradeIns: 0, finance: 0, batched: 0, byKind: {}, orders: 0, delivered: 0, deliverySum: 0, fromWall: 0, errBar: 0, buyDone: 0, buyWon: 0, lostLine: 0, sickNow: 0, calledIn: 0, helped: 0, todayConv: 0, entered: 0, buyers: 0, sold: 0, accessories: 0, services: 0, errors: 0, breaks: 0, rude: 0, express: 0, wallSales: 0, lost: 0, browsed: 0, genius: 0, looked: 0, today: 0, waitSum: 0, waitN: 0 },
+    stats: { setups: 0, tradeAfter: 0, tradeIns: 0, finance: 0, batched: 0, byKind: {}, orders: 0, delivered: 0, deliverySum: 0, fromWall: 0, errBar: 0, buyDone: 0, buyWon: 0, lostLine: 0, sickNow: 0, calledIn: 0, helped: 0, todayConv: 0, entered: 0, buyers: 0, sold: 0, accessories: 0, services: 0, errors: 0, breaks: 0, rude: 0, express: 0, wallSales: 0, lost: 0, browsed: 0, genius: 0, looked: 0, today: 0, waitSum: 0, waitN: 0 },
   };
   game.focus = { op: 0, sales: 0, cel: 0 };
   game.orders = [];
@@ -1437,11 +1437,12 @@ function updateCustomer(c, dt) {
       }
       break;
     case 'toTable':
-      if (arrived) { c.state = 'waiting'; c.patience = rand(5, 12) * (rainy() ? 0.8 : 1); c.wait = 0; c.facing = c.slot.x < c.slot.table.x ? 'right' : 'left'; say(c, 'question', 2); }
+      if (arrived) { c.state = 'waiting'; c.patience = c.tradeOnly ? rand(20, 30) : rand(5, 12) * (rainy() ? 0.8 : 1); c.wait = 0; c.facing = c.slot.x < c.slot.table.x ? 'right' : 'left'; say(c, 'question', 2); }
       break;
     case 'waiting':
       c.wait += dt; c.patience -= dt;
-      if (c.patience <= 0) leave(c, 'lost');
+      if (c.patience <= 0 && c.tradeOnly) { c.exp -= 15; log('Un cliente rinuncia al Trade In: nessuno è arrivato'); leave(c, 'bought'); }
+      else if (c.patience <= 0) leave(c, 'lost');
       else if (!c.bubble && Math.random() < dt * 0.25) say(c, 'question', 1.5);
       break;
     case 'toQueue':
@@ -1482,6 +1483,20 @@ function updateCustomer(c, dt) {
         c.state = 'seated'; c.facing = 'down'; c.t = rand(10, 30);
         game.stats.today++; log('Un cliente si ferma al Today at Apple');
       }
+      break;
+    case 'toSetup':
+      if (arrived) { c.state = 'setup'; c.facing = 'down'; c.t = rand(30, 60); say(c, 'cloud', 999); }
+      break;
+    case 'setup':
+      c.t -= dt;
+      if (c.t <= 0) {
+        c.setupDone = true; c.bubble = null;
+        if (c.setup === 'transferThenTrade') backForTrade(c);
+        else { say(c, 'heart', 1.5); leave(c, 'bought'); }
+      }
+      break;
+    case 'waitTrade':
+      if (SLOTS.some(x => !x.taken && (x.table.product === 'iphone' || x.table.product === 'help'))) backForTrade(c);
       break;
     case 'seated':
       c.t -= dt;
@@ -1590,7 +1605,7 @@ function delivered(o) {
   const sp = handTo(c);
   // lo Specialist che aspettava col cliente gli consegna il prodotto
   if (sp !== c) { sp.state = 'handover'; sp.t = 0.6; face(sp, c); say(sp, 'bag', 0.6); }
-  else leave(c, 'bought');
+  else afterPurchase(c);
 }
 function dispatchOps() {
   game.orders = game.orders.filter(o => !o.done);
@@ -1624,7 +1639,7 @@ function dispatchOps() {
 
 const REPAIR_TIME = [[6, 12], [12, 22], [25, 40]];
 const REPAIR_NAME = ['rapida', 'media', 'complessa'];
-const BUSY = new Set(['toBack', 'picking', 'delivering', 'handing', 'probe', 'demo', 'checkout', 'repair', 'advise', 'listening', 'escort', 'presenting', 'toCustomer', 'toWallCustomer', 'toBar']);
+const BUSY = new Set(['tradeOnly', 'toBack', 'picking', 'delivering', 'handing', 'probe', 'demo', 'checkout', 'repair', 'advise', 'listening', 'escort', 'presenting', 'toCustomer', 'toWallCustomer', 'toBar']);
 // Point ed Express stressano più della vendita e degli accessori
 const ROLE_STRESS = { point: 1.3, express: 1.3, specialist: 1, accessori: 0.9, genius: 0.8, creative: 0.8, ops: 1 };
 function updateStaff(s, dt) {
@@ -1698,6 +1713,11 @@ function updateStaff(s, dt) {
       if (!c || c.state !== 'waiting') { s.customer = null; s.state = 'idle'; s.t = 1; break; }
       if (arrived) {
         c.state = 'served'; serve(s, c); face(s, c);
+        if (c.tradeOnly) {
+          s.state = 'tradeOnly'; s.t = rand(6, 12) * pace(s); say(s, 'trade', s.t); say(c, 'iphone', 2);
+          log(`${s.name} fa il Trade In del vecchio telefono`);
+          break;
+        }
         if (c.kind === 'help') {
           s.state = 'helping'; s.t = rand(4, 9) * pace(s); say(s, 'question', 2); say(c, 'dots', s.t);
           break;
@@ -1753,7 +1773,7 @@ function updateStaff(s, dt) {
         } else if (!c.svcTried && Math.random() < attachChance(s) * 0.7 * (ddOn('business', 'applecare') ? 1 + 1.0 * ddMult() : 1)) {
           c.svcTried = true; s.t = rand(1.5, 3) * pace(s); say(s, 'shield', s.t);
           c.service = Math.random() < 0.5 + (ddOn('business', 'applecare') ? 0.2 * ddMult() : 0);
-        } else if (c.tradeIn && !c.tradeDone) {
+        } else if (c.tradeIn && !c.tradeDone && c.setup !== 'transferThenTrade') {
           c.tradeDone = true; s.t = rand(6, 12) * pace(s); say(s, 'trade', s.t); say(c, 'iphone', 2);
           log(`${s.name} valuta il vecchio dispositivo del cliente per il Trade In`);
         } else if (c.finance && !c.financeDone) {
@@ -1814,6 +1834,13 @@ function updateStaff(s, dt) {
       }
       break;
     }
+    case 'tradeOnly':
+      s.t -= dt;
+      if (s.t <= 0) {
+        if (c && !c.gone && !c.outcome) { game.stats.tradeIns++; game.stats.tradeAfter++; say(c, 'heart', 1.5); s.customer = null; c.staff = null; leave(c, 'bought'); }
+        s.served++; s.customer = null; s.state = 'idle'; s.t = rand(1, 3);
+      }
+      break;
     case 'waitProduct':
       if (!c || c.gone || c.outcome) { s.customer = null; s.bubble = null; s.state = 'idle'; s.t = 1; }
       break;
@@ -1821,7 +1848,7 @@ function updateStaff(s, dt) {
       s.t -= dt;
       if (s.t <= 0) {
         s.bubble = null; say(s, 'check', 1);
-        if (c && !c.gone && !c.outcome) { say(c, 'heart', 1.5); leave(c, 'bought'); }
+        if (c && !c.gone && !c.outcome) { say(c, 'heart', 1.5); c.staff = null; s.customer = null; afterPurchase(c); }
         s.customer = null; s.state = 'idle'; s.t = rand(1, 3);
       }
       break;
@@ -2047,6 +2074,29 @@ document.getElementById('mBody').addEventListener('click', ev => {
   renderMoment();
 });
 
+// ── Dopo l'acquisto. Il trasferimento dei dati da telefono a telefono, o il recupero da iCloud,
+// richiede 30–60 minuti: c'è chi lo fa al Today at Apple. Chi ha rimandato il Trade In, finito il
+// trasferimento torna da uno Specialist con il vecchio telefono.
+function afterPurchase(c) {
+  if (!c.setup || c.setupDone) { leave(c, 'bought'); return; }
+  releaseSlot(c);
+  const seat = STOOLS.find(x => !x.taken);
+  const spot = seat || { x: rand(470, 930), y: rand(1440, 1700) };   // se gli sgabelli sono pieni si resta in piedi lì vicino
+  if (seat) { seat.taken = c; c.slot = seat; } else c.standing = true;
+  c.state = 'toSetup'; c.bubble = null; goTo(c, spot);
+  game.stats.setups++;
+  log(`Un cliente va al Today at Apple per ${c.setup === 'icloud' ? 'recuperare i dati da iCloud' : 'trasferire i dati sul nuovo iPhone'}`);
+}
+function backForTrade(c) {
+  releaseSlot(c);
+  const free = SLOTS.filter(x => !x.taken && (x.table.product === 'iphone' || x.table.product === 'help'));
+  if (!free.length) { c.state = 'waitTrade'; return; }               // tutti i tavoli occupati: aspetta al Today at Apple
+  const slot = free.sort((a, b) => dist(a, c) - dist(b, c))[0];
+  slot.taken = c; c.slot = slot; c.tradeOnly = true; c.wait = 0;
+  c.state = 'toTable'; goTo(c, slot);
+  log('Trasferimento finito: il cliente porta il vecchio telefono a uno Specialist per il Trade In');
+}
+
 function finishSale(s, c, bought) {
   const st = game.stats;
   s.served++;
@@ -2058,7 +2108,7 @@ function finishSale(s, c, bought) {
     if (c.financeDone) st.finance++;
     log(`${s.name} vende ${PRODUCT_NAME[c.product]}${c.accessory ? ' + ' + c.accName : ''}${c.service ? ' + AppleCare' : ''}${c.pending ? ': il cliente aspetta dal backstage' : ''}`);
     if (c.pending) { c.state = 'waitDelivery'; say(c, 'wait', 999); s.state = 'waitProduct'; say(s, 'wait', 999); }
-    else leave(c, 'bought');
+    else { c.staff = null; s.customer = null; afterPurchase(c); }
     if (c.accessory && c.service && leaderReady('sale') && Math.random() < 0.6) saleMoment(s, c);
     if (c.pending) return;
   } else leave(c, 'browsed');
@@ -2135,6 +2185,12 @@ function buildArrivals(seed, opts = {}) {
       extra.fast = r() < 0.32;
       extra.tradeIn = r() < ({ iphone: 0.33, ipad: 0.12, mac: 0.1 }[extra.product] || 0);
       extra.finance = r() < ({ mac: 0.18, iphone: 0.1, ipad: 0.08 }[extra.product] || 0.03);
+      // dopo l'acquisto di un iPhone: c'è chi trasferisce i dati al Today at Apple e poi fa il Trade In,
+      // chi fa subito il Trade In e recupera da iCloud al Today at Apple, chi va a casa
+      if (extra.product === 'iphone') {
+        const q = r();
+        extra.setup = extra.tradeIn ? (q < 0.4 ? 'transferThenTrade' : q < 0.65 ? 'icloud' : null) : (q < 0.25 ? 'transfer' : null);
+      }
     }
     if (kind === 'genius') { const x = r(); extra.repair = x < repairs[0] ? 0 : x < repairs[0] + repairs[1] ? 1 : 2; }
     list.push({ t, kind, extra });
@@ -2190,7 +2246,7 @@ function step(dt) {
 
   if (before < CLOSE && game.time >= CLOSE) {
     log('Chiusura: si finisce con chi è dentro');
-    game.customers.filter(c => ['waiting', 'queued', 'inLine', 'looking', 'toLook', 'seated', 'toWall', 'pickWall', 'waitWall'].includes(c.state)).forEach(c => leave(c, c.kind === 'look' ? 'looked' : 'browsed'));
+    game.customers.filter(c => ['waiting', 'queued', 'inLine', 'looking', 'toLook', 'seated', 'toWall', 'pickWall', 'waitWall'].includes(c.state)).forEach(c => leave(c, c.kind === 'look' ? 'looked' : c.tradeOnly ? 'bought' : 'browsed'));
   }
   if (game.time >= CLOSE && game.customers.length === 0) endDay();
 }
@@ -2235,6 +2291,8 @@ function endDay() {
     ['Con accessorio', s.accessories],
     ['Servizi (AppleCare)', s.services],
     ['Trade In · finanziamenti', `${s.tradeIns} · ${s.finance}`],
+    ['Dati trasferiti al Today at Apple', s.setups],
+    ['…poi tornati per il Trade In', s.tradeAfter],
     ['Accessori all\'Express (B1)', s.express],
     ['Accessori alle pareti', s.wallSales],
     ['Consegne dal backstage', s.delivered],
@@ -2290,6 +2348,7 @@ const ICONS = {
   wait:     ['kkkkk', '.kyk.', '..k..', '.kyk.', 'kkkkk'],
   trade:    ['.g...', 'ggggg', '.g.b.', 'bbbbb', '...b.'],
   card:     ['bbbbb', 'kkkkk', 'bbbbb', 'bwwbb', 'bbbbb'],
+  cloud:    ['.bb..', 'bbbb.', 'bbbbb', '..k..', '.kkk.'],
 };
 function drawIcon(name, x, y, size = 1) {
   if (name[0] === 'r' && FONT[name[1]]) {
@@ -2395,7 +2454,7 @@ function render() {
 const rows = list => list.map(([k, v]) => `<span>${k}</span><b>${v}</b>`).join('');
 const STATE_LABEL = {
   inLine: 'in fila per il Point', toPoint: 'va dal Point', talking: 'dice al Point cosa cerca', toTable: 'va al tavolo', waiting: 'aspetta qualcuno',
-  served: 'viene seguito', waitDelivery: 'aspetta il prodotto dal backstage', waitProduct: 'aspetta il prodotto col cliente', handover: 'consegna il prodotto al cliente', toQueue: 'va in attesa', queued: 'in coda per il Genius Bar', toBar: 'va al Genius Bar',
+  served: 'viene seguito', toSetup: 'va al Today at Apple per i dati', setup: 'trasferisce i dati al Today at Apple', waitTrade: 'aspetta un tavolo libero per il Trade In', tradeOnly: 'fa il Trade In del vecchio telefono', waitDelivery: 'aspetta il prodotto dal backstage', waitProduct: 'aspetta il prodotto col cliente', handover: 'consegna il prodotto al cliente', toQueue: 'va in attesa', queued: 'in coda per il Genius Bar', toBar: 'va al Genius Bar',
   atBar: 'al Genius Bar', toSession: 'va al Today at Apple', seated: 'si ferma al Today at Apple', toLook: 'va a guardare', looking: 'guarda i prodotti',
   toWall: 'va alla parete accessori', pickWall: 'sceglie un accessorio', waitWall: 'aspetta qualcuno alla parete', servedWall: 'viene consigliato',
   toWallCustomer: 'va da un cliente alla parete', advise: 'consiglia un accessorio', leaving: 'esce',

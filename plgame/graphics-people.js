@@ -16,7 +16,7 @@
     const look = entity.look;
     if (!look) return;
     const footX = Math.round(entity.x / scale), footY = Math.round(entity.y / scale);
-    const seated = entity.state === 'seated' || (entity.state === 'training' && !entity.path.length);
+    const seated = entity.state === 'seated' || (entity.state === 'training' && !entity.path.length) || (entity.state === 'setup' && !entity.standing);
     const moving = entity.path.length > 0;
     const frame = moving ? Math.floor(entity.walk) % 4 : -1;
     const x = footX - 6, y = footY - (seated ? 14 : 18);
